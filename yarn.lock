@@ -4192,6 +4192,7 @@ __metadata:
     prettier: ^2.6.2
     prom-client: ^14.1.0
     rimraf: ^3.0.2
+    simple-cache: ^0.1.1
     sinon: ^14.0.0
     ts-node: ^10.7.0
     typescript: ^4.7.4
@@ -4686,6 +4687,13 @@ __metadata:
   version: 3.0.7
   resolution: "signal-exit@npm:3.0.7"
   checksum: a2f098f247adc367dffc27845853e9959b9e88b01cb301658cfe4194352d8d2bb32e18467c786a7fe15f1d44b233ea35633d076d5e737870b7139949d1ab6318
+  languageName: node
+  linkType: hard
+
+"simple-cache@npm:^0.1.1":
+  version: 0.1.1
+  resolution: "simple-cache@npm:0.1.1"
+  checksum: 70d34a2526f10143ff3ae5e03a154b35184619645643fe2c262556c53150cb10c6f862497e1cc06cc70d8e63de95481d40fb75745b6542a3de1d2eea5ebb5ab9
   languageName: node
   linkType: hard
 
