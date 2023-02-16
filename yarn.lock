@@ -5,6 +5,15 @@ __metadata:
   version: 6
   cacheKey: 8
 
+"@alexsasharegan/simple-cache@npm:^3.3.3":
+  version: 3.3.3
+  resolution: "@alexsasharegan/simple-cache@npm:3.3.3"
+  dependencies:
+    safe-types: ^4.17.0
+  checksum: 2cfec6d545284c1a3d180d16562e856e4770357d3a6958ac441c2742a4c1888a06eec23ce731f264755c66f48b0ea36c133b310994773790476e37769a575545
+  languageName: node
+  linkType: hard
+
 "@ampproject/remapping@npm:^2.1.0":
   version: 2.2.0
   resolution: "@ampproject/remapping@npm:2.2.0"
@@ -4161,6 +4170,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "payment-service@workspace:."
   dependencies:
+    "@alexsasharegan/simple-cache": ^3.3.3
     "@istanbuljs/nyc-config-typescript": ^1.0.2
     "@koa/cors": ^4.0.0
     "@trivago/prettier-plugin-sort-imports": ^3.3.0
@@ -4192,7 +4202,6 @@ __metadata:
     prettier: ^2.6.2
     prom-client: ^14.1.0
     rimraf: ^3.0.2
-    simple-cache: ^0.1.1
     sinon: ^14.0.0
     ts-node: ^10.7.0
     typescript: ^4.7.4
@@ -4599,6 +4608,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"safe-types@npm:^4.17.0":
+  version: 4.27.0
+  resolution: "safe-types@npm:4.27.0"
+  checksum: 1b00f555995edaffbdc1cc7c282d15fc0956f9e5b68d8cc5cebadc945e58c33f0107dca5390e3e425938e4381a1b1ada1f5b57d778662713e7988a38b8541203
+  languageName: node
+  linkType: hard
+
 "safer-buffer@npm:>= 2.1.2 < 3.0.0":
   version: 2.1.2
   resolution: "safer-buffer@npm:2.1.2"
@@ -4687,13 +4703,6 @@ __metadata:
   version: 3.0.7
   resolution: "signal-exit@npm:3.0.7"
   checksum: a2f098f247adc367dffc27845853e9959b9e88b01cb301658cfe4194352d8d2bb32e18467c786a7fe15f1d44b233ea35633d076d5e737870b7139949d1ab6318
-  languageName: node
-  linkType: hard
-
-"simple-cache@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "simple-cache@npm:0.1.1"
-  checksum: 70d34a2526f10143ff3ae5e03a154b35184619645643fe2c262556c53150cb10c6f862497e1cc06cc70d8e63de95481d40fb75745b6542a3de1d2eea5ebb5ab9
   languageName: node
   linkType: hard
 
