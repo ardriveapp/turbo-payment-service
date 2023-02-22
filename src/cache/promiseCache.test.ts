@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { PromiseCache } from "./promiseCache";
 
 describe("PromiseCache class", () => {
-  it("constructor to take a capacity that is not exceeded by excessive puts", async () => {
+  it("constructor takes take a capacity that is not exceeded by excessive puts", async () => {
     const cache = new PromiseCache<string, string>(1);
     cache.put("1", Promise.resolve("one"));
     cache.put("2", Promise.resolve("two"));
@@ -110,6 +110,16 @@ describe("PromiseCache class", () => {
     it("returns an input object as its JSON representation", async () => {
       const cache = new PromiseCache<Record<string, string>, string>(1);
       expect(cache.cacheKeyString({ foo: "bar" })).to.equal('{"foo":"bar"}');
+    });
+  });
+
+  describe("time to live", () => {
+    it("purges all entries after ttl", async () => {
+      const cache = new PromiseCache<string, string>(1, 10);
+      cache.put("1", Promise.resolve("one"));
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      expect(cache.get("1")).to.be.undefined;
+      expect(cache.size()).to.equal(0);
     });
   });
 });
