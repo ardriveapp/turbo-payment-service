@@ -16,6 +16,13 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
   }
 
   async getARForBytes(bytes: number): Promise<number> {
+    const roundToChunkSize = (bytes: number) => {
+      const chunkSize = 256 * 1024;
+      return Math.ceil(bytes / chunkSize) * chunkSize;
+    };
+
+    bytes = roundToChunkSize(bytes);
+
     const cached = this.cache.get(bytes);
     if (cached) {
       return cached;
@@ -40,7 +47,6 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
         logger.error(`Error getting AR price`, error);
         throw error;
       });
-
     return this.cache.put(bytes, result);
   }
 }

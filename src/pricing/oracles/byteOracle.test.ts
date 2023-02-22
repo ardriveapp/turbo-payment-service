@@ -31,7 +31,7 @@ describe("ArweaveBytesToAROracle", () => {
     it("should not cache the result for different bytes", async () => {
       const oracle = new ArweaveBytesToAROracle();
       const bytes1 = 1024;
-      const bytes2 = 2048;
+      const bytes2 = Math.pow(2, 19);
       const arPrice1 = await oracle.getARForBytes(bytes1);
       const arPrice2 = await oracle.getARForBytes(bytes2);
       expect(arPrice1).to.not.equal(arPrice2);
