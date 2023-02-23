@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { OracleCache } from "./oracleCache";
 
 describe("OracleCache class", () => {
-  it("constructor takes take a capacity that is not exceeded by excessive puts", async () => {
+  it("constructor takes a capacity that is not exceeded by excessive puts", async () => {
     const cache = new OracleCache<string, string>(1);
     cache.put("1", "one");
     cache.put("2", "two");
