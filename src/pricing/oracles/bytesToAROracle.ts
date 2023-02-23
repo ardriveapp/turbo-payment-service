@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosInstance } from "axios";
 import axiosRetry from "axios-retry";
 
 import { OracleCache } from "../../cache/oracleCache";
@@ -10,35 +10,36 @@ export interface BytesToAROracle {
 
 export class ArweaveBytesToAROracle implements BytesToAROracle {
   private readonly cache: OracleCache<number, number>;
+  private readonly axiosInstance: AxiosInstance;
 
-  constructor() {
+  constructor(axiosInstance?: AxiosInstance) {
     this.cache = new OracleCache(1000);
+    this.axiosInstance = axiosInstance ?? axios.create();
   }
+  roundToChunkSize = (bytes: number) => {
+    const chunkSize = 256 * 1024;
+    return Math.ceil(bytes / chunkSize) * chunkSize;
+  };
 
   async getARForBytes(bytes: number): Promise<number> {
-    const roundToChunkSize = (bytes: number) => {
-      const chunkSize = 256 * 1024;
-      return Math.ceil(bytes / chunkSize) * chunkSize;
-    };
-
-    bytes = roundToChunkSize(bytes);
+    bytes = this.roundToChunkSize(bytes);
 
     const cached = this.cache.get(bytes);
     if (cached) {
       return cached;
     }
 
-    axiosRetry(axios, {
+    axiosRetry(this.axiosInstance, {
       retries: 8,
       retryDelay: axiosRetry.exponentialDelay,
     });
 
-    const result: number = await axios
+    const result: number = await this.axiosInstance
       .get(`https://arweave.net/price/${bytes}`)
       .then((response) => {
         if (response.status !== 200) {
           throw new Error(
-            `Coingecko API returned status code ${response.status}`
+            `arweave.net returned status code ${response.status}`
           );
         }
         return response.data;

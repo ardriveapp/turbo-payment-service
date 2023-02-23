@@ -52,6 +52,7 @@
     "@alexsasharegan/simple-cache": "^3.3.3",
     "@koa/cors": "^4.0.0",
     "axios": "0.27.2",
+    "axios-mock-adapter": "^1.21.2",
     "axios-retry": "^3.4.0",
     "bignumber.js": "^9.1.0",
     "knex": "2.4.0",

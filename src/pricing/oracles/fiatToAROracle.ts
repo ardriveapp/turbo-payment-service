@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosInstance } from "axios";
 import axiosRetry from "axios-retry";
 
 import { OracleCache } from "../../cache/oracleCache";
@@ -10,9 +10,11 @@ export interface FiatToAROracle {
 
 export class CoingeckoFiatToAROracle implements FiatToAROracle {
   private readonly cache: OracleCache<string, number>;
+  private readonly axiosInstance: AxiosInstance;
 
-  constructor() {
+  constructor(axiosInstance?: AxiosInstance) {
     this.cache = new OracleCache(1000);
+    this.axiosInstance = axiosInstance ?? axios;
   }
 
   async getARForFiat(fiat: string): Promise<number> {
@@ -21,12 +23,12 @@ export class CoingeckoFiatToAROracle implements FiatToAROracle {
       return cached;
     }
 
-    axiosRetry(axios, {
+    axiosRetry(this.axiosInstance, {
       retries: 8,
       retryDelay: axiosRetry.exponentialDelay,
     });
 
-    const result: number = await axios
+    const result: number = await this.axiosInstance
       .get(
         `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
       )
