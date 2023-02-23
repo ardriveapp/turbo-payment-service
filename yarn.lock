@@ -5,6 +5,15 @@ __metadata:
   version: 6
   cacheKey: 8
 
+"@alexsasharegan/simple-cache@npm:^3.3.3":
+  version: 3.3.3
+  resolution: "@alexsasharegan/simple-cache@npm:3.3.3"
+  dependencies:
+    safe-types: ^4.17.0
+  checksum: 2cfec6d545284c1a3d180d16562e856e4770357d3a6958ac441c2742a4c1888a06eec23ce731f264755c66f48b0ea36c133b310994773790476e37769a575545
+  languageName: node
+  linkType: hard
+
 "@ampproject/remapping@npm:^2.1.0":
   version: 2.2.0
   resolution: "@ampproject/remapping@npm:2.2.0"
@@ -4161,6 +4170,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "payment-service@workspace:."
   dependencies:
+    "@alexsasharegan/simple-cache": ^3.3.3
     "@istanbuljs/nyc-config-typescript": ^1.0.2
     "@koa/cors": ^4.0.0
     "@trivago/prettier-plugin-sort-imports": ^3.3.0
@@ -4595,6 +4605,13 @@ __metadata:
   version: 2.4.2
   resolution: "safe-stable-stringify@npm:2.4.2"
   checksum: 0324ba2e40f78cae63e31a02b1c9bdf1b786621f9e8760845608eb9e81aef401944ac2078e5c9c1533cf516aea34d08fa8052ca853637ced84b791caaf1e394e
+  languageName: node
+  linkType: hard
+
+"safe-types@npm:^4.17.0":
+  version: 4.27.0
+  resolution: "safe-types@npm:4.27.0"
+  checksum: 1b00f555995edaffbdc1cc7c282d15fc0956f9e5b68d8cc5cebadc945e58c33f0107dca5390e3e425938e4381a1b1ada1f5b57d778662713e7988a38b8541203
   languageName: node
   linkType: hard
 
