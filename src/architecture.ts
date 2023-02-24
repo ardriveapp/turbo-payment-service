@@ -13,8 +13,11 @@ export const defaultArch: Architecture = {
     },
   },
   pricingService: {
-    helloWorld() {
-      return Promise.resolve(777);
+    getARCForFiat() {
+      return Promise.resolve(0);
+    },
+    getARCForBytes() {
+      return Promise.resolve(0);
     },
   },
 };

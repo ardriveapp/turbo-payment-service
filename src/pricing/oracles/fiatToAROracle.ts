@@ -28,26 +28,25 @@ export class CoingeckoFiatToAROracle implements FiatToAROracle {
       retryDelay: axiosRetry.exponentialDelay,
     });
 
-    const result: number = await this.axiosInstance
-      .get(
+    try {
+      const result = await this.axiosInstance.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
-      )
-      .then((response) => {
-        if (response.status !== 200) {
-          throw new Error(
-            `Coingecko API returned status code ${response.status}`
-          );
-        }
-        return response.data.arweave[fiat];
-      })
-      .catch((error) => {
-        logger.error(
-          `Error getting AR price in ${fiat} from Coingecko API`,
-          error
-        );
-        throw error;
-      });
+      );
 
-    return this.cache.put(fiat, result);
+      if (result.data.arweave[fiat]) {
+        const fiatPrice = result.data.arweave[fiat];
+        return this.cache.put(fiat, fiatPrice);
+      } else {
+        throw new Error(
+          `coingecko returned bad response ${result.data.arweave[fiat]}`
+        );
+      }
+    } catch (error) {
+      logger.error(
+        `Error getting AR price in ${fiat} from Coingecko API`,
+        error
+      );
+      throw error;
+    }
   }
 }

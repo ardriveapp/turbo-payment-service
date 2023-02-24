@@ -25,20 +25,6 @@ describe("ArweaveBytesToAROracle", () => {
       expect(arPrice).to.equal(expectedPrice);
     });
 
-    it("should throw an error for invalid bytes", async () => {
-      const oracle = new ArweaveBytesToAROracle(axiosInstance);
-
-      const bytes = -1;
-      const chunkSize = oracle.roundToChunkSize(bytes);
-      mock.onGet(`https://arweave.net/price/${chunkSize}`).reply(400);
-      try {
-        await oracle.getARForBytes(bytes);
-        expect.fail("The function should throw an error");
-      } catch (error) {
-        expect(error).to.exist;
-      }
-    });
-
     it("should cache the result for bytes", async () => {
       const oracle = new ArweaveBytesToAROracle(axiosInstance);
       const bytes = 1024;

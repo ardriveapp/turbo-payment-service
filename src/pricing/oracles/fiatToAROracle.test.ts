@@ -29,8 +29,9 @@ describe("CoingeckoFiatToAROracle", () => {
     });
 
     it("should throw an error for an invalid fiat currency", async () => {
+      // COINGECKO API returns an empty object with status 200 for invalid fiat currencies
       const oracle = new CoingeckoFiatToAROracle(axiosInstance);
-      mock.onGet().reply(400);
+      mock.onGet().reply(200, { arweave: {} });
 
       try {
         await oracle.getARForFiat("invalid-fiat");

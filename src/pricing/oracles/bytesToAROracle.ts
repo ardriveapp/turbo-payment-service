@@ -34,20 +34,18 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
       retryDelay: axiosRetry.exponentialDelay,
     });
 
-    const result: number = await this.axiosInstance
-      .get(`https://arweave.net/price/${bytes}`)
-      .then((response) => {
-        if (response.status !== 200) {
-          throw new Error(
-            `arweave.net returned status code ${response.status}`
-          );
-        }
-        return response.data;
-      })
-      .catch((error) => {
-        logger.error(`Error getting AR price`, error);
-        throw error;
-      });
-    return this.cache.put(bytes, result);
+    try {
+      const response = await this.axiosInstance.get(
+        `https://arweave.net/price/${bytes}`
+      );
+      if (typeof response.data === "number") {
+        return this.cache.put(bytes, response.data);
+      } else {
+        throw new Error(`arweave.net returned bad response ${response.data}`);
+      }
+    } catch (error) {
+      logger.error(`Error getting AR price`, error);
+      throw error;
+    }
   }
 }
