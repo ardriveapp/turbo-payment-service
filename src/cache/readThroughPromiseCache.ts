@@ -3,9 +3,18 @@ import { PromiseCache } from "./promiseCache";
 
 export class ReadThroughPromiseCache<K, V> {
   private readonly cache: PromiseCache<K, V>;
-
-  constructor(cacheCapacity: number, cacheTTL?: number) {
+  private readonly readThroughFunction: (key: K) => Promise<V>;
+  constructor({
+    cacheCapacity,
+    cacheTTL,
+    readThroughFunction,
+  }: {
+    cacheCapacity: number;
+    readThroughFunction: (key: K) => Promise<V>;
+    cacheTTL?: number;
+  }) {
     this.cache = new PromiseCache(cacheCapacity, cacheTTL);
+    this.readThroughFunction = readThroughFunction;
   }
 
   /*
@@ -19,17 +28,18 @@ export class ReadThroughPromiseCache<K, V> {
      }
   */
 
-  get(key: K, readThroughFunction: () => Promise<V>): Promise<V> {
+  get(key: K): Promise<V> {
     const cachedValue = this.cache.get(key);
     if (cachedValue) {
       return cachedValue;
     }
 
-    const valuePromise = readThroughFunction();
+    const valuePromise = this.readThroughFunction(key);
 
     valuePromise.catch((err) => {
       logger.error(`Error getting value for key ${key}`, err);
       this.cache.remove(key);
+      throw err;
     });
 
     this.cache.put(key, valuePromise);

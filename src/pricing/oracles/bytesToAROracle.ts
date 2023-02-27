@@ -13,6 +13,10 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
 
   constructor(axiosInstance?: AxiosInstance) {
     this.axiosInstance = axiosInstance ?? axios.create();
+    axiosRetry(this.axiosInstance, {
+      retries: 8,
+      retryDelay: axiosRetry.exponentialDelay,
+    });
   }
   roundToChunkSize = (bytes: number) => {
     const chunkSize = 256 * 1024;
@@ -21,11 +25,6 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
 
   async getARForBytes(bytes: number): Promise<number> {
     bytes = this.roundToChunkSize(bytes);
-
-    axiosRetry(this.axiosInstance, {
-      retries: 8,
-      retryDelay: axiosRetry.exponentialDelay,
-    });
 
     try {
       const response = await this.axiosInstance.get(

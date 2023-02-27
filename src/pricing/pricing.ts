@@ -16,10 +16,13 @@ export class TurboPricingService implements PricingService {
   private readonly bytesToAROracle: ReadThroughBytesToArOracle;
   private readonly fiatToAROracle: ReadThroughFiatToArOracle;
 
-  constructor(
-    bytesToAROracle: ReadThroughBytesToArOracle,
-    fiatToAROracle: ReadThroughFiatToArOracle
-  ) {
+  constructor({
+    bytesToAROracle,
+    fiatToAROracle,
+  }: {
+    bytesToAROracle: ReadThroughBytesToArOracle;
+    fiatToAROracle: ReadThroughFiatToArOracle;
+  }) {
     this.bytesToAROracle = bytesToAROracle;
     this.fiatToAROracle = fiatToAROracle;
   }

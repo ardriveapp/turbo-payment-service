@@ -12,15 +12,14 @@ export class CoingeckoFiatToAROracle implements FiatToAROracle {
   private readonly axiosInstance: AxiosInstance;
 
   constructor(axiosInstance?: AxiosInstance) {
-    this.axiosInstance = axiosInstance ?? axios;
-  }
-
-  async getARForFiat(fiat: string): Promise<number> {
+    this.axiosInstance = axiosInstance ?? axios.create();
     axiosRetry(this.axiosInstance, {
       retries: 8,
       retryDelay: axiosRetry.exponentialDelay,
     });
+  }
 
+  async getARForFiat(fiat: string): Promise<number> {
     try {
       const result = await this.axiosInstance.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
