@@ -50,25 +50,21 @@ export class ReadThroughFiatToArOracle {
     number
   >;
 
+  private getARForFiatFromOracle = async (fiat: string) => {
+    //TODO Get from elasticache first
+    return this.oracle.getARForFiat(fiat);
+  };
+
   constructor(oracle: FiatToAROracle) {
     this.oracle = oracle;
-    this.readThroughPromiseCache = new ReadThroughPromiseCache(10);
+    this.readThroughPromiseCache = new ReadThroughPromiseCache({
+      cacheCapacity: 10,
+      readThroughFunction: this.getARForFiatFromOracle,
+    });
   }
 
   async getARForFiat(fiat: string): Promise<number> {
-    const readThroughFunction = async () => {
-      // NO NESTING!
-      // try elasticcache
-      // if hit, return it
-      // else try fiatOracle
-
-      return this.oracle.getARForFiat(fiat);
-    };
-
-    const cachedValue = this.readThroughPromiseCache.get(
-      fiat.toString(),
-      readThroughFunction
-    );
+    const cachedValue = this.readThroughPromiseCache.get(fiat.toString());
     return cachedValue;
   }
 }

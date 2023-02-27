@@ -45,26 +45,26 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
 export class ReadThroughBytesToArOracle {
   private readonly oracle: BytesToAROracle;
   private readonly readThroughPromiseCache: ReadThroughPromiseCache<
-    string,
+    number,
     number
   >;
+  private getARForBytesFromOracle = async (bytes: number) => {
+    //TODO Get from elasticache first
+    return this.oracle.getARForBytes(bytes);
+  };
 
   constructor(oracle: BytesToAROracle) {
     this.oracle = oracle;
-    this.readThroughPromiseCache = new ReadThroughPromiseCache(10);
+    this.readThroughPromiseCache = new ReadThroughPromiseCache({
+      cacheCapacity: 10,
+      readThroughFunction: this.getARForBytesFromOracle,
+    });
   }
 
   async getARForBytes(bytes: number): Promise<number> {
     //construct a function that returns a promise
-    const readThroughFunction = async () => {
-      //TODO Get from elasticache first
-      return this.oracle.getARForBytes(bytes);
-    };
 
-    const cachedValue = this.readThroughPromiseCache.get(
-      bytes.toString(),
-      readThroughFunction
-    );
+    const cachedValue = this.readThroughPromiseCache.get(bytes);
 
     return cachedValue;
   }
