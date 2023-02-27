@@ -1,52 +1,34 @@
-import { PromiseCache } from "../cache/promiseCache";
-import { oneMinute } from "../constants";
-import { BytesToAROracle } from "./oracles/bytesToAROracle";
-import { FiatToAROracle } from "./oracles/fiatToAROracle";
+import BigNumber from "bignumber.js";
+
+import { ReadThroughBytesToArOracle } from "./oracles/bytesToAROracle";
+import { ReadThroughFiatToArOracle } from "./oracles/fiatToAROracle";
+
+type ARC = BigNumber;
 
 export interface PricingService {
-  getARCForFiat: (fiat: string) => Promise<number>;
-  getARCForBytes: (bytes: number) => Promise<number>;
+  getARCForFiat: (fiat: string) => Promise<ARC>;
+  getARCForBytes: (bytes: number) => Promise<ARC>;
 }
 
 export class TurboPricingService implements PricingService {
-  private readonly bytesToAROracle: BytesToAROracle;
-  private readonly fiatToAROracle: FiatToAROracle;
-
-  private readonly arcForFiatRequestCache: PromiseCache<string, number>;
-  private readonly arcForBytesRequestCache: PromiseCache<number, number>;
+  private readonly bytesToAROracle: ReadThroughBytesToArOracle;
+  private readonly fiatToAROracle: ReadThroughFiatToArOracle;
 
   constructor(
-    bytesToAROracle: BytesToAROracle,
-    fiatToAROracle: FiatToAROracle
+    bytesToAROracle: ReadThroughBytesToArOracle,
+    fiatToAROracle: ReadThroughFiatToArOracle
   ) {
     this.bytesToAROracle = bytesToAROracle;
     this.fiatToAROracle = fiatToAROracle;
-
-    this.arcForFiatRequestCache = new PromiseCache(oneMinute);
-    this.arcForBytesRequestCache = new PromiseCache(oneMinute);
   }
 
-  async getARCForFiat(fiat: string): Promise<number> {
-    const cached = this.arcForFiatRequestCache.get(fiat);
-    if (cached) {
-      return cached;
-    }
-
-    return this.arcForFiatRequestCache.put(
-      fiat,
-      this.fiatToAROracle.getARForFiat(fiat)
-    );
+  async getARCForFiat(fiat: string): Promise<ARC> {
+    const ar = await this.fiatToAROracle.getARForFiat(fiat);
+    return new BigNumber(ar);
   }
 
-  async getARCForBytes(bytes: number): Promise<number> {
-    const cached = this.arcForBytesRequestCache.get(bytes);
-    if (cached) {
-      return cached;
-    }
-
-    return this.arcForBytesRequestCache.put(
-      bytes,
-      this.bytesToAROracle.getARForBytes(bytes)
-    );
+  async getARCForBytes(bytes: number): Promise<ARC> {
+    const ar = await this.bytesToAROracle.getARForBytes(bytes);
+    return new BigNumber(ar);
   }
 }

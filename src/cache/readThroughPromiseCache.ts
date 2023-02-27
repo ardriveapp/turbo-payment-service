@@ -8,17 +8,19 @@ export class ReadThroughPromiseCache<K, V> {
     this.cache = new PromiseCache(cacheCapacity, cacheTTL);
   }
 
-  get(key: K, readThroughFunction: Promise<V>): Promise<V> {
+  get(key: K, readThroughFunction: () => Promise<V>): Promise<V> {
     const cachedValue = this.cache.get(key);
     if (cachedValue) {
       return cachedValue;
     }
 
-    const valuePromise = readThroughFunction;
+    const valuePromise = readThroughFunction();
+
     valuePromise.catch((err) => {
       logger.error(`Error getting value for key ${key}`, err);
       this.cache.remove(key);
     });
+
     this.cache.put(key, valuePromise);
     return valuePromise;
   }

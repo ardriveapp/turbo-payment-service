@@ -56,11 +56,17 @@ export class ReadThroughBytesToArOracle {
   }
 
   async getARForBytes(bytes: number): Promise<number> {
-    //TODO Get from elasticache first
+    //construct a function that returns a promise
+    const readThroughFunction = async () => {
+      //TODO Get from elasticache first
+      return this.oracle.getARForBytes(bytes);
+    };
+
     const cachedValue = this.readThroughPromiseCache.get(
       bytes.toString(),
-      this.oracle.getARForBytes(bytes)
+      readThroughFunction
     );
+
     return cachedValue;
   }
 }
