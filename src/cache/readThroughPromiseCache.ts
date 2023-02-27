@@ -8,6 +8,17 @@ export class ReadThroughPromiseCache<K, V> {
     this.cache = new PromiseCache(cacheCapacity, cacheTTL);
   }
 
+  /*
+   Example readThroughFunction = () => {
+        // NO NESTING!
+        // try elasticcache
+        if hit, return it
+        else try fiatOracle
+
+        return myFiatToAROracle.getFiatPerOneAR();
+     }
+  */
+
   get(key: K, readThroughFunction: () => Promise<V>): Promise<V> {
     const cachedValue = this.cache.get(key);
     if (cachedValue) {
@@ -24,13 +35,4 @@ export class ReadThroughPromiseCache<K, V> {
     this.cache.put(key, valuePromise);
     return valuePromise;
   }
-
-  //    Example readThroughFunction = () => {
-  //       // NO NESTING!
-  //       // try elasticcache
-  //       if hit, return it
-  //       else try fiatOracle
-
-  //       return myFiatToAROracle.getFiatPerOneAR();
-  //    }
 }
