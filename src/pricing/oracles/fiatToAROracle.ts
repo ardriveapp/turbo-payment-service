@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import axiosRetry from "axios-retry";
 
-import { OracleCache } from "../../cache/oracleCache";
+import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
 export interface FiatToAROracle {
@@ -9,20 +9,13 @@ export interface FiatToAROracle {
 }
 
 export class CoingeckoFiatToAROracle implements FiatToAROracle {
-  private readonly cache: OracleCache<string, number>;
   private readonly axiosInstance: AxiosInstance;
 
   constructor(axiosInstance?: AxiosInstance) {
-    this.cache = new OracleCache(1000);
     this.axiosInstance = axiosInstance ?? axios;
   }
 
   async getARForFiat(fiat: string): Promise<number> {
-    const cached = this.cache.get(fiat);
-    if (cached) {
-      return cached;
-    }
-
     axiosRetry(this.axiosInstance, {
       retries: 8,
       retryDelay: axiosRetry.exponentialDelay,
@@ -35,7 +28,7 @@ export class CoingeckoFiatToAROracle implements FiatToAROracle {
 
       if (result.data.arweave[fiat]) {
         const fiatPrice = result.data.arweave[fiat];
-        return this.cache.put(fiat, fiatPrice);
+        return fiatPrice;
       } else {
         throw new Error(
           `coingecko returned bad response ${result.data.arweave[fiat]}`
@@ -48,5 +41,27 @@ export class CoingeckoFiatToAROracle implements FiatToAROracle {
       );
       throw error;
     }
+  }
+}
+
+export class ReadThroughFiatToArOracle {
+  private readonly oracle: FiatToAROracle;
+  private readonly readThroughPromiseCache: ReadThroughPromiseCache<
+    string,
+    number
+  >;
+
+  constructor(oracle: FiatToAROracle) {
+    this.oracle = oracle;
+    this.readThroughPromiseCache = new ReadThroughPromiseCache(10);
+  }
+
+  async getARForFiat(fiat: string): Promise<number> {
+    //TODO Get from elasticache first
+    const cachedValue = this.readThroughPromiseCache.get(
+      fiat.toString(),
+      this.oracle.getARForFiat(fiat)
+    );
+    return cachedValue;
   }
 }

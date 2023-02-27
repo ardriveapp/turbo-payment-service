@@ -1,7 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import axiosRetry from "axios-retry";
 
-import { OracleCache } from "../../cache/oracleCache";
+import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
 export interface BytesToAROracle {
@@ -9,11 +9,9 @@ export interface BytesToAROracle {
 }
 
 export class ArweaveBytesToAROracle implements BytesToAROracle {
-  private readonly cache: OracleCache<number, number>;
   private readonly axiosInstance: AxiosInstance;
 
   constructor(axiosInstance?: AxiosInstance) {
-    this.cache = new OracleCache(1000);
     this.axiosInstance = axiosInstance ?? axios.create();
   }
   roundToChunkSize = (bytes: number) => {
@@ -23,11 +21,6 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
 
   async getARForBytes(bytes: number): Promise<number> {
     bytes = this.roundToChunkSize(bytes);
-
-    const cached = this.cache.get(bytes);
-    if (cached) {
-      return cached;
-    }
 
     axiosRetry(this.axiosInstance, {
       retries: 8,
@@ -39,7 +32,7 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
         `https://arweave.net/price/${bytes}`
       );
       if (typeof response.data === "number") {
-        return this.cache.put(bytes, response.data);
+        return response.data;
       } else {
         throw new Error(`arweave.net returned bad response ${response.data}`);
       }
@@ -47,5 +40,27 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
       logger.error(`Error getting AR price`, error);
       throw error;
     }
+  }
+}
+
+export class ReadThroughBytesToArOracle {
+  private readonly oracle: BytesToAROracle;
+  private readonly readThroughPromiseCache: ReadThroughPromiseCache<
+    string,
+    number
+  >;
+
+  constructor(oracle: BytesToAROracle) {
+    this.oracle = oracle;
+    this.readThroughPromiseCache = new ReadThroughPromiseCache(10);
+  }
+
+  async getARForBytes(bytes: number): Promise<number> {
+    //TODO Get from elasticache first
+    const cachedValue = this.readThroughPromiseCache.get(
+      bytes.toString(),
+      this.oracle.getARForBytes(bytes)
+    );
+    return cachedValue;
   }
 }
