@@ -34,7 +34,7 @@ describe("CoingeckoArweaveToFiatOracle", () => {
 
       try {
         await oracle.getARForFiat("invalid-fiat");
-        expect.fail("The function should throw an error");
+        expect.fail("Error: coingecko returned bad response undefined");
       } catch (error) {
         expect(error).to.exist;
       }

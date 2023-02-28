@@ -35,7 +35,7 @@ describe("ArweaveBytesToWinstonOracle", () => {
         .reply(200, expectedPrice);
       try {
         await oracle.getWinstonForBytes(bytes);
-        expect.fail("The function should throw an error");
+        expect.fail("Error: arweave.net returned bad response RandomString");
       } catch (error) {
         expect(error).to.exist;
       }

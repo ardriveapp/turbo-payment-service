@@ -23,7 +23,7 @@ describe("ReadThroughPromiseCache Class", () => {
     });
     try {
       cache.get("1");
-      expect.fail("The function should throw an error");
+      expect.fail("Error: test error");
     } catch (error) {
       expect(error).to.exist;
     }
