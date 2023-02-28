@@ -24,7 +24,7 @@ describe("CoingeckoArweaveToFiatOracle", () => {
           },
         });
       const arPrice = await oracle.getFiatPriceForOneAR("usd");
-      expect(arPrice).to.be.a("number");
+      expect(arPrice).to.equal(expectedPrice);
     });
 
     it("should throw an error for an invalid fiat currency", async () => {
