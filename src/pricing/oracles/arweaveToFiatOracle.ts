@@ -49,10 +49,17 @@ export class ReadThroughArweaveToFiatOracle {
     return this.oracle.getFiatPriceForOneAR(fiat);
   };
 
-  constructor({ oracle }: { oracle: ArweaveToFiatOracle }) {
+  constructor({
+    oracle,
+    cacheParams,
+  }: {
+    oracle: ArweaveToFiatOracle;
+    cacheParams?: { cacheCapacity: number; cacheTTL?: number };
+  }) {
     this.oracle = oracle;
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
-      cacheCapacity: 10,
+      cacheCapacity: cacheParams?.cacheCapacity ?? 10,
+      cacheTTL: cacheParams?.cacheTTL,
       readThroughFunction: this.getFiatPriceForOneARFromOracle,
     });
   }
