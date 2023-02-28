@@ -3,7 +3,7 @@ import { expect } from "chai";
 import { PromiseCache } from "./promiseCache";
 
 describe("PromiseCache class", () => {
-  it("constructor takes take a capacity that is not exceeded by excessive puts", async () => {
+  it("constructor takes a capacity that is not exceeded by excessive puts", async () => {
     const cache = new PromiseCache<string, string>(1);
     cache.put("1", Promise.resolve("one"));
     cache.put("2", Promise.resolve("two"));
