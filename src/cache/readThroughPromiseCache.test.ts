@@ -5,9 +5,22 @@ import { ReadThroughPromiseCache } from "./readThroughPromiseCache";
 
 describe("ReadThroughPromiseCache Class", () => {
   it("should be able to cache and retrieve new entries", async () => {
+    // Test function to make sure we return a different value after the first call
+    // Since function is passed in the constructor
+
+    let testTracker = 0;
+
+    const testFunction = async () => {
+      if (testTracker < 1) {
+        testTracker++;
+        return "one";
+      } else {
+        return "two";
+      }
+    };
     const cache = new ReadThroughPromiseCache<string, string>({
       cacheCapacity: 10,
-      readThroughFunction: () => Promise.resolve("one"),
+      readThroughFunction: testFunction,
     });
     cache.get("1");
 
