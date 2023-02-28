@@ -10,7 +10,7 @@ describe("CoingeckoArweaveToFiatOracle", () => {
   afterEach(() => {
     mock.reset();
   });
-  describe("getARForFiat", () => {
+  describe("getFiatPriceOfAR", () => {
     it("should return a number for valid fiat currency", async () => {
       const oracle = new CoingeckoArweaveToFiatOracle();
       const expectedPrice = 1.23;
@@ -23,7 +23,7 @@ describe("CoingeckoArweaveToFiatOracle", () => {
             usd: expectedPrice,
           },
         });
-      const arPrice = await oracle.getARForFiat("usd");
+      const arPrice = await oracle.getFiatPriceOfAR("usd");
       expect(arPrice).to.be.a("number");
     });
 
@@ -33,7 +33,7 @@ describe("CoingeckoArweaveToFiatOracle", () => {
       mock.onGet().reply(200, { arweave: {} });
 
       try {
-        await oracle.getARForFiat("invalid-fiat");
+        await oracle.getFiatPriceOfAR("invalid-fiat");
         expect.fail("Error: coingecko returned bad response undefined");
       } catch (error) {
         expect(error).to.exist;

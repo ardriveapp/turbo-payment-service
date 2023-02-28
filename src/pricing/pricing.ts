@@ -1,12 +1,10 @@
 import BigNumber from "bignumber.js";
 
+import { ARC, ByteCount } from "../types";
 import { AR } from "../types/ar";
 import { Winston } from "../types/winston";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/BytesToWinstonOracle";
 import { ReadThroughFiatToArOracle } from "./oracles/arweaveToFiatOracle";
-
-type ARC = Winston;
-type ByteCount = number;
 
 export interface PricingService {
   getARCForFiat: (fiat: string) => Promise<ARC>;
@@ -29,7 +27,7 @@ export class TurboPricingService implements PricingService {
   }
 
   async getARCForFiat(fiat: string): Promise<Winston> {
-    const ar = await this.arweaveToFiatOracle.getARForFiat(fiat);
+    const ar = await this.arweaveToFiatOracle.getFiatPriceOfAR(fiat);
     return AR.from(BigNumber(ar)).toWinston();
   }
 

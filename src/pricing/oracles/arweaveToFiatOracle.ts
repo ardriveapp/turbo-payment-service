@@ -3,7 +3,7 @@ import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
 export interface ArweaveToFiatOracle {
-  getARForFiat: (fiat: string) => Promise<number>;
+  getFiatPriceOfAR: (fiat: string) => Promise<number>;
 }
 
 export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
@@ -13,7 +13,7 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
     this.axiosClient = axiosClient ?? new AxiosClient({});
   }
 
-  async getARForFiat(fiat: string): Promise<number> {
+  async getFiatPriceOfAR(fiat: string): Promise<number> {
     try {
       const result = await this.axiosClient.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
@@ -44,20 +44,20 @@ export class ReadThroughFiatToArOracle {
     number
   >;
 
-  private getARForFiatFromOracle = async (fiat: string) => {
+  private getFiatPriceOfARFromOracle = async (fiat: string) => {
     //TODO Get from elasticache first
-    return this.oracle.getARForFiat(fiat);
+    return this.oracle.getFiatPriceOfAR(fiat);
   };
 
   constructor({ oracle }: { oracle: ArweaveToFiatOracle }) {
     this.oracle = oracle;
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
       cacheCapacity: 10,
-      readThroughFunction: this.getARForFiatFromOracle,
+      readThroughFunction: this.getFiatPriceOfARFromOracle,
     });
   }
 
-  async getARForFiat(fiat: string): Promise<number> {
+  async getFiatPriceOfAR(fiat: string): Promise<number> {
     const cachedValue = this.readThroughPromiseCache.get(fiat.toString());
     return cachedValue;
   }
