@@ -1,37 +1,33 @@
-import axios, { AxiosInstance } from "axios";
-import axiosRetry from "axios-retry";
+import BigNumber from "bignumber.js";
 
+import { AxiosClient } from "../../axiosClient";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
-export interface BytesToAROracle {
-  getARForBytes: (bytes: number) => Promise<number>;
+export interface BytesToWinstonOracle {
+  getWinstonForBytes: (bytes: number) => Promise<BigNumber>;
 }
 
-export class ArweaveBytesToAROracle implements BytesToAROracle {
-  private readonly axiosInstance: AxiosInstance;
+export class ArweaveBytesToWinstonOracle implements BytesToWinstonOracle {
+  private readonly axiosClient: AxiosClient;
 
-  constructor(axiosInstance?: AxiosInstance) {
-    this.axiosInstance = axiosInstance ?? axios.create();
-    axiosRetry(this.axiosInstance, {
-      retries: 8,
-      retryDelay: axiosRetry.exponentialDelay,
-    });
+  constructor(axiosClient?: AxiosClient) {
+    this.axiosClient = axiosClient ?? new AxiosClient({});
   }
   roundToChunkSize = (bytes: number) => {
     const chunkSize = 256 * 1024;
     return Math.ceil(bytes / chunkSize) * chunkSize;
   };
 
-  async getARForBytes(bytes: number): Promise<number> {
+  async getWinstonForBytes(bytes: number): Promise<BigNumber> {
     bytes = this.roundToChunkSize(bytes);
 
     try {
-      const response = await this.axiosInstance.get(
+      const response = await this.axiosClient.get(
         `https://arweave.net/price/${bytes}`
       );
       if (typeof response.data === "number") {
-        return response.data;
+        return BigNumber(response.data);
       } else {
         throw new Error(`arweave.net returned bad response ${response.data}`);
       }
@@ -42,26 +38,26 @@ export class ArweaveBytesToAROracle implements BytesToAROracle {
   }
 }
 
-export class ReadThroughBytesToArOracle {
-  private readonly oracle: BytesToAROracle;
+export class ReadThroughBytesToWinstonOracle {
+  private readonly oracle: BytesToWinstonOracle;
   private readonly readThroughPromiseCache: ReadThroughPromiseCache<
     number,
-    number
+    BigNumber
   >;
-  private getARForBytesFromOracle = async (bytes: number) => {
+  private getWinstonForBytesFromOracle = async (bytes: number) => {
     //TODO Get from elasticache first
-    return this.oracle.getARForBytes(bytes);
+    return this.oracle.getWinstonForBytes(bytes);
   };
 
-  constructor(oracle: BytesToAROracle) {
+  constructor({ oracle }: { oracle: BytesToWinstonOracle }) {
     this.oracle = oracle;
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
       cacheCapacity: 10,
-      readThroughFunction: this.getARForBytesFromOracle,
+      readThroughFunction: this.getWinstonForBytesFromOracle,
     });
   }
 
-  async getARForBytes(bytes: number): Promise<number> {
+  async getWinstonForBytes(bytes: number): Promise<BigNumber> {
     //construct a function that returns a promise
 
     const cachedValue = this.readThroughPromiseCache.get(bytes);

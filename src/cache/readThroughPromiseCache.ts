@@ -1,6 +1,12 @@
 import logger from "../logger";
 import { PromiseCache } from "./promiseCache";
 
+interface ReadThroughPromiseCacheParams<K, V> {
+  cacheCapacity: number;
+  readThroughFunction: (key: K) => Promise<V>;
+  cacheTTL?: number;
+}
+
 export class ReadThroughPromiseCache<K, V> {
   private readonly cache: PromiseCache<K, V>;
   private readonly readThroughFunction: (key: K) => Promise<V>;
@@ -8,23 +14,18 @@ export class ReadThroughPromiseCache<K, V> {
     cacheCapacity,
     cacheTTL,
     readThroughFunction,
-  }: {
-    cacheCapacity: number;
-    readThroughFunction: (key: K) => Promise<V>;
-    cacheTTL?: number;
-  }) {
+  }: ReadThroughPromiseCacheParams<K, V>) {
     this.cache = new PromiseCache(cacheCapacity, cacheTTL);
     this.readThroughFunction = readThroughFunction;
   }
 
-  /*
-   Example readThroughFunction = () => {
-        // NO NESTING!
+  /**
+   * @example
+    readThroughFunction = () => {
         // try elasticcache
         if hit, return it
         else try fiatOracle
-
-        return myFiatToAROracle.getFiatPerOneAR();
+        return myArweaveToFiatOracle.getFiatPerOneAR();
      }
   */
 

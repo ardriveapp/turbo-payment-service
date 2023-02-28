@@ -51,6 +51,7 @@ describe("ReadThroughPromiseCache Class", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(await cache.get("1")).to.equal("two");
   });
+
   it("preserves most requested entries when over capacity", async () => {
     let testTracker = 0;
 

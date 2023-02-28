@@ -3,9 +3,6 @@ import { BigNumber } from "bignumber.js";
 import { W, Winston } from "./winston";
 
 export class AR {
-  toARC(): Winston {
-    return this.toWinston();
-  }
   constructor(readonly winston: Winston) {}
 
   static from(arValue: BigNumber.Value): AR {

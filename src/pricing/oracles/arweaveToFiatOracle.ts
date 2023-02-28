@@ -1,27 +1,21 @@
-import axios, { AxiosInstance } from "axios";
-import axiosRetry from "axios-retry";
-
+import { AxiosClient } from "../../axiosClient";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
-export interface FiatToAROracle {
+export interface ArweaveToFiatOracle {
   getARForFiat: (fiat: string) => Promise<number>;
 }
 
-export class CoingeckoFiatToAROracle implements FiatToAROracle {
-  private readonly axiosInstance: AxiosInstance;
+export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
+  private readonly axiosClient: AxiosClient;
 
-  constructor(axiosInstance?: AxiosInstance) {
-    this.axiosInstance = axiosInstance ?? axios.create();
-    axiosRetry(this.axiosInstance, {
-      retries: 8,
-      retryDelay: axiosRetry.exponentialDelay,
-    });
+  constructor(axiosClient?: AxiosClient) {
+    this.axiosClient = axiosClient ?? new AxiosClient({});
   }
 
   async getARForFiat(fiat: string): Promise<number> {
     try {
-      const result = await this.axiosInstance.get(
+      const result = await this.axiosClient.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
       );
 
@@ -44,7 +38,7 @@ export class CoingeckoFiatToAROracle implements FiatToAROracle {
 }
 
 export class ReadThroughFiatToArOracle {
-  private readonly oracle: FiatToAROracle;
+  private readonly oracle: ArweaveToFiatOracle;
   private readonly readThroughPromiseCache: ReadThroughPromiseCache<
     string,
     number
@@ -55,7 +49,7 @@ export class ReadThroughFiatToArOracle {
     return this.oracle.getARForFiat(fiat);
   };
 
-  constructor(oracle: FiatToAROracle) {
+  constructor({ oracle }: { oracle: ArweaveToFiatOracle }) {
     this.oracle = oracle;
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
       cacheCapacity: 10,
