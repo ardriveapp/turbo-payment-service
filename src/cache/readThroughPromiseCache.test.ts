@@ -30,6 +30,9 @@ describe("ReadThroughPromiseCache Class", () => {
   });
 
   it("should purge all entries after ttl expires", async () => {
+    // Test function to make sure we return a different value after the first call
+    // Since function is passed in the constructor
+
     let testTracker = 0;
 
     const testFunction = async () => {
@@ -53,6 +56,8 @@ describe("ReadThroughPromiseCache Class", () => {
   });
 
   it("preserves most requested entries when over capacity", async () => {
+    // Test function to make sure we return a different value after the first call
+    // Since function is passed in the constructor
     let testTracker = 0;
 
     const testFunction = async () => {
