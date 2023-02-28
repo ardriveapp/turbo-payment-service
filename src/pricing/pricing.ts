@@ -27,7 +27,7 @@ export class TurboPricingService implements PricingService {
   }
 
   async getARCForFiat(fiat: string): Promise<Winston> {
-    const ar = await this.arweaveToFiatOracle.getFiatPriceOfAR(fiat);
+    const ar = await this.arweaveToFiatOracle.getFiatPriceForOneAR(fiat);
     return AR.from(BigNumber(ar)).toWinston();
   }
 

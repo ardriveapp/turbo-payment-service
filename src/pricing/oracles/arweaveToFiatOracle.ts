@@ -3,7 +3,7 @@ import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
 export interface ArweaveToFiatOracle {
-  getFiatPriceOfAR: (fiat: string) => Promise<number>;
+  getFiatPriceForOneAR: (fiat: string) => Promise<number>;
 }
 
 export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
@@ -13,15 +13,15 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
     this.axiosClient = axiosClient ?? new AxiosClient({});
   }
 
-  async getFiatPriceOfAR(fiat: string): Promise<number> {
+  async getFiatPriceForOneAR(fiat: string): Promise<number> {
     try {
       const result = await this.axiosClient.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
       );
 
       if (result.data.arweave[fiat]) {
-        const fiatPrice = result.data.arweave[fiat];
-        return fiatPrice;
+        const fiatPriceOfOneAR = result.data.arweave[fiat];
+        return fiatPriceOfOneAR;
       } else {
         throw new Error(
           `coingecko returned bad response ${result.data.arweave[fiat]}`
@@ -44,20 +44,20 @@ export class ReadThroughArweaveToFiatOracle {
     number
   >;
 
-  private getFiatPriceOfARFromOracle = async (fiat: string) => {
+  private getFiatPriceForOneARFromOracle = async (fiat: string) => {
     //TODO Get from elasticache first
-    return this.oracle.getFiatPriceOfAR(fiat);
+    return this.oracle.getFiatPriceForOneAR(fiat);
   };
 
   constructor({ oracle }: { oracle: ArweaveToFiatOracle }) {
     this.oracle = oracle;
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
       cacheCapacity: 10,
-      readThroughFunction: this.getFiatPriceOfARFromOracle,
+      readThroughFunction: this.getFiatPriceForOneARFromOracle,
     });
   }
 
-  async getFiatPriceOfAR(fiat: string): Promise<number> {
+  async getFiatPriceForOneAR(fiat: string): Promise<number> {
     const cachedValue = this.readThroughPromiseCache.get(fiat.toString());
     return cachedValue;
   }
