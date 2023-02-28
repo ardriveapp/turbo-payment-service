@@ -6,10 +6,11 @@ import { ReadThroughBytesToWinstonOracle } from "./oracles/BytesToWinstonOracle"
 import { ReadThroughFiatToArOracle } from "./oracles/arweaveToFiatOracle";
 
 type ARC = Winston;
+type ByteCount = number;
 
 export interface PricingService {
   getARCForFiat: (fiat: string) => Promise<ARC>;
-  getARCForBytes: (bytes: number) => Promise<ARC>;
+  getARCForBytes: (bytes: ByteCount) => Promise<ARC>;
 }
 
 export class TurboPricingService implements PricingService {
@@ -32,7 +33,7 @@ export class TurboPricingService implements PricingService {
     return AR.from(BigNumber(ar)).toWinston();
   }
 
-  async getARCForBytes(bytes: number): Promise<Winston> {
+  async getARCForBytes(bytes: ByteCount): Promise<Winston> {
     const winston = await this.BytesToWinstonOracle.getWinstonForBytes(bytes);
     return new Winston(winston);
   }
