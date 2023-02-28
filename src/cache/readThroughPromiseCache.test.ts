@@ -70,7 +70,7 @@ describe("ReadThroughPromiseCache Class", () => {
     };
 
     const cache = new ReadThroughPromiseCache<string, string>({
-      cacheCapacity: 3,
+      cacheCapacity: 1,
       readThroughFunction: testFunction,
       cacheTTL: 5,
     });
@@ -78,6 +78,6 @@ describe("ReadThroughPromiseCache Class", () => {
     expect(await cache.get("1")).to.equal("one");
     expect(await cache.get("1")).to.equal("one");
     expect(await cache.get("2")).to.equal("two");
-    expect(await cache.get("1")).to.equal("one");
+    expect(await cache.get("1")).to.equal("two");
   });
 });
