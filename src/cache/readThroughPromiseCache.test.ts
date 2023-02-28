@@ -22,8 +22,8 @@ describe("ReadThroughPromiseCache Class", () => {
       cacheCapacity: 10,
       readThroughFunction: testFunction,
     });
-    cache.get("1");
 
+    expect(await cache.get("1")).to.equal("one");
     expect(await cache.get("1")).to.equal("one");
   });
 
