@@ -28,18 +28,27 @@ describe("ReadThroughPromiseCache Class", () => {
   });
 
   it("should throw error if readthrough function throws", async () => {
+    let testTracker = 0;
+
+    const testFunction = async () => {
+      if (testTracker < 1) {
+        testTracker++;
+        throw new Error("test error");
+      } else {
+        return "two";
+      }
+    };
     const cache = new ReadThroughPromiseCache<string, string>({
       cacheCapacity: 10,
-      readThroughFunction: () => {
-        throw new Error("test error");
-      },
+      readThroughFunction: testFunction,
     });
     try {
-      cache.get("1");
+      await cache.get("1");
       expect.fail("Error: test error");
     } catch (error) {
       expect(error).to.exist;
     }
+    expect(await cache.get("1")).to.equal("two");
   });
 
   it("should purge all entries after ttl expires", async () => {
