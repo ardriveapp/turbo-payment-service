@@ -4,7 +4,7 @@ import { ARC, ByteCount } from "../types";
 import { AR } from "../types/ar";
 import { Winston } from "../types/winston";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/BytesToWinstonOracle";
-import { ReadThroughFiatToArOracle } from "./oracles/arweaveToFiatOracle";
+import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 
 export interface PricingService {
   getARCForFiat: (fiat: string) => Promise<ARC>;
@@ -13,14 +13,14 @@ export interface PricingService {
 
 export class TurboPricingService implements PricingService {
   private readonly BytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
-  private readonly arweaveToFiatOracle: ReadThroughFiatToArOracle;
+  private readonly arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
 
   constructor({
     BytesToWinstonOracle,
     arweaveToFiatOracle,
   }: {
     BytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
-    arweaveToFiatOracle: ReadThroughFiatToArOracle;
+    arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
   }) {
     this.BytesToWinstonOracle = BytesToWinstonOracle;
     this.arweaveToFiatOracle = arweaveToFiatOracle;

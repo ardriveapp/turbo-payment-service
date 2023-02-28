@@ -37,7 +37,7 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
   }
 }
 
-export class ReadThroughFiatToArOracle {
+export class ReadThroughArweaveToFiatOracle {
   private readonly oracle: ArweaveToFiatOracle;
   private readonly readThroughPromiseCache: ReadThroughPromiseCache<
     string,

@@ -5,7 +5,7 @@ import {
 } from "./pricing/oracles/BytesToWinstonOracle";
 import {
   CoingeckoArweaveToFiatOracle,
-  ReadThroughFiatToArOracle,
+  ReadThroughArweaveToFiatOracle,
 } from "./pricing/oracles/arweaveToFiatOracle";
 import { PricingService, TurboPricingService } from "./pricing/pricing";
 
@@ -24,7 +24,7 @@ export const defaultArch: Architecture = {
     BytesToWinstonOracle: new ReadThroughBytesToWinstonOracle({
       oracle: new ArweaveBytesToWinstonOracle(),
     }),
-    arweaveToFiatOracle: new ReadThroughFiatToArOracle({
+    arweaveToFiatOracle: new ReadThroughArweaveToFiatOracle({
       oracle: new CoingeckoArweaveToFiatOracle(),
     }),
   }),
