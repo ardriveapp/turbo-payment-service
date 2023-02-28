@@ -1,11 +1,11 @@
 import { Cache, EphemeralCache } from "@alexsasharegan/simple-cache";
 
-const oneMinute = 60 * 1000 * 1000;
+import { msPerMinute } from "../constants";
 
 export class PromiseCache<K, V> {
   private cache: Cache<string, Promise<V>>;
 
-  constructor(capacity: number, duration = oneMinute) {
+  constructor(capacity: number, duration = msPerMinute * 1) {
     this.cache = EphemeralCache<string, Promise<V>>(capacity, duration);
   }
 
