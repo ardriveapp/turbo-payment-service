@@ -58,7 +58,7 @@ export class ReadThroughArweaveToFiatOracle {
   }
 
   async getFiatPriceForOneAR(fiat: string): Promise<number> {
-    const cachedValue = this.readThroughPromiseCache.get(fiat.toString());
+    const cachedValue = this.readThroughPromiseCache.get(fiat);
     return cachedValue;
   }
 }
