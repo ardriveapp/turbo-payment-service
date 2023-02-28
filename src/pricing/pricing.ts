@@ -3,8 +3,8 @@ import BigNumber from "bignumber.js";
 import { ARC, ByteCount } from "../types";
 import { AR } from "../types/ar";
 import { Winston } from "../types/winston";
-import { ReadThroughBytesToWinstonOracle } from "./oracles/BytesToWinstonOracle";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
+import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
 export interface PricingService {
   getARCForFiat: (fiat: string) => Promise<ARC>;

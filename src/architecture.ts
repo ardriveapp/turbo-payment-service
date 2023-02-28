@@ -1,12 +1,12 @@
 import { Database } from "./database/database";
 import {
-  ArweaveBytesToWinstonOracle,
-  ReadThroughBytesToWinstonOracle,
-} from "./pricing/oracles/BytesToWinstonOracle";
-import {
   CoingeckoArweaveToFiatOracle,
   ReadThroughArweaveToFiatOracle,
 } from "./pricing/oracles/arweaveToFiatOracle";
+import {
+  ArweaveBytesToWinstonOracle,
+  ReadThroughBytesToWinstonOracle,
+} from "./pricing/oracles/bytesToWinstonOracle";
 import { PricingService, TurboPricingService } from "./pricing/pricing";
 
 export interface Architecture {
