@@ -1,4 +1,9 @@
-import { AxiosClient } from "../../axiosClient";
+import { AxiosInstance } from "axios";
+
+import {
+  CreateAxiosInstanceParams,
+  createAxiosInstance,
+} from "../../axiosClient";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
@@ -7,15 +12,17 @@ export interface ArweaveToFiatOracle {
 }
 
 export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
-  private readonly axiosClient: AxiosClient;
+  private readonly axiosInstanceParams: CreateAxiosInstanceParams;
+  private readonly axiosInstance: AxiosInstance;
 
-  constructor(axiosClient?: AxiosClient) {
-    this.axiosClient = axiosClient ?? new AxiosClient({});
+  constructor(axiosInstanceParams?: CreateAxiosInstanceParams) {
+    this.axiosInstanceParams = axiosInstanceParams ?? {};
+    this.axiosInstance = createAxiosInstance(this.axiosInstanceParams);
   }
 
   async getFiatPriceForOneAR(fiat: string): Promise<number> {
     try {
-      const result = await this.axiosClient.get(
+      const result = await this.axiosInstance.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
       );
 

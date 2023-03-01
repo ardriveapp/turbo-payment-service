@@ -1,7 +1,8 @@
 import BigNumber from "bignumber.js";
 
-import { ARC, ByteCount } from "../types";
+import { ARC } from "../types";
 import { AR } from "../types/ar";
+import { ByteCount } from "../types/byte_count";
 import { Winston } from "../types/winston";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
