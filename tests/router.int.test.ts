@@ -18,7 +18,9 @@ describe("Router tests", () => {
   it("GET /health returns 'OK' in the body, a 200 status, and the correct content-length", async () => {
     server = createServer({});
 
-    const { status, statusText, headers, data } = await axios.get(localTestUrl + "/health");
+    const { status, statusText, headers, data } = await axios.get(
+      localTestUrl + "/health"
+    );
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
@@ -26,6 +28,22 @@ describe("Router tests", () => {
     assertExpectedHeadersWithContentLength(headers, 2);
 
     expect(data).to.equal("OK");
+
+    closeServer();
+  });
+
+  it("POST /price-quote", async () => {
+    server = createServer({});
+
+    const { status, statusText, headers, data } = await axios.post(
+      `${localTestUrl}/v1/price-quote/1024`
+    );
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    assertExpectedHeadersWithContentLength(headers, 2);
+    console.log("data", data);
+    expect(data).to.equal(32479329);
 
     closeServer();
   });
