@@ -1,8 +1,7 @@
 import logger from "../logger";
-import { PromiseCache } from "./promiseCache";
+import { CacheParams, PromiseCache } from "./promiseCache";
 
 interface ReadThroughPromiseCacheParams<K, V> {
-  cacheCapacity: number;
   /**
    * @example
     readThroughFunction = () => {
@@ -13,18 +12,17 @@ interface ReadThroughPromiseCacheParams<K, V> {
      }
   */
   readThroughFunction: (key: K) => Promise<V>;
-  cacheTTL?: number;
+  cacheParams: CacheParams;
 }
 
 export class ReadThroughPromiseCache<K, V> {
   private readonly cache: PromiseCache<K, V>;
   private readonly readThroughFunction: (key: K) => Promise<V>;
   constructor({
-    cacheCapacity,
-    cacheTTL,
+    cacheParams,
     readThroughFunction,
   }: ReadThroughPromiseCacheParams<K, V>) {
-    this.cache = new PromiseCache(cacheCapacity, cacheTTL);
+    this.cache = new PromiseCache(cacheParams);
     this.readThroughFunction = readThroughFunction;
   }
 

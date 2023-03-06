@@ -4,6 +4,7 @@ import {
   CreateAxiosInstanceParams,
   createAxiosInstance,
 } from "../../axiosClient";
+import { CacheParams } from "../../cache/promiseCache";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
@@ -12,12 +13,10 @@ export interface ArweaveToFiatOracle {
 }
 
 export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
-  private readonly axiosInstanceParams: CreateAxiosInstanceParams;
   private readonly axiosInstance: AxiosInstance;
 
   constructor(axiosInstanceParams?: CreateAxiosInstanceParams) {
-    this.axiosInstanceParams = axiosInstanceParams ?? {};
-    this.axiosInstance = createAxiosInstance(this.axiosInstanceParams);
+    this.axiosInstance = createAxiosInstance(axiosInstanceParams ?? {});
   }
 
   async getFiatPriceForOneAR(fiat: string): Promise<number> {
@@ -61,12 +60,11 @@ export class ReadThroughArweaveToFiatOracle {
     cacheParams,
   }: {
     oracle: ArweaveToFiatOracle;
-    cacheParams?: { cacheCapacity: number; cacheTTL?: number };
+    cacheParams?: CacheParams;
   }) {
     this.oracle = oracle;
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
-      cacheCapacity: cacheParams?.cacheCapacity ?? 10,
-      cacheTTL: cacheParams?.cacheTTL,
+      cacheParams: cacheParams ?? { cacheCapacity: 10 },
       readThroughFunction: this.getFiatPriceForOneARFromOracle,
     });
   }

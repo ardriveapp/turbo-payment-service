@@ -23,7 +23,7 @@ describe("ArweaveBytesToWinstonOracle", () => {
         .onGet(`https://arweave.net/price/${chunkSize}`)
         .reply(200, expectedPrice);
       const arPrice = await oracle.getWinstonForBytes(bytes);
-      expect(arPrice.toNumber).to.equal(expectedPrice.toNumber);
+      expect(arPrice.toBigNumber().toNumber).to.equal(expectedPrice.toNumber);
     });
 
     it("should throw if it gets an invalid response", async () => {

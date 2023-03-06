@@ -57,6 +57,9 @@ export class Winston {
   valueOf(): string {
     return this.amount.toFixed();
   }
+  toBigNumber(): BigNumber {
+    return this.amount;
+  }
 
   toJSON(): string {
     return this.toString();

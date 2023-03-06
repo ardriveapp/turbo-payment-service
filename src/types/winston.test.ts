@@ -1,3 +1,4 @@
+import BigNumber from "bignumber.js";
 import { expect } from "chai";
 
 import { Winston } from "./winston";
@@ -188,6 +189,16 @@ describe("Winston class", () => {
       expect(new Winston(1).valueOf()).to.equal("1");
       expect(new Winston("18014398509481982").valueOf()).to.equal(
         "18014398509481982"
+      );
+    });
+  });
+
+  describe("toBigNumber function", () => {
+    it("returns the Winston value as a BigNumber", () => {
+      expect(new Winston(0).valueOf()).to.equal("0");
+      expect(new Winston(1).valueOf()).to.equal("1");
+      expect(new Winston(18014398509481982).toBigNumber().toNumber).to.equal(
+        BigNumber(18014398509481982).toNumber
       );
     });
   });
