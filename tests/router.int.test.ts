@@ -32,12 +32,15 @@ describe("Router tests", () => {
     closeServer();
   });
 
-  it("POST /price-quote", async () => {
+  it("POST /price/bytes", async () => {
     server = createServer({});
 
+    console.log("localTestUrl", `${localTestUrl}/v1/price/bytes/1024`);
     const { status, statusText, headers, data } = await axios.post(
-      `${localTestUrl}/v1/price-quote/1024`
+      `${localTestUrl}/v1/price/bytes/1024`
     );
+
+    console.log("status", status);
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 

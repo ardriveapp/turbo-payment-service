@@ -51,6 +51,7 @@
   "dependencies": {
     "@alexsasharegan/simple-cache": "^3.3.3",
     "@koa/cors": "^4.0.0",
+    "arweave": "^1.13.1",
     "axios": "0.27.2",
     "axios-mock-adapter": "^1.21.2",
     "axios-retry": "^3.4.0",
