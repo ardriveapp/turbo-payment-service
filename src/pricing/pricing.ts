@@ -34,6 +34,6 @@ export class TurboPricingService implements PricingService {
 
   async getARCForBytes(bytes: ByteCount): Promise<Winston> {
     const winston = await this.BytesToWinstonOracle.getWinstonForBytes(bytes);
-    return new Winston(winston);
+    return winston;
   }
 }

@@ -5,6 +5,7 @@ import {
   CreateAxiosInstanceParams,
   createAxiosInstance,
 } from "../../axiosClient";
+import { CacheParams } from "../../cache/promiseCache";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import { msPerMinute } from "../../constants";
 import logger from "../../logger";
@@ -55,7 +56,7 @@ export class ReadThroughBytesToWinstonOracle {
     cacheParams,
   }: {
     oracle: BytesToWinstonOracle;
-    cacheParams?: { cacheCapacity: number; cacheTTL: number };
+    cacheParams?: CacheParams;
   }) {
     this.oracle = oracle;
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
