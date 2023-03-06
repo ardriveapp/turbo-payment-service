@@ -51,8 +51,8 @@ export class ByteCount implements Equatable<ByteCount> {
     return this.byteCount === other.byteCount;
   }
 
-  roundToChunkSize(): number {
+  roundToChunkSize(): ByteCount {
     const chunkSize = 256 * 1024;
-    return Math.ceil(this.byteCount / chunkSize) * chunkSize;
+    return new ByteCount(Math.ceil(this.byteCount / chunkSize) * chunkSize);
   }
 }

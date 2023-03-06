@@ -15,7 +15,7 @@ const router = new Router();
 
 router.get("/", helloWorldRoute);
 router.post("/price/:currency/:value", priceRoute);
-router.post("/v1/price/:currency/:value", priceRoute);
+router.post("/v1/price/:currency/:value", priceBytes);
 
 router.post("/price/bytes/:value", priceBytes);
 router.post("/v1/price/bytes/:value", priceBytes);

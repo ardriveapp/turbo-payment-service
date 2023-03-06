@@ -8,10 +8,13 @@ import { ArweaveBytesToWinstonOracle } from "./bytesToWinstonOracle";
 
 describe("ArweaveBytesToWinstonOracle", () => {
   describe("getWinstonForBytes", () => {
-    const mock = new MockAdapter(axios);
+    let mock: MockAdapter;
+    beforeEach(() => {
+      mock = new MockAdapter(axios);
+    });
 
     afterEach(() => {
-      mock.reset();
+      mock.restore();
     });
 
     it("should return a number for valid bytes", async () => {
@@ -22,7 +25,7 @@ describe("ArweaveBytesToWinstonOracle", () => {
       mock
         .onGet(`https://arweave.net/price/${chunkSize}`)
         .reply(200, expectedPrice);
-      const arPrice = await oracle.getWinstonForBytes(bytes);
+      const arPrice = await oracle.getWinstonForBytes(chunkSize);
       expect(arPrice.toNumber).to.equal(expectedPrice.toNumber);
     });
 

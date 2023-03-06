@@ -57,7 +57,7 @@ describe("ByteCount class", () => {
   describe("roundToChunkSize function", () => {
     it("returns the correct ByteCount number value", () => {
       const eid = new ByteCount(12345);
-      expect(eid.roundToChunkSize()).to.equal(262144);
+      expect(eid.roundToChunkSize().valueOf()).to.equal(262144);
     });
   });
 

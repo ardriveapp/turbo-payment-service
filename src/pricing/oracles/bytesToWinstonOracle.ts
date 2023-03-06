@@ -24,17 +24,18 @@ export class ArweaveBytesToWinstonOracle implements BytesToWinstonOracle {
   }
 
   async getWinstonForBytes(bytes: ByteCount): Promise<BigNumber> {
+    const url = `https://arweave.net/price/${bytes}`;
     try {
-      const response = await this.axiosInstance.get(
-        `https://arweave.net/price/${bytes.roundToChunkSize()}`
-      );
+      const response = await this.axiosInstance.get(url);
       if (typeof response.data === "number") {
         return BigNumber(response.data);
       } else {
-        throw new Error(`arweave.net returned bad response ${response.data}`);
+        throw new Error(
+          `arweave.net returned bad response ${response.data} URL: ${url}`
+        );
       }
     } catch (error) {
-      logger.error(`Error getting AR price`, error);
+      logger.error(`Error getting AR price URL: ${url}`, error);
       throw error;
     }
   }
@@ -67,7 +68,8 @@ export class ReadThroughBytesToWinstonOracle {
   }
 
   async getWinstonForBytes(bytes: ByteCount): Promise<BigNumber> {
-    const cachedValue = this.readThroughPromiseCache.get(bytes);
+    const chunkBytes = bytes.roundToChunkSize();
+    const cachedValue = this.readThroughPromiseCache.get(chunkBytes);
 
     return cachedValue;
   }
