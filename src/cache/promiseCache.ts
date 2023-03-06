@@ -2,11 +2,15 @@ import { Cache, EphemeralCache } from "@alexsasharegan/simple-cache";
 
 import { msPerMinute } from "../constants";
 
+export interface CacheParams {
+  cacheCapacity: number;
+  cacheTTL?: number;
+}
 export class PromiseCache<K, V> {
   private cache: Cache<string, Promise<V>>;
 
-  constructor(capacity: number, duration = msPerMinute * 1) {
-    this.cache = EphemeralCache<string, Promise<V>>(capacity, duration);
+  constructor({ cacheCapacity, cacheTTL = msPerMinute * 1 }: CacheParams) {
+    this.cache = EphemeralCache<string, Promise<V>>(cacheCapacity, cacheTTL);
   }
 
   cacheKeyString(key: K): string {

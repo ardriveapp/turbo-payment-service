@@ -1,4 +1,10 @@
-import { AxiosClient } from "../../axiosClient";
+import { AxiosInstance } from "axios";
+
+import {
+  CreateAxiosInstanceParams,
+  createAxiosInstance,
+} from "../../axiosClient";
+import { CacheParams } from "../../cache/promiseCache";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 
@@ -7,15 +13,15 @@ export interface ArweaveToFiatOracle {
 }
 
 export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
-  private readonly axiosClient: AxiosClient;
+  private readonly axiosInstance: AxiosInstance;
 
-  constructor(axiosClient?: AxiosClient) {
-    this.axiosClient = axiosClient ?? new AxiosClient({});
+  constructor(axiosInstanceParams?: CreateAxiosInstanceParams) {
+    this.axiosInstance = createAxiosInstance(axiosInstanceParams ?? {});
   }
 
   async getFiatPriceForOneAR(fiat: string): Promise<number> {
     try {
-      const result = await this.axiosClient.get(
+      const result = await this.axiosInstance.get(
         `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
       );
 
@@ -54,12 +60,11 @@ export class ReadThroughArweaveToFiatOracle {
     cacheParams,
   }: {
     oracle: ArweaveToFiatOracle;
-    cacheParams?: { cacheCapacity: number; cacheTTL?: number };
+    cacheParams?: CacheParams;
   }) {
     this.oracle = oracle;
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
-      cacheCapacity: cacheParams?.cacheCapacity ?? 10,
-      cacheTTL: cacheParams?.cacheTTL,
+      cacheParams: cacheParams ?? { cacheCapacity: 10 },
       readThroughFunction: this.getFiatPriceForOneARFromOracle,
     });
   }
