@@ -1,12 +1,4 @@
 import { Database } from "./database/database";
-import {
-  CoingeckoArweaveToFiatOracle,
-  ReadThroughArweaveToFiatOracle,
-} from "./pricing/oracles/arweaveToFiatOracle";
-import {
-  ArweaveBytesToWinstonOracle,
-  ReadThroughBytesToWinstonOracle,
-} from "./pricing/oracles/bytesToWinstonOracle";
 import { PricingService, TurboPricingService } from "./pricing/pricing";
 
 export interface Architecture {
@@ -20,14 +12,7 @@ export const defaultArch: Architecture = {
       return Promise.resolve({ address: "Steve", balance: 101 });
     },
   },
-  pricingService: new TurboPricingService({
-    BytesToWinstonOracle: new ReadThroughBytesToWinstonOracle({
-      oracle: new ArweaveBytesToWinstonOracle(),
-    }),
-    arweaveToFiatOracle: new ReadThroughArweaveToFiatOracle({
-      oracle: new CoingeckoArweaveToFiatOracle(),
-    }),
-  }),
+  pricingService: new TurboPricingService({}),
 };
 
 export default defaultArch;

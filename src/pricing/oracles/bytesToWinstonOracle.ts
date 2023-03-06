@@ -9,7 +9,7 @@ import { CacheParams } from "../../cache/promiseCache";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import { msPerMinute } from "../../constants";
 import logger from "../../logger";
-import { ByteCount } from "../../types/byte_count";
+import { ByteCount } from "../../types/byteCount";
 import { Winston } from "../../types/winston";
 
 export interface BytesToWinstonOracle {
@@ -55,10 +55,10 @@ export class ReadThroughBytesToWinstonOracle {
     oracle,
     cacheParams,
   }: {
-    oracle: BytesToWinstonOracle;
+    oracle?: BytesToWinstonOracle;
     cacheParams?: CacheParams;
   }) {
-    this.oracle = oracle;
+    this.oracle = oracle ?? new ArweaveBytesToWinstonOracle();
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
       cacheParams: {
         cacheCapacity: cacheParams?.cacheCapacity ?? 100,

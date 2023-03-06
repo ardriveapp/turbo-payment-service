@@ -59,10 +59,10 @@ export class ReadThroughArweaveToFiatOracle {
     oracle,
     cacheParams,
   }: {
-    oracle: ArweaveToFiatOracle;
+    oracle?: ArweaveToFiatOracle;
     cacheParams?: CacheParams;
   }) {
-    this.oracle = oracle;
+    this.oracle = oracle ?? new CoingeckoArweaveToFiatOracle();
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
       cacheParams: cacheParams ?? { cacheCapacity: 10 },
       readThroughFunction: this.getFiatPriceForOneARFromOracle,

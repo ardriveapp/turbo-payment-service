@@ -1,6 +1,6 @@
 import { expect } from "chai";
 
-import { ByteCount } from "./byte_count";
+import { ByteCount } from "./byteCount";
 
 describe("ByteCount class", () => {
   describe("constructor", () => {

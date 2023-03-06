@@ -2,7 +2,7 @@ import BigNumber from "bignumber.js";
 
 import { ARC } from "../types";
 import { AR } from "../types/ar";
-import { ByteCount } from "../types/byte_count";
+import { ByteCount } from "../types/byteCount";
 import { Winston } from "../types/winston";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
@@ -13,18 +13,20 @@ export interface PricingService {
 }
 
 export class TurboPricingService implements PricingService {
-  private readonly BytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
+  private readonly bytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
   private readonly arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
 
   constructor({
-    BytesToWinstonOracle,
+    bytesToWinstonOracle,
     arweaveToFiatOracle,
   }: {
-    BytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
-    arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
+    bytesToWinstonOracle?: ReadThroughBytesToWinstonOracle;
+    arweaveToFiatOracle?: ReadThroughArweaveToFiatOracle;
   }) {
-    this.BytesToWinstonOracle = BytesToWinstonOracle;
-    this.arweaveToFiatOracle = arweaveToFiatOracle;
+    this.bytesToWinstonOracle =
+      bytesToWinstonOracle ?? new ReadThroughBytesToWinstonOracle({});
+    this.arweaveToFiatOracle =
+      arweaveToFiatOracle ?? new ReadThroughArweaveToFiatOracle({});
   }
 
   async getARCForFiat(fiat: string, fiatQuantity: number): Promise<Winston> {
@@ -33,7 +35,7 @@ export class TurboPricingService implements PricingService {
   }
 
   async getARCForBytes(bytes: ByteCount): Promise<Winston> {
-    const winston = await this.BytesToWinstonOracle.getWinstonForBytes(bytes);
+    const winston = await this.bytesToWinstonOracle.getWinstonForBytes(bytes);
     return winston;
   }
 }
