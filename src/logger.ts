@@ -12,6 +12,7 @@ const containsAnError = (info: TransformableInfo) =>
 function devFormat() {
   const formatSimple = (info: TransformableInfo) => {
     const infoAfter = format.simple().transform(info) as TransformableInfo;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return `${infoAfter[Symbol.for("message") as any]}`;
   };
   const formatWrappedError = (info: TransformableInfo) =>
