@@ -4,7 +4,7 @@ import { PromiseCache } from "./promiseCache";
 
 describe("PromiseCache class", () => {
   it("constructor takes a capacity that is not exceeded by excessive puts", async () => {
-    const cache = new PromiseCache<string, string>(1);
+    const cache = new PromiseCache<string, string>({ cacheCapacity: 1 });
     cache.put("1", Promise.resolve("one"));
     cache.put("2", Promise.resolve("two"));
     expect(cache.get("1")).to.be.undefined;
@@ -14,7 +14,7 @@ describe("PromiseCache class", () => {
   });
 
   it("preserves most requested entries when over capacity", async () => {
-    const cache = new PromiseCache<string, string>(3);
+    const cache = new PromiseCache<string, string>({ cacheCapacity: 3 });
     cache.put("1", Promise.resolve("one"));
     cache.put("2", Promise.resolve("two"));
     cache.put("3", Promise.resolve("three"));
@@ -32,7 +32,7 @@ describe("PromiseCache class", () => {
   });
 
   it("caches and retrieves new entries", async () => {
-    const cache = new PromiseCache<string, string>(1);
+    const cache = new PromiseCache<string, string>({ cacheCapacity: 1 });
     cache.put("1", Promise.resolve("one"));
     expect(cache.get("1")).to.not.be.undefined;
     expect(await cache.get("1")).to.equal("one");
@@ -40,7 +40,7 @@ describe("PromiseCache class", () => {
   });
 
   it("updates and retrieves existing entries", async () => {
-    const cache = new PromiseCache<string, string>(2);
+    const cache = new PromiseCache<string, string>({ cacheCapacity: 2 });
     cache.put("1", Promise.resolve("one"));
     cache.put("1", Promise.resolve("uno"));
     expect(cache.get("1")).to.not.be.undefined;
@@ -49,7 +49,9 @@ describe("PromiseCache class", () => {
   });
 
   it("caches and retrieves different object entries", async () => {
-    const cache = new PromiseCache<Record<string, string>, string>(2);
+    const cache = new PromiseCache<Record<string, string>, string>({
+      cacheCapacity: 2,
+    });
     const cacheKey1 = { foo: "bar" };
     const cacheKey2 = { bar: "foo" };
     cache.put(cacheKey1, Promise.resolve("foobar"));
@@ -63,7 +65,7 @@ describe("PromiseCache class", () => {
 
   describe("remove function", () => {
     it("removes a single entry", async () => {
-      const cache = new PromiseCache<string, string>(2);
+      const cache = new PromiseCache<string, string>({ cacheCapacity: 2 });
       cache.put("1", Promise.resolve("one"));
       cache.put("2", Promise.resolve("two"));
       expect(cache.get("1")).to.not.be.undefined;
@@ -78,7 +80,7 @@ describe("PromiseCache class", () => {
 
   describe("clear function", () => {
     it("purges all entries", async () => {
-      const cache = new PromiseCache<string, string>(1);
+      const cache = new PromiseCache<string, string>({ cacheCapacity: 1 });
       cache.put("1", Promise.resolve("one"));
       cache.clear();
       expect(cache.get("1")).to.be.undefined;
@@ -88,7 +90,7 @@ describe("PromiseCache class", () => {
 
   describe("size function", () => {
     it("returns the correct entry count", async () => {
-      const cache = new PromiseCache<string, string>(2);
+      const cache = new PromiseCache<string, string>({ cacheCapacity: 2 });
       cache.put("1", Promise.resolve("one"));
       cache.put("2", Promise.resolve("two"));
       expect(cache.size()).to.equal(2);
@@ -97,25 +99,30 @@ describe("PromiseCache class", () => {
 
   describe("cacheKeyString function", () => {
     it("returns and input string as the same string", async () => {
-      const cache = new PromiseCache<string, string>(1);
+      const cache = new PromiseCache<string, string>({ cacheCapacity: 1 });
       expect(cache.cacheKeyString("key")).to.equal("key");
       expect(cache.cacheKeyString('{ bad: "json"')).to.equal('{ bad: "json"');
     });
 
     it("returns an input number as a string", async () => {
-      const cache = new PromiseCache<number, string>(1);
+      const cache = new PromiseCache<number, string>({ cacheCapacity: 1 });
       expect(cache.cacheKeyString(1)).to.equal("1");
     });
 
     it("returns an input object as its JSON representation", async () => {
-      const cache = new PromiseCache<Record<string, string>, string>(1);
+      const cache = new PromiseCache<Record<string, string>, string>({
+        cacheCapacity: 1,
+      });
       expect(cache.cacheKeyString({ foo: "bar" })).to.equal('{"foo":"bar"}');
     });
   });
 
   describe("time to live", () => {
     it("purges all entries after ttl", async () => {
-      const cache = new PromiseCache<string, string>(1, 10);
+      const cache = new PromiseCache<string, string>({
+        cacheCapacity: 1,
+        cacheTTL: 10,
+      });
       cache.put("1", Promise.resolve("one"));
       await new Promise((resolve) => setTimeout(resolve, 15));
       expect(cache.get("1")).to.be.undefined;

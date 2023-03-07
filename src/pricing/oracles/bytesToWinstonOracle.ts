@@ -5,30 +5,30 @@ import {
   CreateAxiosInstanceParams,
   createAxiosInstance,
 } from "../../axiosClient";
+import { CacheParams } from "../../cache/promiseCache";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import { msPerMinute } from "../../constants";
 import logger from "../../logger";
-import { ByteCount } from "../../types/byte_count";
+import { ByteCount } from "../../types/byteCount";
+import { Winston } from "../../types/winston";
 
 export interface BytesToWinstonOracle {
-  getWinstonForBytes: (bytes: ByteCount) => Promise<BigNumber>;
+  getWinstonForBytes: (bytes: ByteCount) => Promise<Winston>;
 }
 
 export class ArweaveBytesToWinstonOracle implements BytesToWinstonOracle {
-  private readonly axiosInstanceParams: CreateAxiosInstanceParams;
   private readonly axiosInstance: AxiosInstance;
 
   constructor(axiosInstanceParams?: CreateAxiosInstanceParams) {
-    this.axiosInstanceParams = axiosInstanceParams ?? {};
-    this.axiosInstance = createAxiosInstance(this.axiosInstanceParams);
+    this.axiosInstance = createAxiosInstance(axiosInstanceParams ?? {});
   }
 
-  async getWinstonForBytes(bytes: ByteCount): Promise<BigNumber> {
+  async getWinstonForBytes(bytes: ByteCount): Promise<Winston> {
     const url = `https://arweave.net/price/${bytes}`;
     try {
       const response = await this.axiosInstance.get(url);
       if (typeof response.data === "number") {
-        return BigNumber(response.data);
+        return new Winston(BigNumber(response.data));
       } else {
         throw new Error(
           `arweave.net returned bad response ${response.data} URL: ${url}`
@@ -45,7 +45,7 @@ export class ReadThroughBytesToWinstonOracle {
   private readonly oracle: BytesToWinstonOracle;
   private readonly readThroughPromiseCache: ReadThroughPromiseCache<
     ByteCount,
-    BigNumber
+    Winston
   >;
   private getWinstonForBytesFromOracle = async (bytes: ByteCount) => {
     //TODO Get from elasticache first
@@ -56,20 +56,21 @@ export class ReadThroughBytesToWinstonOracle {
     oracle,
     cacheParams,
   }: {
-    oracle: BytesToWinstonOracle;
-    cacheParams?: { cacheCapacity: number; cacheTTL: number };
+    oracle?: BytesToWinstonOracle;
+    cacheParams?: CacheParams;
   }) {
-    this.oracle = oracle;
+    this.oracle = oracle ?? new ArweaveBytesToWinstonOracle();
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
-      cacheCapacity: cacheParams?.cacheCapacity ?? 100,
-      cacheTTL: cacheParams?.cacheTTL ?? msPerMinute * 15,
+      cacheParams: {
+        cacheCapacity: cacheParams?.cacheCapacity ?? 100,
+        cacheTTL: cacheParams?.cacheTTL ?? msPerMinute * 15,
+      },
       readThroughFunction: this.getWinstonForBytesFromOracle,
     });
   }
 
-  async getWinstonForBytes(bytes: ByteCount): Promise<BigNumber> {
-    const chunkBytes = bytes.roundToChunkSize();
-    const cachedValue = this.readThroughPromiseCache.get(chunkBytes);
+  async getWinstonForBytes(bytes: ByteCount): Promise<Winston> {
+    const cachedValue = this.readThroughPromiseCache.get(bytes);
 
     return cachedValue;
   }

@@ -3,7 +3,7 @@ import MockAdapter from "axios-mock-adapter";
 import BigNumber from "bignumber.js";
 import { expect } from "chai";
 
-import { ByteCount } from "../../types/byte_count";
+import { ByteCount } from "../../types/byteCount";
 import { ArweaveBytesToWinstonOracle } from "./bytesToWinstonOracle";
 
 describe("ArweaveBytesToWinstonOracle", () => {
@@ -18,15 +18,14 @@ describe("ArweaveBytesToWinstonOracle", () => {
     });
 
     it("should return a number for valid bytes", async () => {
-      const oracle = new ArweaveBytesToWinstonOracle();
+      const oracle = new ArweaveBytesToWinstonOracle({ retries: 0 });
       const bytes = new ByteCount(1024);
-      const chunkSize = bytes.roundToChunkSize();
       const expectedPrice = BigNumber(31205630);
       mock
-        .onGet(`https://arweave.net/price/${chunkSize}`)
+        .onGet(`https://arweave.net/price/${bytes}`)
         .reply(200, expectedPrice);
-      const arPrice = await oracle.getWinstonForBytes(chunkSize);
-      expect(arPrice.toNumber).to.equal(expectedPrice.toNumber);
+      const arPrice = await oracle.getWinstonForBytes(bytes);
+      expect(arPrice.toBigNumber().toNumber).to.equal(expectedPrice.toNumber);
     });
 
     it("should throw if it gets an invalid response", async () => {

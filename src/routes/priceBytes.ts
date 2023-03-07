@@ -2,7 +2,7 @@ import { Next } from "koa";
 
 import logger from "../logger";
 import { KoaContext } from "../server";
-import { ByteCount } from "../types/byte_count";
+import { ByteCount } from "../types/byteCount";
 
 export async function priceBytes(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
