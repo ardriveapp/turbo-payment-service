@@ -1,6 +1,5 @@
 import BigNumber from "bignumber.js";
 
-import logger from "../logger";
 import { ARC } from "../types";
 import { AR } from "../types/ar";
 import { ByteCount } from "../types/byteCount";
