@@ -3,7 +3,7 @@ import { Next } from "koa";
 import logger from "../logger";
 import { KoaContext } from "../server";
 
-export async function priceRoute(ctx: KoaContext, next: Next) {
+export async function priceFiat(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
   const { pricingService } = ctx.state;
 

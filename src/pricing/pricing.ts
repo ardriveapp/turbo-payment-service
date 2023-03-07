@@ -1,5 +1,6 @@
 import BigNumber from "bignumber.js";
 
+import logger from "../logger";
 import { ARC } from "../types";
 import { AR } from "../types/ar";
 import { ByteCount } from "../types/byteCount";
@@ -30,8 +31,12 @@ export class TurboPricingService implements PricingService {
   }
 
   async getARCForFiat(fiat: string, fiatQuantity: number): Promise<Winston> {
-    const fiatPrice = await this.arweaveToFiatOracle.getFiatPriceForOneAR(fiat);
-    return AR.from(BigNumber(fiatQuantity / fiatPrice)).toWinston();
+    const fiatPriceOfOneAR =
+      await this.arweaveToFiatOracle.getFiatPriceForOneAR(fiat);
+    const amountOfARForFiatQuantity = fiatQuantity / fiatPriceOfOneAR;
+    return AR.from(
+      BigNumber(amountOfARForFiatQuantity.toPrecision(12))
+    ).toWinston();
   }
 
   async getARCForBytes(bytes: ByteCount): Promise<Winston> {

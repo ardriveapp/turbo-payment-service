@@ -4,8 +4,7 @@ import * as promClient from "prom-client";
 
 import logger from "./logger";
 import { helloWorldRoute } from "./routes/helloWorld";
-import { priceRoute } from "./routes/price";
-import { priceBytes } from "./routes/priceBytes";
+import { priceRoutes } from "./routes/priceRoutes";
 import { KoaContext } from "./server";
 
 const metricsRegistry = promClient.register;
@@ -14,11 +13,11 @@ promClient.collectDefaultMetrics({ register: metricsRegistry });
 const router = new Router();
 
 router.get("/", helloWorldRoute);
-router.post("/price/:currency/:value", priceRoute);
-router.post("/v1/price/:currency/:value", priceBytes);
+router.post("priceFiat", "/price/:currency/:value", priceRoutes);
+router.post("priceFiat", "/v1/price/:currency/:value", priceRoutes);
 
-router.post("/price/bytes/:value", priceBytes);
-router.post("/v1/price/bytes/:value", priceBytes);
+router.post("priceBytes", "/price/bytes/:value", priceRoutes);
+router.post("priceBytes", "/v1/price/bytes/:value", priceRoutes);
 
 router.post("/v1/price-quote", () => logger.info("TODO"));
 

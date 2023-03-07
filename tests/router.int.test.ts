@@ -46,4 +46,20 @@ describe("Router tests", () => {
 
     closeServer();
   });
+
+  it("POST /price/:currency/:value", async () => {
+    server = createServer({});
+
+    const { status, statusText, data } = await axios.post(
+      `${localTestUrl}/v1/price/USD/100`
+    );
+
+    const arcAmount = Number(data);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    expect(arcAmount).to.be.a("number");
+    closeServer();
+  });
 });
