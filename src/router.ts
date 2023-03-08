@@ -3,7 +3,6 @@ import Router from "koa-router";
 import * as promClient from "prom-client";
 
 import logger from "./logger";
-import { helloWorldRoute } from "./routes/helloWorld";
 import { priceRoutes } from "./routes/priceRoutes";
 import { KoaContext } from "./server";
 
@@ -12,7 +11,6 @@ promClient.collectDefaultMetrics({ register: metricsRegistry });
 
 const router = new Router();
 
-router.get("/", helloWorldRoute);
 router.post("priceFiat", "/price/:currency/:value", priceRoutes);
 router.post("priceFiat", "/v1/price/:currency/:value", priceRoutes);
 
