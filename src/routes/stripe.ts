@@ -16,7 +16,7 @@ const stripe = new Stripe(stripeSecretKey, {
   typescript: true,
 });
 
-export async function stripeRoute(ctx: KoaContext, next: Next) {
+export async function* stripeRoute(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
   if (
     !ctx.req.headers["stripe-signature"] &&
@@ -51,6 +51,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     // Funds have been captured
     // Fulfill any orders, e-mail receipts, etc
     // To cancel the payment after capture you will need to issue a Refund (https://stripe.com/docs/api/refunds).
+    yield next;
     console.log(`🔔  Webhook received: ${pi.object} ${pi.status}!`);
     console.log("💰 Payment captured!");
   } else if (eventType === "payment_intent.payment_failed") {
@@ -60,6 +61,5 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     console.log("❌ Payment failed.");
   }
 
-  ctx.body = "OK";
   return next;
 }
