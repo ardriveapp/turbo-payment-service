@@ -1,5 +1,6 @@
 import cors from "@koa/cors";
 import Koa, { DefaultState, ParameterizedContext } from "koa";
+import koaBody from "koa-body";
 
 import defaultArch, { Architecture } from "./architecture";
 import { defaultPort } from "./constants";
@@ -36,6 +37,7 @@ export function createServer(
   }
 
   app.use(router.routes());
+  app.use(koaBody());
 
   const server = app.listen(port);
 

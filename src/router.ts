@@ -1,10 +1,12 @@
 import { Next } from "koa";
+import koaBody from "koa-body";
 import Router from "koa-router";
 import * as promClient from "prom-client";
 
 import logger from "./logger";
 import { helloWorldRoute } from "./routes/helloWorld";
 import { priceRoutes } from "./routes/priceRoutes";
+import { stripeRoute } from "./routes/stripe";
 import { KoaContext } from "./server";
 
 const metricsRegistry = promClient.register;
@@ -15,6 +17,8 @@ const router = new Router();
 router.get("/", helloWorldRoute);
 router.post("priceFiat", "/price/:currency/:value", priceRoutes);
 router.post("priceFiat", "/v1/price/:currency/:value", priceRoutes);
+
+router.post("stripe", "/stripe-webhook", koaBody(), stripeRoute);
 
 router.post("priceBytes", "/price/bytes/:value", priceRoutes);
 router.post("priceBytes", "/v1/price/bytes/:value", priceRoutes);
