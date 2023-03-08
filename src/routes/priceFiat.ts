@@ -10,7 +10,7 @@ export async function priceFiat(ctx: KoaContext, next: Next) {
   const currency = ctx.params.currency;
   const value = ctx.params.value;
 
-  const paymentProvider = ctx.request.header["x-payment-provider"];
+  const paymentProvider = ctx.request.header["x-payment-provider"] ?? "stripe";
 
   logger.info(" priceRoute", { currency, value, paymentProvider });
 
