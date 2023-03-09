@@ -32,10 +32,10 @@ describe("Router tests", () => {
     closeServer();
   });
 
-  it("POST /price/bytes", async () => {
+  it("GET /price/bytes", async () => {
     server = createServer({});
 
-    const { status, statusText, data } = await axios.post(
+    const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/price/bytes/1024`
     );
     const arcPrice = Number(data);
@@ -47,10 +47,10 @@ describe("Router tests", () => {
     closeServer();
   });
 
-  it("POST /price/:currency/:value", async () => {
+  it("GET /price/:currency/:value", async () => {
     server = createServer({});
 
-    const { status, statusText, data } = await axios.post(
+    const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/price/USD/100`
     );
 
