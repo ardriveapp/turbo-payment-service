@@ -3,7 +3,7 @@ import MockAdapter from "axios-mock-adapter";
 import BigNumber from "bignumber.js";
 import { expect } from "chai";
 
-import { ByteCount } from "../../types/byteCount";
+import { ByteCount } from "../../types/positiveFiniteInteger";
 import { Winston } from "../../types/winston";
 import { ArweaveBytesToWinstonOracle } from "./bytesToWinstonOracle";
 
