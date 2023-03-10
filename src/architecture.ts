@@ -1,4 +1,4 @@
-import { Database } from "./database/database";
+import { Database, TestDatabase } from "./database/database";
 import { PricingService, TurboPricingService } from "./pricing/pricing";
 
 export interface Architecture {
@@ -7,11 +7,7 @@ export interface Architecture {
 }
 
 export const defaultArch: Architecture = {
-  paymentDatabase: {
-    goodbyeUniverse() {
-      return Promise.resolve({ address: "Steve", balance: 101 });
-    },
-  },
+  paymentDatabase: new TestDatabase(),
   pricingService: new TurboPricingService({}),
 };
 

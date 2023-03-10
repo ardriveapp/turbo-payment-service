@@ -22,3 +22,5 @@ node_modules
 !.yarn/sdks
 !.yarn/versions
 
+.env
+
