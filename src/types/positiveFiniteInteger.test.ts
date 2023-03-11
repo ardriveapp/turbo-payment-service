@@ -56,14 +56,6 @@ describe("PositiveFiniteInteger class", () => {
     });
   });
 
-  describe("roundToChunkSize function", () => {
-    it("returns the correct PositiveFiniteInteger number value", () => {
-      const eid = new PositiveFiniteInteger(12345);
-      const rounded = new PositiveFiniteInteger(262144);
-      expect(eid.roundToChunkSize()).to.deep.equal(rounded);
-    });
-  });
-
   describe("equals function", () => {
     it("correctly evaluates equality", () => {
       const bc1 = new PositiveFiniteInteger(12345);

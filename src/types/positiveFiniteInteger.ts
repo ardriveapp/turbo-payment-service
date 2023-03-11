@@ -60,11 +60,4 @@ export class PositiveFiniteInteger implements Equatable<PositiveFiniteInteger> {
   equals(other: PositiveFiniteInteger): boolean {
     return this.positiveFiniteInteger === other.positiveFiniteInteger;
   }
-
-  roundToChunkSize(): PositiveFiniteInteger {
-    const chunkSize = 256 * 1024;
-    return new PositiveFiniteInteger(
-      Math.ceil(this.positiveFiniteInteger / chunkSize) * chunkSize
-    );
-  }
 }
