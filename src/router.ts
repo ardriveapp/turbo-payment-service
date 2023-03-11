@@ -11,16 +11,9 @@ promClient.collectDefaultMetrics({ register: metricsRegistry });
 
 const router = new Router();
 
-router.get(
-  "price",
-  "/v1/price/:bytesOrCurrency/:byteCountOrFiatAmount",
-  priceRoutes
-);
-router.get(
-  "price",
-  "/price/:bytesOrCurrency/:byteCountOrFiatAmount",
-  priceRoutes
-);
+router.get("/v1/price/:amount", priceRoutes);
+router.get("/v1/price/bytes/:amount", priceRoutes);
+router.get("/v1/price/:currency/:amount", priceRoutes);
 
 router.post("/v1/price-quote", () => logger.info("TODO"));
 

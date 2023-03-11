@@ -1,3 +1,7 @@
 import { PositiveFiniteInteger } from "./positiveFiniteInteger";
 
-export type ByteCount = PositiveFiniteInteger;
+export class ByteCount extends PositiveFiniteInteger {
+  constructor(value: number) {
+    super(value);
+  }
+}

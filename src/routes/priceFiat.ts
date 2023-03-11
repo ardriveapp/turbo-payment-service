@@ -7,8 +7,8 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
   const { pricingService } = ctx.state;
 
-  const currency = ctx.params.bytesOrCurrency;
-  const fiatAmount = ctx.params.byteCountOrFiatAmount;
+  const currency = ctx.params.currency;
+  const fiatAmount = ctx.params.amount;
 
   const paymentProvider = ctx.request.header["x-payment-provider"] ?? "stripe";
 
