@@ -1,10 +1,11 @@
 import { Next } from "koa";
-import * as promClient from "prom-client";
 import getRawBody from "raw-body";
 import { Stripe } from "stripe";
 
-import logger from "../logger";
-import { KoaContext } from "../server";
+import logger from "../../logger";
+import { KoaContext } from "../../server";
+import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
+import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
 require("dotenv").config();
 
@@ -27,21 +28,6 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
   const sig = ctx.request.headers["stripe-signature"] as string;
   const rawBody = await getRawBody(ctx.req);
 
-  const paymentSuccessCounter = new promClient.Counter({
-    name: "payment_intent_succeeded",
-    help: "payment_intent_succeeded",
-  });
-
-  const paymentFailedCounter = new promClient.Counter({
-    name: "payment_intent_failed",
-    help: "payment_intent_failed",
-  });
-
-  const topUpsCounter = new promClient.Counter({
-    name: "top_ups",
-    help: "top_ups",
-  });
-
   let event;
 
   try {
@@ -49,8 +35,8 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
 
     event = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET);
   } catch (err: any) {
-    console.log(`⚠️ Webhook signature verification failed.`);
-    console.log(err.message);
+    logger.info(`⚠️ Webhook signature verification failed.`);
+    logger.info(err.message);
     ctx.status = 400;
     ctx.response.body = `Webhook Error: ${err.message}`;
     return;
@@ -58,33 +44,31 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
 
   // Extract the data from the event.
   const data: Stripe.Event.Data = event.data;
-
+  const pi: Stripe.PaymentIntent = data.object as Stripe.PaymentIntent;
+  // Funds have been captured
+  const walletAddress = pi.metadata["address"]; // => "6735"
+  logger.info(
+    `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
+  );
   switch (event.type) {
     case "payment_intent.succeeded":
       // Cast the event into a PaymentIntent to make use of the types.
-      const pi: Stripe.PaymentIntent = data.object as Stripe.PaymentIntent;
-      // Funds have been captured
-      // Fulfill any orders, e-mail receipts, etc
-      console.log(`🔔  Webhook received: ${pi.object} ${pi.status}!`);
-      console.log("💰 Payment captured!");
-      paymentSuccessCounter.inc();
-      topUpsCounter.inc(pi.amount);
+      handlePaymentSuccessEvent(pi, ctx);
       ctx.status = 200;
       return next;
     case "payment_intent.payment_failed":
-      console.log("💸 Payment failed.");
-      paymentFailedCounter.inc();
+      handlePaymentFailedEvent(pi);
       ctx.status = 500;
       return next;
     case "payment_method.created":
-      console.log("PaymentMethod was created!");
+      logger.info("PaymentMethod was created!");
       break;
     case "payment_method.attached":
-      console.log("PaymentMethod was attached to a Customer!");
+      logger.info("PaymentMethod was attached to a Customer!");
       break;
     // ... handle other event types
     default:
-      console.log(`Unhandled event type ${event.type}`);
+      logger.info(`Unhandled event type ${event.type}`);
       ctx.status = 404;
       ctx.response.body = `Webhook Error: ${event.type}`;
       return;

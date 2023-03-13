@@ -5,7 +5,7 @@ import * as promClient from "prom-client";
 import logger from "./logger";
 import { helloWorldRoute } from "./routes/helloWorld";
 import { priceRoutes } from "./routes/priceRoutes";
-import { stripeRoute } from "./routes/stripe";
+import { stripeRoute } from "./routes/stripe/stripe";
 import { KoaContext } from "./server";
 
 const metricsRegistry = promClient.register;
