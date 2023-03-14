@@ -25,7 +25,7 @@ router.post("/v1/webhook/stripe", () => logger.info("TODO"));
 router.post("/v1/reserve-balance", () => logger.info("TODO"));
 router.post("/v1/refund-balance", () => logger.info("TODO"));
 
-router.post("/stripe-webhook", stripeRoute);
+router.post("/v1/stripe-webhook", stripeRoute);
 
 // Health
 router.get("/health", async (ctx: KoaContext, next: Next) => {
