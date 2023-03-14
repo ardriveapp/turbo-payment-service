@@ -33,9 +33,10 @@ export class TurboPricingService implements PricingService {
     const amountOfARForFiatQuantity = fiatQuantity / fiatPriceOfOneAR;
     // AR only accepts 12 decimal places, but we have more from the above calculation.
     // We need to round to 12 decimal places to avoid errors.
-    return AR.from(
-      BigNumber(amountOfARForFiatQuantity.toPrecision(12))
-    ).toWinston();
+    // toPrecision rounds up by default so this is a workaround to round down to ensure we don't overpay.
+    const ar =
+      Math.floor(amountOfARForFiatQuantity * 1000000000000) / 1000000000000;
+    return AR.from(BigNumber(ar)).toWinston();
   }
 
   async getWCForBytes(bytes: ByteCount): Promise<Winston> {
