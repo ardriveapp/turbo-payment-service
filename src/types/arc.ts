@@ -1,3 +1,5 @@
+import { AR } from "./ar";
 import { Winston } from "./winston";
 
-export type ARC = Winston;
+export type WC = Winston;
+export type ARC = AR;

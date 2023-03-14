@@ -2,16 +2,16 @@ import { Next } from "koa";
 
 import logger from "../logger";
 import { KoaContext } from "../server";
-import { PositiveFiniteInteger } from "../types/types";
+import { ByteCount } from "../types/types";
 
 export async function priceBytesHandler(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
   const { pricingService } = ctx.state;
 
   const bytesValue = ctx.params.amount;
-  let bytes: PositiveFiniteInteger;
+  let bytes: ByteCount;
   try {
-    bytes = new PositiveFiniteInteger(Number(bytesValue));
+    bytes = ByteCount(Number(bytesValue));
   } catch (error) {
     logger.error(error);
     ctx.response.status = 400;
