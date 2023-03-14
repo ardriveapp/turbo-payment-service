@@ -1,4 +1,5 @@
 import axios from "axios";
+import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
 
@@ -15,9 +16,18 @@ describe("Router tests", () => {
     logger.info("Server closed!");
   }
 
-  it("GET /health returns 'OK' in the body, a 200 status, and the correct content-length", async () => {
+  let mock: MockAdapter;
+  beforeEach(() => {
     server = createServer({});
+    mock = new MockAdapter(axios, { onNoMatch: "passthrough" });
+  });
 
+  afterEach(() => {
+    mock.restore();
+    closeServer();
+  });
+
+  it("GET /health returns 'OK' in the body, a 200 status, and the correct content-length", async () => {
     const { status, statusText, headers, data } = await axios.get(
       localTestUrl + "/health"
     );
@@ -28,12 +38,10 @@ describe("Router tests", () => {
     assertExpectedHeadersWithContentLength(headers, 2);
 
     expect(data).to.equal("OK");
-
-    closeServer();
   });
 
   it("GET /price/bytes", async () => {
-    server = createServer({});
+    mock.onGet("arweave.net/price/1024").reply(200, "100");
 
     const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/price/bytes/1024`
@@ -43,12 +51,18 @@ describe("Router tests", () => {
     expect(statusText).to.equal("OK");
 
     expect(arcPrice).to.be.a("number");
-
-    closeServer();
   });
 
   it("GET /price/:currency/:value", async () => {
-    server = createServer({});
+    mock
+      .onGet(
+        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
+      )
+      .reply(200, {
+        arweave: {
+          usd: 10,
+        },
+      });
 
     const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/price/USD/100`
@@ -60,18 +74,24 @@ describe("Router tests", () => {
     expect(statusText).to.equal("OK");
 
     expect(arcAmount).to.be.a("number");
-    closeServer();
   });
 
-  it("GET /price/:currency/:value throws for invalid currency", async () => {
-    server = createServer({});
+  it("GET /price/:currency/:value returns 502 for invalid currency", async () => {
+    //Coingecko returns 200 and empty arweave object for invalid currency
+
+    mock
+      .onGet(
+        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=RandomCurrency"
+      )
+      .reply(200, { arweave: {} });
 
     const { status } = await axios.get(
-      `${localTestUrl}/v1/price/RandomCurrency/100`
+      `${localTestUrl}/v1/price/RandomCurrency/100`,
+      {
+        // stop axios from throwing an error for 502
+        validateStatus: () => true,
+      }
     );
-
     expect(status).to.equal(502);
-
-    closeServer();
   });
 });
