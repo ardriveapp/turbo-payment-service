@@ -62,4 +62,16 @@ describe("Router tests", () => {
     expect(arcAmount).to.be.a("number");
     closeServer();
   });
+
+  it("GET /price/:currency/:value throws for invalid currency", async () => {
+    server = createServer({});
+
+    const { status } = await axios.get(
+      `${localTestUrl}/v1/price/RandomCurrency/100`
+    );
+
+    expect(status).to.equal(502);
+
+    closeServer();
+  });
 });
