@@ -18,11 +18,17 @@ export class MetricRegistry {
     help: "payment_intent_succeeded",
   });
 
+  public static uncaughtExceptionCounter = new promClient.Counter({
+    name: "uncaught_exceptions_total",
+    help: "Count of uncaught exceptions",
+  });
+
   private constructor() {
     this.registry = new promClient.Registry();
     this.registry.registerMetric(MetricRegistry.paymentFailedCounter);
     this.registry.registerMetric(MetricRegistry.paymentSuccessCounter);
     this.registry.registerMetric(MetricRegistry.topUpsCounter);
+    this.registry.registerMetric(MetricRegistry.uncaughtExceptionCounter);
   }
 
   public static getInstance(): MetricRegistry {
