@@ -31,6 +31,8 @@ export class TurboPricingService implements PricingService {
     const fiatPriceOfOneAR =
       await this.arweaveToFiatOracle.getFiatPriceForOneAR(fiat);
     const amountOfARForFiatQuantity = fiatQuantity / fiatPriceOfOneAR;
+    // AR only accepts 12 decimal places, but we have more from the above calculation.
+    // We need to round to 12 decimal places to avoid errors.
     return AR.from(
       BigNumber(amountOfARForFiatQuantity.toPrecision(12))
     ).toWinston();
