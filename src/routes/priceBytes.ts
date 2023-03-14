@@ -20,7 +20,7 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
   }
   //TODO - Hit db and return 503 if unavailable
   try {
-    const price = await pricingService.getARCForBytes(bytes);
+    const price = await pricingService.getWCForBytes(bytes);
     ctx.response.status = 200;
     ctx.body = price;
   } catch (error) {

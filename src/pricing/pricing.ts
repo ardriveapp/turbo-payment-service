@@ -6,8 +6,8 @@ import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
 export interface PricingService {
-  getARCForFiat: (fiat: string, fiatQuantity: number) => Promise<WC>;
-  getARCForBytes: (bytes: ByteCount) => Promise<WC>;
+  getWCForFiat: (fiat: string, fiatQuantity: number) => Promise<WC>;
+  getWCForBytes: (bytes: ByteCount) => Promise<WC>;
 }
 
 export class TurboPricingService implements PricingService {
@@ -27,7 +27,7 @@ export class TurboPricingService implements PricingService {
       arweaveToFiatOracle ?? new ReadThroughArweaveToFiatOracle({});
   }
 
-  async getARCForFiat(fiat: string, fiatQuantity: number): Promise<Winston> {
+  async getWCForFiat(fiat: string, fiatQuantity: number): Promise<Winston> {
     const fiatPriceOfOneAR =
       await this.arweaveToFiatOracle.getFiatPriceForOneAR(fiat);
     const amountOfARForFiatQuantity = fiatQuantity / fiatPriceOfOneAR;
@@ -38,7 +38,7 @@ export class TurboPricingService implements PricingService {
     ).toWinston();
   }
 
-  async getARCForBytes(bytes: ByteCount): Promise<Winston> {
+  async getWCForBytes(bytes: ByteCount): Promise<Winston> {
     const chunkSize = roundToArweaveChunkSize(bytes);
     const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize

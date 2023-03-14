@@ -17,7 +17,7 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
   //TODO - Do something with paymentProvider
 
   try {
-    const price = await pricingService.getARCForFiat(currency, fiatAmount);
+    const price = await pricingService.getWCForFiat(currency, fiatAmount);
     ctx.body = price;
   } catch (error) {
     logger.error(error);
