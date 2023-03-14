@@ -1,5 +1,5 @@
 export interface Database {
-  getPriceQuote: (
+  getPaymentQuote: (
     walletAddress: string
   ) => Promise<{ address: string; balance: number }>;
   createPriceQuote: () => Promise<{ address: string; balance: number }>;
@@ -12,7 +12,7 @@ export interface Database {
 }
 
 export class TestDatabase implements Database {
-  getPriceQuote = (walletAddress: string) =>
+  getPaymentQuote = (walletAddress: string) =>
     Promise.resolve({ address: walletAddress, balance: 10 });
   createPriceQuote = () => Promise.resolve({ address: "", balance: 0 });
   getReceipt = (walletAddress: string) =>

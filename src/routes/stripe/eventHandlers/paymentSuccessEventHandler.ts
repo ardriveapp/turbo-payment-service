@@ -9,18 +9,18 @@ import { AR } from "../../../types/ar";
 
 export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
-  ctx: KoaContext
+  ctx: Partial<KoaContext>
 ) {
   const pricingService = ctx.architecture.pricingService as PricingService;
   const database = ctx.architecture.paymentDatabase as Database;
   const walletAddress = pi.metadata["address"];
-  console.log(
+  logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
   );
 
-  console.log(`💰 Payment captured!  ${pi.amount}}`);
+  logger.info(`💰 Payment captured!  ${pi.amount}}`);
 
-  const paymentQuote = await database.getPriceQuote(walletAddress);
+  const paymentQuote = await database.getPaymentQuote(walletAddress);
   if (paymentQuote) {
     logger.info(`Payment Quote found for ${walletAddress}`);
     const receipt = await database.createReceipt(walletAddress);
