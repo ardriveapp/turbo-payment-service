@@ -1,9 +1,7 @@
 import BigNumber from "bignumber.js";
 
-import { ARC } from "../types";
-import { AR } from "../types/ar";
-import { ByteCount } from "../types/byteCount";
-import { Winston } from "../types/winston";
+import { AR, ARC, ByteCount, Winston } from "../types/types";
+import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
@@ -39,7 +37,10 @@ export class TurboPricingService implements PricingService {
   }
 
   async getARCForBytes(bytes: ByteCount): Promise<Winston> {
-    const winston = await this.bytesToWinstonOracle.getWinstonForBytes(bytes);
+    const chunkSize = roundToArweaveChunkSize(bytes);
+    const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
+      chunkSize
+    );
     return winston;
   }
 }
