@@ -1,8 +1,8 @@
 import * as chai from "chai";
 import sinon from "sinon";
 import sinonChai from "sinon-chai";
-import { Stripe } from "stripe";
 
+import { paymentIntentStub } from "../../../../tests/helpers/stubs";
 import { handlePaymentSuccessEvent } from "./paymentSuccessEventHandler";
 
 var expect = chai.expect;
@@ -31,45 +31,7 @@ describe("handlePaymentSuccessEvent", () => {
   });
 
   it("should process payment and create receipt if payment quote exists", async () => {
-    const paymentIntent: Stripe.PaymentIntent = {
-      id: "pi_123",
-      status: "succeeded",
-      amount: 100,
-      currency: "usd",
-      metadata: { address: "0x1234567890" },
-      object: "payment_intent",
-      amount_capturable: 0,
-      amount_received: 0,
-      application: null,
-      application_fee_amount: null,
-      automatic_payment_methods: null,
-      canceled_at: null,
-      cancellation_reason: null,
-      capture_method: "automatic",
-      client_secret: null,
-      confirmation_method: "automatic",
-      created: 0,
-      customer: null,
-      description: null,
-      invoice: null,
-      last_payment_error: null,
-      livemode: false,
-      next_action: null,
-      on_behalf_of: null,
-      payment_method: null,
-      payment_method_options: null,
-      payment_method_types: [],
-      processing: null,
-      receipt_email: null,
-      review: null,
-      setup_future_usage: null,
-      shipping: null,
-      source: null,
-      statement_descriptor: null,
-      statement_descriptor_suffix: null,
-      transfer_data: null,
-      transfer_group: null,
-    };
+    const paymentIntent = paymentIntentStub;
     sinon.stub(mockDatabase, "getPaymentQuote").resolves({});
     sinon.stub(mockDatabase, "createReceipt").resolves({});
     sinon.stub(mockPricingService, "getARCForFiat").resolves("1.2345");
@@ -89,45 +51,7 @@ describe("handlePaymentSuccessEvent", () => {
   });
 
   it("should throw an error if no payment quote is found", async () => {
-    const paymentIntent: Stripe.PaymentIntent = {
-      id: "pi_123",
-      status: "succeeded",
-      amount: 100,
-      currency: "usd",
-      metadata: { address: "0x1234567890" },
-      object: "payment_intent",
-      amount_capturable: 0,
-      amount_received: 0,
-      application: null,
-      application_fee_amount: null,
-      automatic_payment_methods: null,
-      canceled_at: null,
-      cancellation_reason: null,
-      capture_method: "automatic",
-      client_secret: null,
-      confirmation_method: "automatic",
-      created: 0,
-      customer: null,
-      description: null,
-      invoice: null,
-      last_payment_error: null,
-      livemode: false,
-      next_action: null,
-      on_behalf_of: null,
-      payment_method: null,
-      payment_method_options: null,
-      payment_method_types: [],
-      processing: null,
-      receipt_email: null,
-      review: null,
-      setup_future_usage: null,
-      shipping: null,
-      source: null,
-      statement_descriptor: null,
-      statement_descriptor_suffix: null,
-      transfer_data: null,
-      transfer_group: null,
-    };
+    const paymentIntent = paymentIntentStub;
     sinon.stub(mockDatabase, "getPaymentQuote").resolves(undefined);
     try {
       await handlePaymentSuccessEvent(paymentIntent, mockCtx);
