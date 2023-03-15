@@ -62,10 +62,10 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
       ctx.status = 200;
       return next;
     case "payment_method.created":
-      logger.info("PaymentMethod was created!");
+      logger.info("PaymentMethod was created!", { walletAddress });
       break;
     case "payment_method.attached":
-      logger.info("PaymentMethod was attached to a Customer!");
+      logger.info("PaymentMethod was attached to a Customer!", { walletAddress });
       break;
     // ... handle other event types
     default:
