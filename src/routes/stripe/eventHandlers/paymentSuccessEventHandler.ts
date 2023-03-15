@@ -20,8 +20,8 @@ export async function handlePaymentSuccessEvent(
 
   logger.info(`💰 Payment captured!  ${pi.amount}}`);
 
-  const paymentQuote = await database.getPriceQuote(walletAddress);
-  if (paymentQuote) {
+  const priceQuote = await database.getPriceQuote(walletAddress);
+  if (priceQuote) {
     logger.info(`Payment Quote found for ${walletAddress}`);
     const receipt = await database.createPaymentReceipt(walletAddress);
 

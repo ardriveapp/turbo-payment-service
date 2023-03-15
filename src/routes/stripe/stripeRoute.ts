@@ -44,20 +44,20 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
 
   // Extract the data from the event.
   const data: Stripe.Event.Data = event.data;
-  const pi: Stripe.PaymentIntent = data.object as Stripe.PaymentIntent;
+  const paymentIntent: Stripe.PaymentIntent = data.object as Stripe.PaymentIntent;
   // Funds have been captured
-  const walletAddress = pi.metadata["address"]; // => "6735"
+  const walletAddress = paymentIntent.metadata["address"]; // => "6735"
   logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
+    `🔔  Webhook received for Wallet ${walletAddress}: ${paymentIntent.status}!`
   );
   switch (event.type) {
     case "payment_intent.succeeded":
       // Cast the event into a PaymentIntent to make use of the types.
-      handlePaymentSuccessEvent(pi, ctx);
+      handlePaymentSuccessEvent(paymentIntent, ctx);
       ctx.status = 200;
       return next;
     case "payment_intent.payment_failed":
-      handlePaymentFailedEvent(pi);
+      handlePaymentFailedEvent(paymentIntent);
       ctx.status = 500;
       return next;
     case "payment_method.created":
