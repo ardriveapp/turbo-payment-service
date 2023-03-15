@@ -47,7 +47,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
   const paymentIntent: Stripe.PaymentIntent =
     data.object as Stripe.PaymentIntent;
   // Funds have been captured
-  const walletAddress = paymentIntent.metadata["address"]; // => "6735"
+  const walletAddress = paymentIntent.metadata["address"];
   logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${paymentIntent.status}!`
   );
