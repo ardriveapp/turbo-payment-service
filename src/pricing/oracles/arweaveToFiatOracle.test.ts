@@ -5,11 +5,15 @@ import { expect } from "chai";
 import { CoingeckoArweaveToFiatOracle } from "./arweaveToFiatOracle";
 
 describe("CoingeckoArweaveToFiatOracle", () => {
-  const mock = new MockAdapter(axios);
+  let mock: MockAdapter;
+  beforeEach(() => {
+    mock = new MockAdapter(axios);
+  });
 
   afterEach(() => {
-    mock.reset();
+    mock.restore();
   });
+
   describe("getFiatPriceForOneAR", () => {
     it("should return a number for valid fiat currency", async () => {
       const oracle = new CoingeckoArweaveToFiatOracle();

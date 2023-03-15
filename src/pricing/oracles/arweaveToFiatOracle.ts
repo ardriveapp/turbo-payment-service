@@ -20,22 +20,22 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
   }
 
   async getFiatPriceForOneAR(fiat: string): Promise<number> {
-    try {
-      const result = await this.axiosInstance.get(
-        `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`
-      );
+    fiat = fiat.toLowerCase();
 
+    const url = `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`;
+    logger.info(`Getting AR price in ${fiat} from Coingecko API URL: ${url}`);
+
+    try {
+      const result = await this.axiosInstance.get(url);
       if (result.data.arweave[fiat]) {
         const fiatPriceOfOneAR = result.data.arweave[fiat];
-        return fiatPriceOfOneAR;
+        return Number(fiatPriceOfOneAR);
       } else {
-        throw new Error(
-          `coingecko returned bad response ${result.data.arweave[fiat]}`
-        );
+        throw new Error(result.data);
       }
     } catch (error) {
       logger.error(
-        `Error getting AR price in ${fiat} from Coingecko API`,
+        `Error getting AR price in ${fiat} from Coingecko API URL: ${url}`,
         error
       );
       throw error;

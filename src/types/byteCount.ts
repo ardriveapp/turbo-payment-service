@@ -1,58 +1,7 @@
-import { Equatable } from "./equatable";
+import { PositiveFiniteInteger } from "./positiveFiniteInteger";
 
-export class ByteCount implements Equatable<ByteCount> {
-  constructor(private readonly byteCount: number) {
-    if (
-      !Number.isFinite(this.byteCount) ||
-      !Number.isInteger(this.byteCount) ||
-      this.byteCount < 0
-    ) {
-      throw new Error("Byte count must be a non-negative integer value!");
-    }
-  }
-
-  [Symbol.toPrimitive](hint?: string): number | string {
-    if (hint === "string") {
-      this.toString();
-    }
-
-    return this.byteCount;
-  }
-
-  plus(byteCount: ByteCount): ByteCount {
-    return new ByteCount(this.byteCount + byteCount.byteCount);
-  }
-
-  minus(byteCount: ByteCount): ByteCount {
-    return new ByteCount(this.byteCount - byteCount.byteCount);
-  }
-
-  isGreaterThan(byteCount: ByteCount): boolean {
-    return this.byteCount > byteCount.byteCount;
-  }
-
-  isGreaterThanOrEqualTo(byteCount: ByteCount): boolean {
-    return this.byteCount >= byteCount.byteCount;
-  }
-
-  toString(): string {
-    return `${this.byteCount}`;
-  }
-
-  valueOf(): number {
-    return this.byteCount;
-  }
-
-  toJSON(): number {
-    return this.byteCount;
-  }
-
-  equals(other: ByteCount): boolean {
-    return this.byteCount === other.byteCount;
-  }
-
-  roundToChunkSize(): number {
-    const chunkSize = 256 * 1024;
-    return Math.ceil(this.byteCount / chunkSize) * chunkSize;
-  }
+export function ByteCount(value: number): PositiveFiniteInteger {
+  return new PositiveFiniteInteger(value);
 }
+
+export type ByteCount = PositiveFiniteInteger;

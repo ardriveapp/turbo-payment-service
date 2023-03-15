@@ -17,7 +17,7 @@ export function createServer(
 ) {
   const app = new Koa();
 
-  app.use(cors({ allowMethods: "GET" }));
+  app.use(cors({ allowMethods: ["GET", "POST"] }));
   app.use(async (ctx: KoaContext, next) => {
     attachArchToKoaContext(ctx);
 

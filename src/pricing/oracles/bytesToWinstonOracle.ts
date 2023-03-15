@@ -9,8 +9,7 @@ import { CacheParams } from "../../cache/promiseCache";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import { msPerMinute } from "../../constants";
 import logger from "../../logger";
-import { ByteCount } from "../../types/byteCount";
-import { Winston } from "../../types/winston";
+import { ByteCount, Winston } from "../../types/types";
 
 export interface BytesToWinstonOracle {
   getWinstonForBytes: (bytes: ByteCount) => Promise<Winston>;
@@ -24,17 +23,18 @@ export class ArweaveBytesToWinstonOracle implements BytesToWinstonOracle {
   }
 
   async getWinstonForBytes(bytes: ByteCount): Promise<Winston> {
+    const url = `https://arweave.net/price/${bytes}`;
     try {
-      const response = await this.axiosInstance.get(
-        `https://arweave.net/price/${bytes.roundToChunkSize()}`
-      );
+      const response = await this.axiosInstance.get(url);
       if (typeof response.data === "number") {
         return new Winston(BigNumber(response.data));
       } else {
-        throw new Error(`arweave.net returned bad response ${response.data}`);
+        throw new Error(
+          `arweave.net returned bad response ${response.data} URL: ${url}`
+        );
       }
     } catch (error) {
-      logger.error(`Error getting AR price`, error);
+      logger.error(`Error getting AR price URL: ${url}`, error);
       throw error;
     }
   }
