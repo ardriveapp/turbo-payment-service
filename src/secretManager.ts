@@ -26,9 +26,9 @@ export class SecretManager {
   }
 
   constructor() {
-    if (process.env.STRIPE_SECRET_KEY && process.env.WEBHOOK_SECRET) {
+    if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET) {
       this.STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-      this.STRIPE_WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
+      this.STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
     } else {
       this.getSecretsFromAWS();
     }
