@@ -35,11 +35,10 @@ export function createServer(
   });
 
   function attachArchToKoaContext(ctx: KoaContext): void {
-    const { paymentDatabase, pricingService, metricsRegistry } = arch;
+    const { paymentDatabase, pricingService } = arch;
 
     ctx.state.paymentDatabase = paymentDatabase ?? defaultArch.paymentDatabase;
     ctx.state.pricingService = pricingService ?? defaultArch.pricingService;
-    ctx.state.metricsRegistry = metricsRegistry ?? defaultArch.metricsRegistry;
   }
 
   app.use(router.routes());
