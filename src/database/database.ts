@@ -1,22 +1,22 @@
 export interface Database {
-  getPaymentQuote: (
+  getPriceQuote: (
     walletAddress: string
   ) => Promise<{ address: string; balance: number }>;
   createPriceQuote: () => Promise<{ address: string; balance: number }>;
-  getReceipt: (
+  getPaymentReceipt: (
     walletAddress: string
   ) => Promise<{ address: string; balance: number }>;
-  createReceipt: (
+  createPaymentReceipt: (
     walletAddress: string
   ) => Promise<{ address: string; balance: number }>;
 }
 
 export class TestDatabase implements Database {
-  getPaymentQuote = (walletAddress: string) =>
+  getPriceQuote = (walletAddress: string) =>
     Promise.resolve({ address: walletAddress, balance: 10 });
   createPriceQuote = () => Promise.resolve({ address: "", balance: 0 });
-  getReceipt = (walletAddress: string) =>
+  getPaymentReceipt = (walletAddress: string) =>
     Promise.resolve({ address: walletAddress, balance: 0 });
-  createReceipt = (walletAddress: string) =>
+  createPaymentReceipt = (walletAddress: string) =>
     Promise.resolve({ address: walletAddress, balance: 0 });
 }

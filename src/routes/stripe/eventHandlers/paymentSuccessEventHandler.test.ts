@@ -13,8 +13,8 @@ const mockPricingService = {
 };
 
 const mockDatabase = {
-  getPaymentQuote: () => Promise.resolve({}),
-  createReceipt: () => Promise.resolve({}),
+  getPriceQuote: () => Promise.resolve({}),
+  createPaymentReceipt: () => Promise.resolve({}),
 };
 
 const mockCtx = {
@@ -32,18 +32,18 @@ describe("handlePaymentSuccessEvent", () => {
 
   it("should process payment and create receipt if payment quote exists", async () => {
     const paymentIntent = paymentIntentStub;
-    sinon.stub(mockDatabase, "getPaymentQuote").resolves({});
-    sinon.stub(mockDatabase, "createReceipt").resolves({});
+    sinon.stub(mockDatabase, "getPriceQuote").resolves({});
+    sinon.stub(mockDatabase, "createPaymentReceipt").resolves({});
     sinon.stub(mockPricingService, "getARCForFiat").resolves("1.2345");
 
     await handlePaymentSuccessEvent(paymentIntent, mockCtx);
 
-    expect(mockDatabase.getPaymentQuote).to.have.been.calledOnceWithExactly(
+    expect(mockDatabase.getPriceQuote).to.have.been.calledOnceWithExactly(
       paymentIntent.metadata["address"]
     );
-    expect(mockDatabase.createReceipt).to.have.been.calledOnceWithExactly(
-      paymentIntent.metadata["address"]
-    );
+    expect(
+      mockDatabase.createPaymentReceipt
+    ).to.have.been.calledOnceWithExactly(paymentIntent.metadata["address"]);
     expect(mockPricingService.getARCForFiat).to.have.been.calledOnceWithExactly(
       paymentIntent.currency,
       paymentIntent.amount
@@ -52,7 +52,7 @@ describe("handlePaymentSuccessEvent", () => {
 
   it("should throw an error if no payment quote is found", async () => {
     const paymentIntent = paymentIntentStub;
-    sinon.stub(mockDatabase, "getPaymentQuote").resolves(undefined);
+    sinon.stub(mockDatabase, "getPriceQuote").resolves(undefined);
     try {
       await handlePaymentSuccessEvent(paymentIntent, mockCtx);
       expect.fail("No payment quote found for 0x1234567890");
