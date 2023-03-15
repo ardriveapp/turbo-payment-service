@@ -1,5 +1,5 @@
 import { Database } from "./database/database";
-import { PricingService } from "./pricing/pricing";
+import { PricingService, TurboPricingService } from "./pricing/pricing";
 
 export interface Architecture {
   paymentDatabase: Database;
@@ -12,11 +12,7 @@ export const defaultArch: Architecture = {
       return Promise.resolve({ address: "Steve", balance: 101 });
     },
   },
-  pricingService: {
-    helloWorld() {
-      return Promise.resolve(777);
-    },
-  },
+  pricingService: new TurboPricingService({}),
 };
 
 export default defaultArch;
