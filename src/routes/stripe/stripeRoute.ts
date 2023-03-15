@@ -7,22 +7,22 @@ import { KoaContext } from "../../server";
 import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
-require("dotenv").config();
-
-const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY!;
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET!;
-
-const stripe = new Stripe(STRIPE_SECRET_KEY, {
-  apiVersion: "2022-11-15",
-  appInfo: {
-    // For sample support and debugging, not required for production:
-    name: "ardrive-turbo",
-    version: "0.0.0",
-  },
-  typescript: true,
-});
-
 export async function stripeRoute(ctx: KoaContext, next: Next) {
+  const secretManager = ctx.architecture.secretManager;
+
+  const STRIPE_SECRET_KEY = await secretManager.getStripeSecretKey();
+  const WEBHOOK_SECRET = await secretManager.getStripeWebhookSecret();
+
+  const stripe = new Stripe(STRIPE_SECRET_KEY, {
+    apiVersion: "2022-11-15",
+    appInfo: {
+      // For sample support and debugging, not required for production:
+      name: "ardrive-turbo",
+      version: "0.0.0",
+    },
+    typescript: true,
+  });
+
   logger.child({ path: ctx.path });
   //get the webhook signature for verification
   const sig = ctx.request.headers["stripe-signature"] as string;
@@ -44,7 +44,8 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
 
   // Extract the data from the event.
   const data: Stripe.Event.Data = event.data;
-  const paymentIntent: Stripe.PaymentIntent = data.object as Stripe.PaymentIntent;
+  const paymentIntent: Stripe.PaymentIntent =
+    data.object as Stripe.PaymentIntent;
   // Funds have been captured
   const walletAddress = paymentIntent.metadata["address"]; // => "6735"
   logger.info(
