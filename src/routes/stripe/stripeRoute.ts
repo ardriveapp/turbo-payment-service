@@ -59,7 +59,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
       return next;
     case "payment_intent.payment_failed":
       handlePaymentFailedEvent(paymentIntent);
-      ctx.status = 500;
+      ctx.status = 200;
       return next;
     case "payment_method.created":
       logger.info("PaymentMethod was created!");
