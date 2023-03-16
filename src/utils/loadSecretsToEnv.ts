@@ -13,6 +13,11 @@ export async function loadSecretsToEnv() {
     return;
   }
 
+  if (process.env.NODE_ENV === "test") {
+    //TODO - Just return for now until we handle more secrets
+    return;
+  }
+
   if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET) {
     return; // Already loaded
   }
