@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import { Knex } from "knex";
 
 export const localTestUrl = "http://localhost:1235";
 
@@ -34,4 +35,26 @@ export async function expectAsyncErrorThrow({
   if (errorMessage) {
     expect(error?.message).to.equal(errorMessage);
   }
+}
+
+type KnexRawResult = {
+  command: string; // "SELECT" |
+  rowCount: number; // 1
+  oid: unknown; // null
+  rows: { table_name: string }[]; //  [ { table_name: 'new_data_item_1' } ]
+  fields: {
+    name: string; // "table_name"
+    tableID: number; // 13276
+    columnID: number; // 3
+    dataTypeID: number; // 19
+    dataTypeSize: number; // 64
+    dataTypeModifier: number; // -1
+    format: "text";
+  }[];
+};
+
+export function listTables(pg: Knex): Knex.Raw<KnexRawResult> {
+  return pg.raw(
+    "select table_name from information_schema.tables where table_schema = 'public' order by table_name"
+  );
 }
