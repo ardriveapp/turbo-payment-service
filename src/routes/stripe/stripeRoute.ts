@@ -7,13 +7,17 @@ import { KoaContext } from "../../server";
 import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
+require("dotenv").config();
+
 let stripe: Stripe;
 
 export async function stripeRoute(ctx: KoaContext, next: Next) {
-  const secretManager = ctx.architecture.secretManager;
+  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+  const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
-  const STRIPE_SECRET_KEY = await secretManager.getStripeSecretKey();
-  const WEBHOOK_SECRET = await secretManager.getStripeWebhookSecret();
+  if (!STRIPE_SECRET_KEY || !WEBHOOK_SECRET) {
+    throw new Error("Stripe secret key or webhook secret not set");
+  }
 
   stripe ??= new Stripe(STRIPE_SECRET_KEY, {
     apiVersion: "2022-11-15",
