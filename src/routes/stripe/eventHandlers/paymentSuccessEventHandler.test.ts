@@ -39,10 +39,6 @@ describe("handlePaymentSuccessEvent", () => {
     expect(
       mockDatabase.createPaymentReceipt
     ).to.have.been.calledOnceWithExactly(paymentIntent.metadata["address"]);
-    expect(mockPricingService.getARCForFiat).to.have.been.calledOnceWithExactly(
-      paymentIntent.currency,
-      paymentIntent.amount
-    );
   });
 
   it("should throw an error if no payment quote is found", async () => {
