@@ -45,7 +45,7 @@ export class Schema {
   private async createUserTable(): Promise<void> {
     return this.pg.schema.createTable(user, (t) => {
       t.string(userAddress).primary().notNullable();
-      t.string(winstonCreditBalance).defaultTo("0").notNullable();
+      t.string(winstonCreditBalance).notNullable();
       t.timestamp(lastPaymentDate, this.noTimeZone)
         .defaultTo(this.defaultTimestamp())
         .notNullable();

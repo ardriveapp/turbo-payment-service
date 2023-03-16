@@ -1,6 +1,7 @@
 import { expect } from "chai";
 import Knex from "knex";
 
+import { expectedColumnInfo } from "../../tests/helpers/testExpectations";
 import { listTables } from "../../tests/helpers/testHelpers";
 import * as knexConfig from "./knexfile";
 import { Schema } from "./schema";
@@ -34,6 +35,56 @@ describe("Schema class", () => {
     ]);
   });
 
+  it("creates a `user` table that has the expected column structure", async () => {
+    const columnInfo = await knex("user").columnInfo();
+    expect(columnInfo).to.deep.equal({
+      user_address,
+      winston_credit_balance,
+      last_payment_date,
+      last_upload_date,
+      promotional_info,
+    });
+  });
+
+  it("creates a `price_quote` table that has the expected column structure", async () => {
+    const columnInfo = await knex("price_quote").columnInfo();
+    expect(columnInfo).to.deep.equal({
+      price_quote_id,
+      user_address,
+      usd_amount,
+      winston_credit_amount,
+      quote_expiration_date,
+      quote_creation_date,
+      payment_provider,
+    });
+  });
+
+  it("creates a `payment_receipt` table that has the expected column structure", async () => {
+    const columnInfo = await knex("payment_receipt").columnInfo();
+    expect(columnInfo).to.deep.equal({
+      payment_receipt_id,
+      payment_receipt_date,
+      user_address,
+      usd_amount,
+      winston_credit_amount,
+      price_quote_id,
+      payment_provider,
+    });
+  });
+
+  it("creates a `chargeback_receipt` table that has the expected column structure", async () => {
+    const columnInfo = await knex("chargeback_receipt").columnInfo();
+    expect(columnInfo).to.deep.equal({
+      chargeback_receipt_id,
+      payment_receipt_id,
+      chargeback_receipt_date,
+      user_address,
+      usd_amount,
+      winston_credit_amount,
+      chargeback_reason,
+      payment_provider,
+    });
+  });
 
   it("rollback schema public static method removes all expected tables", async () => {
     await Schema.rollback(knex);
@@ -46,3 +97,22 @@ describe("Schema class", () => {
     ]);
   });
 });
+
+const {
+  chargeback_reason,
+  chargeback_receipt_date,
+  chargeback_receipt_id,
+  last_payment_date,
+  last_upload_date,
+  payment_provider,
+  payment_receipt_date,
+  payment_receipt_id,
+  price_quote_id,
+  promotional_info,
+  quote_creation_date,
+  quote_expiration_date,
+  usd_amount,
+  user_address,
+  winston_credit_amount,
+  winston_credit_balance,
+} = expectedColumnInfo;
