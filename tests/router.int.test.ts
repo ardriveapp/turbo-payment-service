@@ -16,7 +16,7 @@ describe("Router tests", () => {
   }
 
   it("GET /health returns 'OK' in the body, a 200 status, and the correct content-length", async () => {
-    server = createServer({});
+    server = await createServer({});
 
     const { status, statusText, headers, data } = await axios.get(
       localTestUrl + "/health"
@@ -33,7 +33,7 @@ describe("Router tests", () => {
   });
 
   it("GET /price/bytes", async () => {
-    server = createServer({});
+    server = await createServer({});
 
     const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/price/bytes/1024`
@@ -48,7 +48,7 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value", async () => {
-    server = createServer({});
+    server = await createServer({});
 
     const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/price/USD/100`

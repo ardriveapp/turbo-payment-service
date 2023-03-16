@@ -7,8 +7,6 @@ import { KoaContext } from "../../server";
 import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
-require("dotenv").config();
-
 let stripe: Stripe;
 
 export async function stripeRoute(ctx: KoaContext, next: Next) {
@@ -75,8 +73,6 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     // ... handle other event types
     default:
       logger.info(`Unhandled event type ${event.type}`);
-      ctx.status = 200;
-
       return;
   }
 

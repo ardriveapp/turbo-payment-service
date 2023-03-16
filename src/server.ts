@@ -18,13 +18,13 @@ process.on("uncaughtException", (error) => {
   logger.error("Uncaught exception:", error);
 });
 
-export function createServer(
+export async function createServer(
   arch: Partial<Architecture>,
   port: number = defaultPort
 ) {
   const app = new Koa();
 
-  loadSecretsToEnv();
+  await loadSecretsToEnv();
 
   app.use(cors({ allowMethods: ["GET", "POST"] }));
   app.use(async (ctx: KoaContext, next) => {

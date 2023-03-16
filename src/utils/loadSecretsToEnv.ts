@@ -3,9 +3,16 @@ import {
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
 
-require("dotenv").config();
+import logger from "../logger";
 
 export async function loadSecretsToEnv() {
+  try {
+    require("dotenv").config();
+  } catch (error) {
+    logger.error("Error loading .env file", error);
+    return;
+  }
+
   if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET) {
     return; // Already loaded
   }
