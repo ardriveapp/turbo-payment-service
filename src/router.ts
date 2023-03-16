@@ -4,6 +4,7 @@ import * as promClient from "prom-client";
 
 import logger from "./logger";
 import { priceRoutes } from "./routes/priceRoutes";
+import { stripeRoute } from "./routes/stripe/stripeRoute";
 import { KoaContext } from "./server";
 
 const metricsRegistry = promClient.register;
@@ -23,6 +24,8 @@ router.post("/v1/webhook/stripe", () => logger.info("TODO"));
 
 router.post("/v1/reserve-balance", () => logger.info("TODO"));
 router.post("/v1/refund-balance", () => logger.info("TODO"));
+
+router.post("/v1/stripe-webhook", stripeRoute);
 
 // Health
 router.get("/health", async (ctx: KoaContext, next: Next) => {

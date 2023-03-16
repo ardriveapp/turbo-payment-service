@@ -17,8 +17,8 @@ describe("Router tests", () => {
   }
 
   let mock: MockAdapter;
-  beforeEach(() => {
-    server = createServer({});
+  beforeEach(async () => {
+    server = await createServer({});
     mock = new MockAdapter(axios, { onNoMatch: "passthrough" });
   });
 
