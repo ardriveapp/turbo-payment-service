@@ -7,13 +7,15 @@ import { KoaContext } from "../../server";
 import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
+let stripe: Stripe;
+
 export async function stripeRoute(ctx: KoaContext, next: Next) {
   const secretManager = ctx.architecture.secretManager;
 
   const STRIPE_SECRET_KEY = await secretManager.getStripeSecretKey();
   const WEBHOOK_SECRET = await secretManager.getStripeWebhookSecret();
 
-  const stripe = new Stripe(STRIPE_SECRET_KEY, {
+  stripe ??= new Stripe(STRIPE_SECRET_KEY, {
     apiVersion: "2022-11-15",
     appInfo: {
       // For sample support and debugging, not required for production:
@@ -51,29 +53,33 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
   logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${paymentIntent.status}!`
   );
+  // Unawaited calls so we can return a response immediately.
+  // TODO - Set the events we want to handle on stripe dashboard
   switch (event.type) {
     case "payment_intent.succeeded":
-      // Cast the event into a PaymentIntent to make use of the types.
       handlePaymentSuccessEvent(paymentIntent, ctx);
-      ctx.status = 200;
-      return next;
+      break;
     case "payment_intent.payment_failed":
       handlePaymentFailedEvent(paymentIntent);
-      ctx.status = 200;
-      return next;
-    case "payment_method.created":
-      logger.info("PaymentMethod was created!");
       break;
-    case "payment_method.attached":
-      logger.info("PaymentMethod was attached to a Customer!");
+    case "charge.dispute.created":
+      logger.info(`Dispute created for ${walletAddress}`);
+      break;
+    case "charge.refund.created":
+      logger.info(`Refund created for ${walletAddress}`);
       break;
     // ... handle other event types
     default:
       logger.info(`Unhandled event type ${event.type}`);
-      ctx.status = 404;
-      ctx.response.body = `Webhook Error: ${event.type}`;
+      ctx.status = 200;
+
       return;
   }
+
+  // Return a 200 response to acknowledge receipt of the event.
+  // Otherwise, Stripe will keep trying to send the event.
+  // Handle errors internally
+  ctx.status = 200;
 
   return next;
 }

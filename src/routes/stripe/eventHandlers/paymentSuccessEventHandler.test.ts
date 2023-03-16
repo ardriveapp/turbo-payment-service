@@ -25,11 +25,6 @@ const mockCtx = {
 };
 
 describe("handlePaymentSuccessEvent", () => {
-  afterEach(() => {
-    // reset the mocks after each test
-    sinon.reset();
-  });
-
   it("should process payment and create receipt if payment quote exists", async () => {
     const paymentIntent = paymentIntentStub;
     sinon.stub(mockDatabase, "getPriceQuote").resolves({});
