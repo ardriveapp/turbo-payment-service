@@ -9,7 +9,7 @@ export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
   ctx: Partial<KoaContext>
 ) {
-  const database = ctx.architecture.paymentDatabase as Database;
+  const paymentDatabase = ctx.state?.paymentDatabase as Database;
   const walletAddress = pi.metadata["address"];
   logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
@@ -17,10 +17,10 @@ export async function handlePaymentSuccessEvent(
 
   logger.info(`💰 Payment captured!  ${pi.amount}}`);
 
-  const priceQuote = await database.getPriceQuote(walletAddress);
+  const priceQuote = await paymentDatabase.getPriceQuote(walletAddress);
   if (priceQuote) {
     logger.info(`Payment Quote found for ${walletAddress}`);
-    const receipt = await database.createPaymentReceipt(walletAddress);
+    const receipt = await paymentDatabase.createPaymentReceipt(walletAddress);
 
     logger.info(
       `Receipt created for ${walletAddress} ${JSON.stringify(receipt)}`

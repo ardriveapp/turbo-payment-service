@@ -5,8 +5,8 @@ import logger from "../../../logger";
 import { MetricRegistry } from "../../../metricRegistry";
 import { KoaContext } from "../../../server";
 
-export async function handlePaymentFailedEvent(
-  pi: Stripe.PaymentIntent,
+export async function handleDisputeCreatedEvent(
+  pi: Stripe.Dispute,
   ctx: Partial<KoaContext>
 ) {
   const walletAddress = pi.metadata["address"];
@@ -19,8 +19,16 @@ export async function handlePaymentFailedEvent(
   const priceQuote = await paymentDatabase.expirePriceQuote(walletAddress);
   if (priceQuote) {
     logger.info(`Payment Quote found for ${walletAddress}`);
+    const oldBalance = await paymentDatabase.getUserBalance(walletAddress);
+    const balance = await paymentDatabase.updateUserBalance(
+      walletAddress,
+      oldBalance.balance - priceQuote.balance
+    );
+    logger.info("Balance updated: " + JSON.stringify(balance));
   } else {
-    logger.info(`No payment quote found for ${walletAddress}`);
+    logger.info(
+      `No price quote found for ${walletAddress}. Creating refund anyway.`
+    );
   }
   const receipt = await paymentDatabase.createRefundReceipt(walletAddress);
   logger.info(
