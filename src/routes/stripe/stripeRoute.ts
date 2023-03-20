@@ -11,6 +11,8 @@ import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHa
 let stripe: Stripe;
 
 export async function stripeRoute(ctx: KoaContext, next: Next) {
+  console.log("Stripe Route");
+
   const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
   const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 

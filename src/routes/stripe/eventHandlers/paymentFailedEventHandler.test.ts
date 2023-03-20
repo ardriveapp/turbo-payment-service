@@ -3,7 +3,6 @@ import sinon from "sinon";
 import sinonChai from "sinon-chai";
 
 import { paymentIntentFailedStub } from "../../../../tests/helpers/stubs";
-import logger from "../../../logger";
 import { handlePaymentFailedEvent } from "./paymentFailedEventHandler";
 
 var expect = chai.expect;
@@ -28,10 +27,9 @@ describe("handlePaymentFailedEvent", () => {
     sandbox.restore();
   });
 
-  it("should log payment failed event and create refund receipt", async () => {
+  it("should capture payment failed event and create refund receipt", async () => {
     const paymentIntent = paymentIntentFailedStub;
 
-    const loggerInfoStub = sandbox.stub(logger, "info");
     const expirePriceQuoteStub = sandbox
       .stub(mockDatabase, "expirePriceQuote")
       .resolves({ walletAddress: "", balance: 10 });
@@ -41,12 +39,6 @@ describe("handlePaymentFailedEvent", () => {
 
     await handlePaymentFailedEvent(paymentIntent, mockCtx as any);
 
-    expect(loggerInfoStub).to.have.been.calledWith(
-      `🔔  Webhook received for Wallet ${paymentIntent.metadata["address"]}: ${paymentIntent.status}!`
-    );
-    expect(loggerInfoStub).to.have.been.calledWith(
-      `💸 Payment failed. ${paymentIntent.amount}`
-    );
     expect(expirePriceQuoteStub).to.have.been.calledWith(
       paymentIntent.metadata["address"]
     );

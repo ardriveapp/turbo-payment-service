@@ -2,6 +2,7 @@ import axios from "axios";
 import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
+import Stripe from "stripe";
 
 import logger from "../src/logger";
 import { createServer } from "../src/server";
@@ -93,5 +94,70 @@ describe("Router tests", () => {
       }
     );
     expect(status).to.equal(502);
+  });
+
+  it("POST /stripe-webhook receives Stripe webhook event and returns 200 status", async () => {
+    // Set up necessary environment variables
+    process.env.STRIPE_SECRET_KEY = "your_stripe_secret_key";
+    process.env.STRIPE_WEBHOOK_SECRET = "your_stripe_webhook_secret";
+
+    const payload = {
+      id: "evt_test_webhook",
+      object: "event",
+      created: 1650586663,
+      data: {
+        object: {
+          id: "pi_test",
+          object: "payment_intent",
+          amount: 1000,
+          currency: "usd",
+          metadata: { address: "test_address" },
+          status: "succeeded",
+        },
+      },
+      type: "payment_intent.succeeded",
+    };
+
+    const payloadString = JSON.stringify(payload, null, 2);
+
+    let stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: "2022-11-15",
+      appInfo: {
+        // For sample support and debugging, not required for production:
+        name: "ardrive-turbo",
+        version: "0.0.0",
+      },
+      typescript: true,
+    });
+
+    const header = stripe.webhooks.generateTestHeaderString({
+      payload: payloadString,
+      secret: process.env.STRIPE_WEBHOOK_SECRET,
+    });
+
+    const event = stripe.webhooks.constructEvent(
+      payloadString,
+      header,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+
+    try {
+      const { status, statusText } = await axios.post(
+        `${localTestUrl}/v1/stripe-webhook`,
+        event,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Stripe-Signature": header,
+          },
+        }
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("OK");
+    } catch (error: any) {
+      logger.error(error);
+      throw new Error(`Test failed: ${error.message}`);
+    }
   });
 });
