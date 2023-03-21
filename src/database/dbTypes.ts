@@ -22,8 +22,8 @@ export type FiatAmount = number;
 // TODO: Define these types here? e.g: `'usd' | 'etc'`
 export type FiatIdentifier = string;
 
-// TODO: Expand to include `"apple-pay"`
-export type PaymentProvider = "stripe";
+// TODO: Define these types here? e.g: `'stripe' | 'apple-pay'`
+export type PaymentProvider = string;
 
 export interface User {
   userAddress: UserAddress;
