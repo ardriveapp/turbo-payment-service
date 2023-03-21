@@ -30,7 +30,7 @@ describe("handleDisputeCreatedEvent", () => {
     sandbox.restore();
   });
 
-  it("should capture dispute created event, update balance, and create refund receipt", async () => {
+  it("should capture the dispute created event, update balance, and create refund receipt", async () => {
     const dispute = chargeDisputeStub;
 
     const expirePriceQuoteStub = sandbox

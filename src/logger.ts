@@ -32,7 +32,7 @@ const logger = createLogger({
   level: process.env.LOG_LEVEL ?? "info",
   transports: [new transports.Console()],
   format: process.env.DEV_LOGS === "1" ? devFormat() : format.simple(),
-  silent: true,
+  silent: process.env.NODE_ENV === "test",
 });
 
 export default logger;

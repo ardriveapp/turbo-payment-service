@@ -27,7 +27,7 @@ describe("handlePaymentFailedEvent", () => {
     sandbox.restore();
   });
 
-  it("should capture payment failed event and create refund receipt", async () => {
+  it("should capture the payment failed event and create refund receipt", async () => {
     const paymentIntent = paymentIntentFailedStub;
 
     const expirePriceQuoteStub = sandbox

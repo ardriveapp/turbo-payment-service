@@ -13,7 +13,7 @@ export async function handleDisputeCreatedEvent(
   logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
   );
-  logger.info(`💸 Payment failed. ${pi.amount}`);
+  logger.info(`💸 Dispute Created. ${pi.amount}`);
   const paymentDatabase = ctx.state?.paymentDatabase as Database;
 
   const priceQuote = await paymentDatabase.expirePriceQuote(walletAddress);
@@ -27,7 +27,7 @@ export async function handleDisputeCreatedEvent(
     logger.info("Balance updated: " + JSON.stringify(balance));
   } else {
     logger.info(
-      `No price quote found for ${walletAddress}. Creating refund anyway.`
+      `No payment quote found for ${walletAddress}. Creating refund anyway.`
     );
   }
   const receipt = await paymentDatabase.createRefundReceipt(walletAddress);
