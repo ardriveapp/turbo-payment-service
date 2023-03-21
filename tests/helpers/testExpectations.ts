@@ -60,6 +60,8 @@ export const expectedColumnInfo = {
   },
   price_quote_id: expectedVarCharColumn({}),
   usd_amount: expectedVarCharColumn({}),
+  fiat_amount: expectedVarCharColumn({}),
+  fiat_identifier: expectedVarCharColumn({}),
   winston_credit_amount: expectedVarCharColumn({}),
   quote_expiration_date: expectedDateColumn(false),
   quote_creation_date: expectedDateColumn(),

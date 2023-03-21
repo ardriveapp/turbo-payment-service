@@ -15,6 +15,8 @@ export const columnNames = {
   promotionalInfo: "promotional_info",
   priceQuoteId: "price_quote_id",
   usdAmount: "usd_amount",
+  fiatAmount: "fiat_amount",
+  fiatIdentifier: "fiat_identifier",
   winstonCreditAmount: "winston_credit_amount",
   quoteExpirationDate: "quote_expiration_date",
   quoteCreationDate: "quote_creation_date",

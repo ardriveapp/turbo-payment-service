@@ -62,6 +62,8 @@ export class Schema {
       t.string(priceQuoteId).primary().notNullable();
       t.string(userAddress).notNullable().index();
       t.string(usdAmount).notNullable();
+      t.string(fiatAmount).notNullable();
+      t.string(fiatIdentifier).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(paymentProvider).notNullable();
       t.timestamp(quoteExpirationDate, this.noTimeZone).notNullable();
@@ -76,6 +78,8 @@ export class Schema {
       t.string(paymentReceiptId).notNullable().primary();
       t.string(userAddress).notNullable().index();
       t.string(usdAmount).notNullable();
+      t.string(fiatAmount).notNullable();
+      t.string(fiatIdentifier).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(priceQuoteId).notNullable();
       t.string(paymentProvider).notNullable();
@@ -113,6 +117,8 @@ const {
   chargebackReason,
   chargebackReceiptDate,
   chargebackReceiptId,
+  fiatAmount,
+  fiatIdentifier,
   lastPaymentDate,
   lastUploadDate,
   paymentProvider,
