@@ -30,7 +30,7 @@ describe("Schema class", () => {
       "knex_migrations",
       "knex_migrations_lock",
       "payment_receipt",
-      "price_quote",
+      "top_up_quote",
       "user",
     ]);
   });
@@ -40,20 +40,17 @@ describe("Schema class", () => {
     expect(columnInfo).to.deep.equal({
       user_address,
       winston_credit_balance,
-      last_payment_date,
-      last_upload_date,
       promotional_info,
     });
   });
 
-  it("creates a `price_quote` table that has the expected column structure", async () => {
-    const columnInfo = await knex("price_quote").columnInfo();
+  it("creates a `top_up_quote` table that has the expected column structure", async () => {
+    const columnInfo = await knex("top_up_quote").columnInfo();
     expect(columnInfo).to.deep.equal({
-      price_quote_id,
+      top_up_quote_id,
       user_address,
-      usd_amount,
-      fiat_amount,
-      fiat_identifier,
+      amount,
+      currency_type,
       winston_credit_amount,
       quote_expiration_date,
       quote_creation_date,
@@ -67,11 +64,10 @@ describe("Schema class", () => {
       payment_receipt_id,
       payment_receipt_date,
       user_address,
-      usd_amount,
-      fiat_amount,
-      fiat_identifier,
+      amount,
+      currency_type,
       winston_credit_amount,
-      price_quote_id,
+      top_up_quote_id,
       payment_provider,
     });
   });
@@ -83,7 +79,8 @@ describe("Schema class", () => {
       payment_receipt_id,
       chargeback_receipt_date,
       user_address,
-      usd_amount,
+      amount,
+      currency_type,
       winston_credit_amount,
       chargeback_reason,
       payment_provider,
@@ -103,21 +100,18 @@ describe("Schema class", () => {
 });
 
 const {
+  amount,
   chargeback_reason,
   chargeback_receipt_date,
   chargeback_receipt_id,
-  fiat_amount,
-  fiat_identifier,
-  last_payment_date,
-  last_upload_date,
+  currency_type,
   payment_provider,
   payment_receipt_date,
   payment_receipt_id,
-  price_quote_id,
+  top_up_quote_id,
   promotional_info,
   quote_creation_date,
   quote_expiration_date,
-  usd_amount,
   user_address,
   winston_credit_amount,
   winston_credit_balance,

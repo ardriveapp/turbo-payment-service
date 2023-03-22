@@ -1,6 +1,6 @@
 export const tableNames = {
   user: "user",
-  priceQuote: "price_quote",
+  topUpQuote: "top_up_quote",
   paymentReceipt: "payment_receipt",
   chargebackReceipt: "chargeback_receipt",
   // TODO: Do we use audit log table for accountability during disputes (see tech design)
@@ -9,14 +9,12 @@ export const tableNames = {
 
 export const columnNames = {
   userAddress: "user_address",
+  userAddressType: "user_address_type",
   winstonCreditBalance: "winston_credit_balance",
-  lastPaymentDate: "last_payment_date",
-  lastUploadDate: "last_upload_date",
   promotionalInfo: "promotional_info",
-  priceQuoteId: "price_quote_id",
-  usdAmount: "usd_amount",
-  fiatAmount: "fiat_amount",
-  fiatIdentifier: "fiat_identifier",
+  topUpQuoteId: "top_up_quote_id",
+  amount: "amount",
+  currencyType: "currency_type",
   winstonCreditAmount: "winston_credit_amount",
   quoteExpirationDate: "quote_expiration_date",
   quoteCreationDate: "quote_creation_date",
