@@ -26,7 +26,7 @@ export async function handleDisputeCreatedEvent(
       walletAddress,
       oldBalance.balance - oldPaymentReceipt.balance
     );
-    logger.info("Balance updated: " + JSON.stringify(balance));
+    logger.info("Balance updated: ", balance);
   } else {
     logger.info(
       `No payment quote found for ${walletAddress}. Creating refund anyway.`
