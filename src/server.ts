@@ -24,7 +24,7 @@ export async function createServer(
 ) {
   const app = new Koa();
 
-  await loadSecretsToEnv();
+  // await loadSecretsToEnv();
 
   app.use(cors({ allowMethods: ["GET", "POST"] }));
   app.use(async (ctx: KoaContext, next) => {
