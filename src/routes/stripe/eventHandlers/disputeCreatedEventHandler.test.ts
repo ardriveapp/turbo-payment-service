@@ -3,6 +3,7 @@ import sinon from "sinon";
 import sinonChai from "sinon-chai";
 
 import { chargeDisputeStub } from "../../../../tests/helpers/stubs";
+import { TestDatabase } from "../../../database/database";
 import { handleDisputeCreatedEvent } from "./disputeCreatedEventHandler";
 
 var expect = chai.expect;
@@ -10,18 +11,8 @@ chai.use(sinonChai);
 
 describe("handleDisputeCreatedEvent", () => {
   let sandbox: sinon.SinonSandbox;
-  const mockDatabase = {
-    expirePriceQuote: () => Promise.resolve({}),
-    createRefundReceipt: () => Promise.resolve({}),
+  const mockDatabase = new TestDatabase();
 
-    getUserBalance: () => Promise.resolve({}),
-    updateUserBalance: () => Promise.resolve({}),
-  };
-  const mockCtx = {
-    state: {
-      paymentDatabase: mockDatabase,
-    },
-  };
   beforeEach(() => {
     sandbox = sinon.createSandbox();
   });
@@ -32,34 +23,37 @@ describe("handleDisputeCreatedEvent", () => {
 
   it("should capture the dispute created event, update balance, and create refund receipt", async () => {
     const dispute = chargeDisputeStub;
-
+    const walletAddress = dispute.metadata["address"];
+    const disputeAmount = dispute.amount;
+    const userBalance = 1000;
     const expirePriceQuoteStub = sandbox
       .stub(mockDatabase, "expirePriceQuote")
-      .resolves({ balance: 500 });
+      .resolves({ walletAddress: walletAddress, balance: disputeAmount });
+    const getPaymentReceiptStub = sandbox
+      .stub(mockDatabase, "getPaymentReceipt")
+      .resolves({ walletAddress: walletAddress, balance: disputeAmount });
     const getUserBalanceStub = sandbox
       .stub(mockDatabase, "getUserBalance")
-      .resolves({ balance: 1000 });
+      .resolves({ walletAddress: walletAddress, balance: userBalance });
     const updateUserBalanceStub = sandbox
       .stub(mockDatabase, "updateUserBalance")
-      .resolves({ balance: 500 });
+      .resolves({
+        walletAddress: walletAddress,
+        balance: userBalance - disputeAmount,
+      });
     const createRefundReceiptStub = sandbox
       .stub(mockDatabase, "createRefundReceipt")
-      .resolves({});
+      .resolves({ walletAddress: walletAddress, balance: disputeAmount });
 
-    await handleDisputeCreatedEvent(dispute, mockCtx as any);
+    await handleDisputeCreatedEvent(dispute, mockDatabase);
 
-    expect(expirePriceQuoteStub).to.have.been.calledWith(
-      dispute.metadata["address"]
-    );
-    expect(getUserBalanceStub).to.have.been.calledWith(
-      dispute.metadata["address"]
-    );
+    expect(expirePriceQuoteStub).to.have.been.calledWith(walletAddress);
+    expect(getPaymentReceiptStub).to.have.been.calledWith(walletAddress);
+    expect(getUserBalanceStub).to.have.been.calledWith(walletAddress);
     expect(updateUserBalanceStub).to.have.been.calledWith(
-      dispute.metadata["address"],
-      500
+      walletAddress,
+      userBalance - disputeAmount
     );
-    expect(createRefundReceiptStub).to.have.been.calledWith(
-      dispute.metadata["address"]
-    );
+    expect(createRefundReceiptStub).to.have.been.calledWith(walletAddress);
   });
 });

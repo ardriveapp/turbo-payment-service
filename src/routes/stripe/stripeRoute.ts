@@ -58,32 +58,56 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
   logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${eventObject.status}!`
   );
+  // Return a 200 response to acknowledge receipt of the event.
+  // Otherwise, Stripe will keep trying to send the event.
+  // Handle errors internally
+  ctx.status = 200;
+
   // Unawaited calls so we can return a response immediately.
   // TODO - Set the events we want to handle on stripe dashboard
+
   switch (event.type) {
     case "payment_intent.succeeded":
       // Funds have been captured
-      handlePaymentSuccessEvent(data.object as Stripe.PaymentIntent, ctx);
+      try {
+        handlePaymentSuccessEvent(
+          data.object as Stripe.PaymentIntent,
+          ctx.state.paymentDatabase
+        );
+      } catch (error) {
+        logger.error("Payment Success Event handler failed", error);
+        ctx.status = 500;
+      }
       break;
     case "payment_intent.payment_failed":
     case "payment_intent.canceled":
-      handlePaymentFailedEvent(data.object as Stripe.PaymentIntent, ctx);
+      try {
+        handlePaymentFailedEvent(data.object as Stripe.PaymentIntent, ctx);
+      } catch (error) {
+        logger.error("Payment Failed/Cancelled Event handler failed", error);
+        ctx.status = 500;
+      }
       break;
     case "charge.dispute.created":
-      handleDisputeCreatedEvent(data.object as Stripe.Dispute, ctx);
+      try {
+        handleDisputeCreatedEvent(
+          data.object as Stripe.Dispute,
+          ctx.state.paymentDatabase
+        );
+      } catch (error) {
+        logger.error("Dispute Created Event handler failed", error);
+        ctx.status = 500;
+      }
+
       break;
 
     // ... handle other event types
     // If we see any events logged here that we don't handle, we should disable them on the stripe dashboard.
     default:
-      logger.info(`Unhandled event type ${event.type}`);
+      logger.error(`Unhandled event type ${event.type}`);
+      ctx.status = 500;
       return;
   }
-
-  // Return a 200 response to acknowledge receipt of the event.
-  // Otherwise, Stripe will keep trying to send the event.
-  // Handle errors internally
-  ctx.status = 200;
 
   return next;
 }

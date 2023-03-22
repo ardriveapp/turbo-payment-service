@@ -124,7 +124,9 @@ export const chargeDisputeStub: Stripe.Dispute = {
   },
   is_charge_refundable: true,
   livemode: false,
-  metadata: {},
+  metadata: {
+    address: "0x1234567890",
+  },
   payment_intent: null,
   reason: "fraudulent",
   status: "warning_needs_response",

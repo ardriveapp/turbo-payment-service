@@ -3,13 +3,11 @@ import { Stripe } from "stripe";
 import { Database } from "../../../database/database";
 import logger from "../../../logger";
 import { MetricRegistry } from "../../../metricRegistry";
-import { KoaContext } from "../../../server";
 
 export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
-  ctx: Partial<KoaContext>
+  paymentDatabase: Database
 ) {
-  const paymentDatabase = ctx.state?.paymentDatabase as Database;
   const walletAddress = pi.metadata["address"];
   logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`

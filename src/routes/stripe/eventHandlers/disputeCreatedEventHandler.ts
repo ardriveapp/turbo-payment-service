@@ -3,26 +3,28 @@ import { Stripe } from "stripe";
 import { Database } from "../../../database/database";
 import logger from "../../../logger";
 import { MetricRegistry } from "../../../metricRegistry";
-import { KoaContext } from "../../../server";
 
 export async function handleDisputeCreatedEvent(
   pi: Stripe.Dispute,
-  ctx: Partial<KoaContext>
+  paymentDatabase: Database
 ) {
   const walletAddress = pi.metadata["address"];
   logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
   );
   logger.info(`💸 Dispute Created. ${pi.amount}`);
-  const paymentDatabase = ctx.state?.paymentDatabase as Database;
 
   const priceQuote = await paymentDatabase.expirePriceQuote(walletAddress);
+  const oldPaymentReceipt = await paymentDatabase.getPaymentReceipt(
+    walletAddress
+  );
   if (priceQuote) {
     logger.info(`Payment Quote found for ${walletAddress}`);
     const oldBalance = await paymentDatabase.getUserBalance(walletAddress);
+    //TODO: Use BigNumber or Winston types for balance
     const balance = await paymentDatabase.updateUserBalance(
       walletAddress,
-      oldBalance.balance - priceQuote.balance
+      oldBalance.balance - oldPaymentReceipt.balance
     );
     logger.info("Balance updated: " + JSON.stringify(balance));
   } else {
