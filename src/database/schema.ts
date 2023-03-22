@@ -19,7 +19,7 @@ export class Schema {
     const migrationStartTime = Date.now();
 
     await this.createUserTable();
-    await this.createPriceQuoteTable();
+    await this.createTopUpQuoteTable();
     await this.createPaymentReceiptTable();
     await this.createChargebackReceiptTable();
 
@@ -45,16 +45,18 @@ export class Schema {
   private async createUserTable(): Promise<void> {
     return this.pg.schema.createTable(user, (t) => {
       t.string(userAddress).primary().notNullable();
+      t.string(userAddressType).notNullable();
       t.string(winstonCreditBalance).notNullable();
       // TODO: Will jsonb work for this promo info or should we use a string and JSON stringify/parse?
       t.jsonb(promotionalInfo).defaultTo({}).notNullable();
     });
   }
 
-  private async createPriceQuoteTable(): Promise<void> {
+  private async createTopUpQuoteTable(): Promise<void> {
     return this.pg.schema.createTable(topUpQuote, (t) => {
       t.string(topUpQuoteId).primary().notNullable();
-      t.string(userAddress).notNullable().index();
+      t.string(destinationAddress).notNullable().index();
+      t.string(destinationAddressType).notNullable();
       t.string(amount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
@@ -69,7 +71,8 @@ export class Schema {
   private async createPaymentReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(paymentReceipt, (t) => {
       t.string(paymentReceiptId).notNullable().primary();
-      t.string(userAddress).notNullable().index();
+      t.string(destinationAddress).notNullable().index();
+      t.string(destinationAddressType).notNullable();
       t.string(amount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
@@ -84,7 +87,8 @@ export class Schema {
   private async createChargebackReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(chargebackReceipt, (t) => {
       t.string(chargebackReceiptId).notNullable().primary();
-      t.string(userAddress).notNullable().index();
+      t.string(destinationAddress).notNullable().index();
+      t.string(destinationAddressType).notNullable();
       t.string(amount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
@@ -112,6 +116,8 @@ const {
   chargebackReceiptDate,
   chargebackReceiptId,
   currencyType,
+  destinationAddress,
+  destinationAddressType,
   paymentProvider,
   paymentReceiptDate,
   paymentReceiptId,
@@ -120,6 +126,7 @@ const {
   quoteExpirationDate,
   topUpQuoteId,
   userAddress,
+  userAddressType,
   winstonCreditAmount,
   winstonCreditBalance,
 } = columnNames;

@@ -10,6 +10,8 @@ export const tableNames = {
 export const columnNames = {
   userAddress: "user_address",
   userAddressType: "user_address_type",
+  destinationAddress: "destination_address",
+  destinationAddressType: "destination_address_type",
   winstonCreditBalance: "winston_credit_balance",
   promotionalInfo: "promotional_info",
   topUpQuoteId: "top_up_quote_id",

@@ -39,6 +39,7 @@ describe("Schema class", () => {
     const columnInfo = await knex("user").columnInfo();
     expect(columnInfo).to.deep.equal({
       user_address,
+      user_address_type,
       winston_credit_balance,
       promotional_info,
     });
@@ -48,7 +49,8 @@ describe("Schema class", () => {
     const columnInfo = await knex("top_up_quote").columnInfo();
     expect(columnInfo).to.deep.equal({
       top_up_quote_id,
-      user_address,
+      destination_address,
+      destination_address_type,
       amount,
       currency_type,
       winston_credit_amount,
@@ -63,7 +65,8 @@ describe("Schema class", () => {
     expect(columnInfo).to.deep.equal({
       payment_receipt_id,
       payment_receipt_date,
-      user_address,
+      destination_address,
+      destination_address_type,
       amount,
       currency_type,
       winston_credit_amount,
@@ -78,7 +81,8 @@ describe("Schema class", () => {
       chargeback_receipt_id,
       payment_receipt_id,
       chargeback_receipt_date,
-      user_address,
+      destination_address,
+      destination_address_type,
       amount,
       currency_type,
       winston_credit_amount,
@@ -105,6 +109,8 @@ const {
   chargeback_receipt_date,
   chargeback_receipt_id,
   currency_type,
+  destination_address,
+  destination_address_type,
   payment_provider,
   payment_receipt_date,
   payment_receipt_id,
@@ -113,6 +119,7 @@ const {
   quote_creation_date,
   quote_expiration_date,
   user_address,
+  user_address_type,
   winston_credit_amount,
   winston_credit_balance,
 } = expectedColumnInfo;

@@ -49,6 +49,9 @@ const expectedVarCharColumn = ({
 
 export const expectedColumnInfo = {
   user_address: expectedVarCharColumn({}),
+  user_address_type: expectedVarCharColumn({}),
+  destination_address: expectedVarCharColumn({}),
+  destination_address_type: expectedVarCharColumn({}),
   winston_credit_balance: expectedVarCharColumn({}),
   promotional_info: {
     type: "jsonb",
