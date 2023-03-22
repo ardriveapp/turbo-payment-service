@@ -11,6 +11,7 @@ on:
     branches:
       - prod
       - dev
+      - PE-3015_payment_ecs_deploy
 
 jobs:
   vars:
@@ -42,6 +43,17 @@ jobs:
                 "ENVIRONMENT": "prod"
               },
               "refs/heads/dev": {
+                "ACCOUNT_ID": "687681253134",
+                "AWS_REGION": "us-east-1",
+                "ECR_REGISTRY": "687681253134.dkr.ecr.us-east-1.amazonaws.com",
+                "ECR_IMAGE_NAME": "payment-service-dev-ecr",
+                "ECS_CLUSTER": "payment-service-cluster-dev",
+                "ECS_SERVICE": "payment-service-dev",
+                "ECS_TASK": "payment-service-dev",
+                "IMAGE_NAME": "payment-service",
+                "ENVIRONMENT": "dev"
+              },
+              "refs/heads/PE-3015_payment_ecs_deploy": {
                 "ACCOUNT_ID": "687681253134",
                 "AWS_REGION": "us-east-1",
                 "ECR_REGISTRY": "687681253134.dkr.ecr.us-east-1.amazonaws.com",
