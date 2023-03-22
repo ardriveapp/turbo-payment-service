@@ -10,8 +10,9 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "typecheck": "tsc --noEmit",
+    "docker-test": "bash \"scripts/docker-test.sh\"",
     "test": "nyc mocha",
-    "ci": "yarn build && yarn test",
+    "ci": "yarn build && yarn docker-test",
     "build": "yarn clean && tsc --project ./tsconfig.prod.json",
     "dev": "yarn clean && tsc --project ./tsconfig.prod.json -w",
     "start": "yarn node --inspect lib/index.js",
@@ -19,7 +20,7 @@
     "start:watch": "yarn nodemon -r ./src/index.ts",
     "db:up": "docker run --init --rm -d --name payment-service-postgres -v payment-service-data:/var/lib/postgresql/payment-service-data -p 5432:5432 -e POSTGRES_PASSWORD=localTestPassword postgres:13.4",
     "db:down": "docker stop payment-service-postgres && docker volume rm payment-service-data",
-    "db:migrate:latest": "yarn knex migrate:latest --knexfile \"src/arch/db/knexfile.ts\""
+    "db:migrate:latest": "yarn knex migrate:latest --knexfile \"src/database/knexfile.ts\""
   },
   "devDependencies": {
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
