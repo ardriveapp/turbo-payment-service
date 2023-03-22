@@ -6,7 +6,6 @@ import { defaultPort } from "./constants";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
 import router from "./router";
-import { loadSecretsToEnv } from "./utils/loadSecretsToEnv";
 
 type KoaState = DefaultState & Architecture;
 export type KoaContext = ParameterizedContext<KoaState>;
