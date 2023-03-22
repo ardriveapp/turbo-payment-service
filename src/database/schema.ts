@@ -19,7 +19,7 @@ export class Schema {
     const migrationStartTime = Date.now();
 
     await this.createUserTable();
-    await this.createPriceQuoteTable();
+    await this.createTopUpQuoteTable();
     await this.createPaymentReceiptTable();
     await this.createChargebackReceiptTable();
 
@@ -33,7 +33,7 @@ export class Schema {
     const rollbackStartTime = Date.now();
 
     await this.pg.schema.dropTable(user);
-    await this.pg.schema.dropTable(priceQuote);
+    await this.pg.schema.dropTable(topUpQuote);
     await this.pg.schema.dropTable(paymentReceipt);
     await this.pg.schema.dropTable(chargebackReceipt);
 
@@ -45,25 +45,20 @@ export class Schema {
   private async createUserTable(): Promise<void> {
     return this.pg.schema.createTable(user, (t) => {
       t.string(userAddress).primary().notNullable();
+      t.string(userAddressType).notNullable();
       t.string(winstonCreditBalance).notNullable();
-      t.timestamp(lastPaymentDate, this.noTimeZone)
-        .defaultTo(this.defaultTimestamp())
-        .notNullable();
-      t.timestamp(lastUploadDate, this.noTimeZone)
-        .defaultTo(this.defaultTimestamp())
-        .notNullable();
       // TODO: Will jsonb work for this promo info or should we use a string and JSON stringify/parse?
       t.jsonb(promotionalInfo).defaultTo({}).notNullable();
     });
   }
 
-  private async createPriceQuoteTable(): Promise<void> {
-    return this.pg.schema.createTable(priceQuote, (t) => {
-      t.string(priceQuoteId).primary().notNullable();
-      t.string(userAddress).notNullable().index();
-      t.string(usdAmount).notNullable();
-      t.string(fiatAmount).notNullable();
-      t.string(fiatIdentifier).notNullable();
+  private async createTopUpQuoteTable(): Promise<void> {
+    return this.pg.schema.createTable(topUpQuote, (t) => {
+      t.string(topUpQuoteId).primary().notNullable();
+      t.string(destinationAddress).notNullable().index();
+      t.string(destinationAddressType).notNullable();
+      t.string(amount).notNullable();
+      t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(paymentProvider).notNullable();
       t.timestamp(quoteExpirationDate, this.noTimeZone).notNullable();
@@ -76,12 +71,12 @@ export class Schema {
   private async createPaymentReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(paymentReceipt, (t) => {
       t.string(paymentReceiptId).notNullable().primary();
-      t.string(userAddress).notNullable().index();
-      t.string(usdAmount).notNullable();
-      t.string(fiatAmount).notNullable();
-      t.string(fiatIdentifier).notNullable();
+      t.string(destinationAddress).notNullable().index();
+      t.string(destinationAddressType).notNullable();
+      t.string(amount).notNullable();
+      t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
-      t.string(priceQuoteId).notNullable();
+      t.string(topUpQuoteId).notNullable();
       t.string(paymentProvider).notNullable();
       t.timestamp(paymentReceiptDate, this.noTimeZone)
         .notNullable()
@@ -92,8 +87,10 @@ export class Schema {
   private async createChargebackReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(chargebackReceipt, (t) => {
       t.string(chargebackReceiptId).notNullable().primary();
-      t.string(userAddress).notNullable().index();
-      t.string(usdAmount).notNullable();
+      t.string(destinationAddress).notNullable().index();
+      t.string(destinationAddressType).notNullable();
+      t.string(amount).notNullable();
+      t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(paymentReceiptId).notNullable();
       t.string(paymentProvider).notNullable();
@@ -111,25 +108,25 @@ export class Schema {
   private noTimeZone = { useTz: false };
 }
 
-const { chargebackReceipt, paymentReceipt, priceQuote, user } = tableNames;
+const { chargebackReceipt, paymentReceipt, topUpQuote, user } = tableNames;
 
 const {
+  amount,
   chargebackReason,
   chargebackReceiptDate,
   chargebackReceiptId,
-  fiatAmount,
-  fiatIdentifier,
-  lastPaymentDate,
-  lastUploadDate,
+  currencyType,
+  destinationAddress,
+  destinationAddressType,
   paymentProvider,
   paymentReceiptDate,
   paymentReceiptId,
-  priceQuoteId,
   promotionalInfo,
   quoteCreationDate,
   quoteExpirationDate,
-  usdAmount,
+  topUpQuoteId,
   userAddress,
+  userAddressType,
   winstonCreditAmount,
   winstonCreditBalance,
 } = columnNames;
