@@ -39,3 +39,5 @@ export const paymentIntentStub: Stripe.PaymentIntent = {
   transfer_data: null,
   transfer_group: null,
 };
+
+
