@@ -1,22 +1,33 @@
-export interface Database {
-  getPriceQuote: (
-    walletAddress: string
-  ) => Promise<{ address: string; balance: number }>;
-  createPriceQuote: () => Promise<{ address: string; balance: number }>;
-  getPaymentReceipt: (
-    walletAddress: string
-  ) => Promise<{ address: string; balance: number }>;
-  createPaymentReceipt: (
-    walletAddress: string
-  ) => Promise<{ address: string; balance: number }>;
-}
+import { WC } from "../types/arc";
+import {
+  CreatePaymentReceiptParams,
+  CreateTopUpQuoteParams,
+  PaymentReceipt,
+  PaymentReceiptId,
+  PromotionalInfo,
+  TopUpQuote,
+  TopUpQuoteId,
+  User,
+  UserAddress,
+} from "./dbTypes";
 
-export class TestDatabase implements Database {
-  getPriceQuote = (walletAddress: string) =>
-    Promise.resolve({ address: walletAddress, balance: 10 });
-  createPriceQuote = () => Promise.resolve({ address: "", balance: 0 });
-  getPaymentReceipt = (walletAddress: string) =>
-    Promise.resolve({ address: walletAddress, balance: 0 });
-  createPaymentReceipt = (walletAddress: string) =>
-    Promise.resolve({ address: walletAddress, balance: 0 });
+export interface Database {
+  createTopUpQuote: (topUpQuote: CreateTopUpQuoteParams) => Promise<void>;
+  getTopUpQuote: (topUpQuoteId: TopUpQuoteId) => Promise<TopUpQuote>;
+  getPromoInfo: (userAddress: UserAddress) => Promise<PromotionalInfo>;
+  getUser: (userAddress: UserAddress) => Promise<User>;
+  createPaymentReceipt: (
+    paymentReceipt: CreatePaymentReceiptParams
+  ) => Promise<void>;
+  getPaymentReceipt: (
+    paymentReceiptId: PaymentReceiptId
+  ) => Promise<PaymentReceipt>;
+  reserveBalance: (
+    userAddress: UserAddress,
+    winstonCreditAmount: WC
+  ) => Promise<void>;
+  refundBalance: (
+    userAddress: UserAddress,
+    winstonCreditAmount: WC
+  ) => Promise<void>;
 }
