@@ -1,0 +1,142 @@
+name: "ECR and ECS Deploy"
+
+concurrency:
+  group: ecr-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  push:
+    branches:
+      - prod
+      - dev
+
+jobs:
+  vars:
+    runs-on: ubuntu-latest
+    outputs:
+      ACCOUNT_ID: ${{ steps.set-vars.outputs.account-id }}
+      AWS_REGION: ${{ steps.set-vars.outputs.aws-region }}
+      ECR_REGISTRY: ${{ steps.set-vars.outputs.ecr-registry }}
+      ECR_IMAGE_NAME: ${{ steps.set-vars.outputs.ecr-image-name }}
+      ECS_CLUSTER: ${{ steps.set-vars.outputs.ecs-cluster }}
+      ECS_SERVICE: ${{ steps.set-vars.outputs.ecs-service }}
+      ECS_TASK: ${{ steps.set-vars.outputs.ecs-task }}
+      IMAGE_NAME: ${{ steps.set-vars.outputs.image-name }}
+      ENVIRONMENT: ${{ steps.set-vars.outputs.environment }}
+    steps:
+      - id: set-vars
+        env:
+          MATRIX: |
+            {
+              "refs/heads/prod": {
+                "ACCOUNT_ID": "860972156520",
+                "AWS_REGION": "us-east-1",
+                "ECR_REGISTRY": "860972156520.dkr.ecr.us-east-1.amazonaws.com",
+                "ECR_IMAGE_NAME": "payment-service-prod-ecr",
+                "ECS_CLUSTER": "payment-service-cluster-prod",
+                "ECS_SERVICE": "payment-service-prod",
+                "ECS_TASK": "payment-service-prod",
+                "IMAGE_NAME": "payment-service",
+                "ENVIRONMENT": "prod"
+              },
+              "refs/heads/dev": {
+                "ACCOUNT_ID": "687681253134",
+                "AWS_REGION": "us-east-1",
+                "ECR_REGISTRY": "687681253134.dkr.ecr.us-east-1.amazonaws.com",
+                "ECR_IMAGE_NAME": "payment-service-dev-ecr",
+                "ECS_CLUSTER": "payment-service-cluster-dev",
+                "ECS_SERVICE": "payment-service-dev",
+                "ECS_TASK": "payment-service-dev",
+                "IMAGE_NAME": "payment-service",
+                "ENVIRONMENT": "dev"
+              }
+            }
+        run: |
+          echo "::set-output name=account-id::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".ACCOUNT_ID')"
+          echo "::set-output name=aws-region::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".AWS_REGION')"
+          echo "::set-output name=ecr-registry::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".ECR_REGISTRY')"
+          echo "::set-output name=ecr-image-name::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".ECR_IMAGE_NAME')"
+          echo "::set-output name=ecs-cluster::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".ECS_CLUSTER')"
+          echo "::set-output name=ecs-service::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".ECS_SERVICE')"
+          echo "::set-output name=ecs-task::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".ECS_TASK')"
+          echo "::set-output name=image-name::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".IMAGE_NAME')"
+          echo "::set-output name=environment::$(echo '${{ env.MATRIX }}' | jq -jc '."${{ github.ref }}".ENVIRONMENT')"
+
+  deploy-ecr:
+    runs-on: ubuntu-latest
+
+    needs: vars
+    steps:
+      - uses: actions/checkout@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.CI_SECRET_ACCESS_KEY }}
+          role-skip-session-tagging: true
+          role-to-assume: arn:aws:iam::${{ needs.vars.outputs.ACCOUNT_ID }}:role/DeploymentRole
+          role-external-id: arn:aws:iam::316715143444:role/DeploymentRole
+          role-duration-seconds: 1800
+          aws-region: ${{ needs.vars.outputs.AWS_REGION }}
+
+      - name: Docker build
+        run: |
+          docker build --build-arg "NODE_VERSION=$(cat .nvmrc | tr -cd '[:digit:]'.)" -t "${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:$GITHUB_SHA" .
+
+      - name: Docker login, tag and push image
+        id: build-image
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin ${{ needs.vars.outputs.ECR_REGISTRY }}
+          docker push "${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:$GITHUB_SHA"
+          echo "::set-output name=image::"${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:$GITHUB_SHA""
+
+      - name: Scan Image for Vulnerabilities
+        id: scan-image
+        # Check for critical vulnerabilities
+        env:
+          RETRY_DELAY_SECONDS: 5 # 5 seconds
+          MAX_ATTEMPTS: 60 # 5sec * 60 attempts = 5min total wait time
+        run: |
+          attempts=0
+          status="IN_PROGRESS"
+          while [ "IN_PROGRESS" == "$status" ]; do
+              if [ $attempts -gt $MAX_ATTEMPTS ]; then
+                echo "Max time limit reached. Exiting deployment."
+                exit 1
+              fi
+              sleep $RETRY_DELAY_SECONDS
+              findings=$(aws ecr describe-image-scan-findings --repository-name ${{ needs.vars.outputs.ECR_IMAGE_NAME }} --image-id imageTag=${{ github.sha }} | jq '.')
+              status=$(echo $findings | jq -r '.imageScanStatus.status' )
+              attempts=$((attempts+1))
+              echo "Scanning is ${status}... Attempt ${attempts}"
+          done
+          critical=$(echo $findings | jq '.imageScanFindings.findingSeverityCounts.CRITICAL // 0') 
+          high=$(echo $findings | jq '.imageScanFindings.findingSeverityCounts.HIGH // 0') 
+          if  [ $critical -gt 0 ] || [ $high -gt 0 ]; then
+            echo "Critical or high vulnerabilities found in image that MUST be resolved before being deployed!"
+            echo $findings
+            exit 1
+          fi
+          echo "No critical or high vulnerabilities found!"
+          echo $findings
+
+  deploy:
+    name: Deploy
+    needs:
+      - deploy-ecr
+      - vars
+    uses: ./.github/workflows/deploy_to_env.yml
+    with:
+      AWS_REGION: ${{ needs.vars.outputs.AWS_REGION }}
+      ACCOUNT_ID: ${{ needs.vars.outputs.ACCOUNT_ID }}
+      ENVIRONMENT: ${{ needs.vars.outputs.ENVIRONMENT }}
+      SERVICE_NAME: ${{ needs.vars.outputs.ECS_SERVICE }}
+      CONTAINER_NAME: ${{ needs.vars.outputs.IMAGE_NAME }}-task-definition-${{ needs.vars.outputs.ENVIRONMENT }}
+      CLUSTER_NAME: ${{ needs.vars.outputs.ECS_CLUSTER }}
+      ECR_IMAGE: ${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:${{ github.sha }}
+      INFRA_ACCOUNT_ID: "316715143444"
+    secrets:
+      KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
+      ACCESS_KEY: ${{ secrets.CI_SECRET_ACCESS_KEY }}

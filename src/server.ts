@@ -6,7 +6,6 @@ import { defaultPort } from "./constants";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
 import router from "./router";
-import { loadSecretsToEnv } from "./utils/loadSecretsToEnv";
 
 type KoaState = DefaultState & Architecture;
 export type KoaContext = ParameterizedContext<KoaState>;
@@ -24,7 +23,9 @@ export async function createServer(
 ) {
   const app = new Koa();
 
-  await loadSecretsToEnv();
+  // TODO: Add Stripe Secrets to AWS turbo envs and re-enable secret manager. Ran into this error when logged into turbo dev:
+  // error: Uncaught exception: getaddrinfo ENOTFOUND secretsmanager.region.amazonaws.com {"$metadata":{"attempts":1,"totalRetryDelay":0},"code":"ENOTFOUND","errno":-3008,"hostname":"secretsmanager.region.amazonaws.com","stack":"Error: getaddrinfo ENOTFOUND secretsmanager.region.amazonaws.com\n    at GetAddrInfoReqWrap.onlookup [as oncomplete] (node:dns:107:26)","syscall":"getaddrinfo"}
+  // await loadSecretsToEnv();
 
   app.use(cors({ allowMethods: ["GET", "POST"] }));
   app.use(async (ctx: KoaContext, next) => {
