@@ -3,19 +3,14 @@ import { JWKInterface } from "arweave/node/lib/wallet";
 import { expect } from "chai";
 import { ParsedUrlQuery } from "querystring";
 
+import { jwkToPem } from "../utils/pem";
 import { verifyArweaveSignature } from "./verifySignature";
-
-const arweave = Arweave.init({
-  host: "arweave.net",
-  port: 443,
-  protocol: "https",
-});
 
 describe("verifyArweaveSignature", () => {
   let wallet: JWKInterface;
 
   before(async () => {
-    wallet = await arweave.wallets.generate();
+    wallet = await Arweave.crypto.generateJWK();
   });
 
   it("should pass for a valid signature without query parameters", async () => {
@@ -29,7 +24,8 @@ describe("verifyArweaveSignature", () => {
 
     console.log("signature", signature);
 
-    const publicKey = await arweave.wallets.getAddress(wallet);
+    const publicKey = jwkToPem(wallet);
+
     console.log("publicKey", publicKey);
 
     const isVerified = await verifyArweaveSignature(
@@ -51,8 +47,7 @@ describe("verifyArweaveSignature", () => {
       wallet,
       Buffer.from(dataToSign)
     );
-
-    const publicKey = await arweave.wallets.getAddress(wallet);
+    const publicKey = jwkToPem(wallet);
 
     const isVerified = await verifyArweaveSignature(
       publicKey,
@@ -67,7 +62,7 @@ describe("verifyArweaveSignature", () => {
   it("should fail for an invalid signature", async () => {
     const nonce = "should fail for an invalid signature nonce";
     const invalidSignature = "invalid_signature";
-    const publicKey = await arweave.wallets.getAddress(wallet);
+    const publicKey = jwkToPem(wallet);
 
     const isVerified = await verifyArweaveSignature(
       publicKey,
