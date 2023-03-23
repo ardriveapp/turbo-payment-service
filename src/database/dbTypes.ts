@@ -34,7 +34,7 @@ export interface User {
   promotionalInfo: PromotionalInfo;
 }
 
-export interface PriceQuote {
+export interface TopUpQuote {
   topUpQuoteId: TopUpQuoteId;
   destinationAddress: UserAddress;
   destinationAddressType: UserAddressType;
@@ -73,37 +73,36 @@ export interface ChargebackReceipt {
 
 export interface UserDBInsert {
   user_address: string;
+  user_address_type: string;
   winston_credit_balance: string;
 }
 export interface UserDBResult extends UserDBInsert {
-  last_payment_date: string;
-  last_upload_date: string;
   // TODO: Type that comes back from postgres
   promotional_info: unknown;
 }
 
-export interface PriceQuoteDBInsert {
-  price_quote_id: string;
-  user_address: string;
-  usd_amount: string;
-  fiat_amount: string;
-  fiat_identifier: string;
+export interface TopUpQuoteDBInsert {
+  top_up_quote_id: string;
+  destination_address: string;
+  destination_address_type: string;
+  amount: string;
+  currency_type: string;
   winston_credit_amount: string;
   payment_provider: string;
   quote_expiration_date: string;
 }
-export interface PriceQuoteDBResult extends PriceQuoteDBInsert {
+export interface TopUpQuoteDBResult extends TopUpQuoteDBInsert {
   quote_creation_date: string;
 }
 
 export interface PaymentReceiptDBInsert {
   payment_receipt_id: string;
-  user_address: string;
-  usd_amount: string;
-  fiat_amount: string;
-  fiat_identifier: string;
+  destination_address: string;
+  destination_address_type: string;
+  amount: string;
+  currency_type: string;
   winston_credit_amount: string;
-  price_quote_id: string;
+  top_up_quote_id: string;
   payment_provider: string;
 }
 export interface PaymentReceiptDBResult extends PaymentReceiptDBInsert {
@@ -112,8 +111,10 @@ export interface PaymentReceiptDBResult extends PaymentReceiptDBInsert {
 
 export interface ChargebackReceiptDBInsert {
   chargeback_receipt_id: string;
-  user_address: string;
-  usd_amount: string;
+  destination_address: string;
+  destination_address_type: string;
+  amount: string;
+  currency_type: string;
   winston_credit_amount: string;
   payment_receipt_id: string;
   payment_provider: string;

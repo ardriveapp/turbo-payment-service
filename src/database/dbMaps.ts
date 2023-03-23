@@ -4,73 +4,71 @@ import {
   ChargebackReceiptDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
-  PriceQuote,
-  PriceQuoteDBResult,
   PromotionalInfo,
+  TopUpQuote,
+  TopUpQuoteDBResult,
   User,
   UserDBResult,
 } from "./dbTypes";
 
 export function userDBMap({
-  last_payment_date,
-  last_upload_date,
   promotional_info,
   user_address,
   winston_credit_balance,
+  user_address_type,
 }: UserDBResult): User {
   return {
-    lastPaymentDate: last_payment_date,
-    lastUploadDate: last_upload_date,
     promotionalInfo: promotional_info as PromotionalInfo,
     userAddress: user_address,
+    userAddressType: user_address_type,
     winstonCreditBalance: new Winston(winston_credit_balance),
   };
 }
 
-export function priceQuoteDBMap({
-  fiat_amount,
-  fiat_identifier,
+export function topUpQuoteDBMap({
+  amount,
+  currency_type,
   payment_provider,
-  price_quote_id,
+  top_up_quote_id,
   quote_creation_date,
   quote_expiration_date,
-  usd_amount,
-  user_address,
+  destination_address,
+  destination_address_type,
   winston_credit_amount,
-}: PriceQuoteDBResult): PriceQuote {
+}: TopUpQuoteDBResult): TopUpQuote {
   return {
-    fiatAmount: +fiat_amount,
-    fiatIdentifier: fiat_identifier,
+    amount: +amount,
+    currencyType: currency_type,
     paymentProvider: payment_provider,
-    priceQuoteId: price_quote_id,
+    topUpQuoteId: top_up_quote_id,
     quoteCreationDate: quote_creation_date,
     quoteExpirationDate: quote_expiration_date,
-    usdAmount: +usd_amount,
-    userAddress: user_address,
+    destinationAddress: destination_address,
+    destinationAddressType: destination_address_type,
     winstonCreditAmount: new Winston(winston_credit_amount),
   };
 }
 
-export function PaymentReceiptDBMap({
-  fiat_amount,
-  fiat_identifier,
+export function paymentReceiptDBMap({
+  amount,
+  currency_type,
   payment_provider,
   payment_receipt_date,
   payment_receipt_id,
-  price_quote_id,
-  usd_amount,
-  user_address,
+  top_up_quote_id,
   winston_credit_amount,
+  destination_address,
+  destination_address_type,
 }: PaymentReceiptDBResult): PaymentReceipt {
   return {
-    fiatAmount: +fiat_amount,
-    fiatIdentifier: fiat_identifier,
     paymentProvider: payment_provider,
     paymentReceiptDate: payment_receipt_date,
     paymentReceiptId: payment_receipt_id,
-    priceQuoteId: price_quote_id,
-    usdAmount: +usd_amount,
-    userAddress: user_address,
+    topUpQuoteId: top_up_quote_id,
+    amount: +amount,
+    currencyType: currency_type,
+    destinationAddress: destination_address,
+    destinationAddressType: destination_address_type,
     winstonCreditAmount: new Winston(winston_credit_amount),
   };
 }
@@ -81,8 +79,10 @@ export function ChargebackReceiptDBMap({
   chargeback_receipt_id,
   chargeback_reason,
   payment_receipt_id,
-  usd_amount,
-  user_address,
+  amount,
+  currency_type,
+  destination_address,
+  destination_address_type,
   winston_credit_amount,
 }: ChargebackReceiptDBResult): ChargebackReceipt {
   return {
@@ -91,8 +91,10 @@ export function ChargebackReceiptDBMap({
     chargebackReason: chargeback_reason,
     chargebackReceiptId: chargeback_receipt_id,
     paymentReceiptId: payment_receipt_id,
-    usdAmount: +usd_amount,
-    userAddress: user_address,
+    amount: +amount,
+    currencyType: currency_type,
+    destinationAddress: destination_address,
+    destinationAddressType: destination_address_type,
     winstonCreditAmount: new Winston(winston_credit_amount),
   };
 }
