@@ -122,7 +122,7 @@ describe("Router tests", () => {
     expect(balance).to.be.a("number");
   });
 
-  it("GET /balance returns 403 for correct signature", async () => {
+  it("GET /balance returns 403 for bad signature", async () => {
     const nonce = "123";
     const publicKey = jwkToPem(testWallet, true);
     const signature = await signData(jwkToPem(testWallet), "another nonce");
