@@ -3,6 +3,9 @@ import { WC } from "../types/arc";
 /** In this MVP this will be an Arweave Public Address */
 export type UserAddress = string;
 
+/** For MVP, this is: "arweave" */
+export type UserAddressType = string;
+
 /** Currently using Postgres Date type (ISO String without Timezone) */
 export type Timestamp = string;
 
@@ -12,33 +15,31 @@ export type PromotionalInfo = Record<string, unknown>;
 // TODO: Use all generated UUIDs or use IDs from payment providers?
 type idType = string;
 
-export type PriceQuoteId = idType;
+export type TopUpQuoteId = idType;
 export type PaymentReceiptId = idType;
 export type ChargebackReceiptId = idType;
 
-export type UsdAmount = number;
-export type FiatAmount = number;
+export type Amount = number;
 
 // TODO: Define these types here? e.g: `'usd' | 'etc'`
-export type FiatIdentifier = string;
+export type CurrencyType = string;
 
 // TODO: Define these types here? e.g: `'stripe' | 'apple-pay'`
 export type PaymentProvider = string;
 
 export interface User {
   userAddress: UserAddress;
+  userAddressType: UserAddressType;
   winstonCreditBalance: WC;
-  lastPaymentDate: Timestamp;
-  lastUploadDate: Timestamp;
   promotionalInfo: PromotionalInfo;
 }
 
 export interface PriceQuote {
-  priceQuoteId: PriceQuoteId;
-  userAddress: UserAddress;
-  usdAmount: UsdAmount;
-  fiatAmount: FiatAmount;
-  fiatIdentifier: FiatIdentifier;
+  topUpQuoteId: TopUpQuoteId;
+  destinationAddress: UserAddress;
+  destinationAddressType: UserAddressType;
+  amount: Amount;
+  currencyType: CurrencyType;
   winstonCreditAmount: WC;
   paymentProvider: PaymentProvider;
   quoteExpirationDate: Timestamp;
@@ -47,20 +48,22 @@ export interface PriceQuote {
 
 export interface PaymentReceipt {
   paymentReceiptId: PaymentReceiptId;
-  userAddress: UserAddress;
-  usdAmount: UsdAmount;
-  fiatAmount: FiatAmount;
-  fiatIdentifier: FiatIdentifier;
+  destinationAddress: UserAddress;
+  destinationAddressType: UserAddressType;
+  amount: Amount;
+  currencyType: CurrencyType;
   winstonCreditAmount: WC;
-  priceQuoteId: PriceQuoteId;
+  topUpQuoteId: TopUpQuoteId;
   paymentProvider: PaymentProvider;
   paymentReceiptDate: Timestamp;
 }
 
 export interface ChargebackReceipt {
   chargebackReceiptId: ChargebackReceiptId;
-  userAddress: UserAddress;
-  usdAmount: UsdAmount;
+  destinationAddress: UserAddress;
+  destinationAddressType: UserAddressType;
+  amount: Amount;
+  currencyType: CurrencyType;
   winstonCreditAmount: WC;
   paymentReceiptId: PaymentReceiptId;
   paymentProvider: PaymentProvider;
