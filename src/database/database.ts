@@ -9,6 +9,9 @@ export interface Database {
   createPaymentReceipt: (
     walletAddress: string
   ) => Promise<{ address: string; balance: number }>;
+  getBalance: (
+    walletAddress: string
+  ) => Promise<{ address: string; balance: number }>;
 }
 
 export class TestDatabase implements Database {
@@ -19,4 +22,6 @@ export class TestDatabase implements Database {
     Promise.resolve({ address: walletAddress, balance: 0 });
   createPaymentReceipt = (walletAddress: string) =>
     Promise.resolve({ address: walletAddress, balance: 0 });
+  getBalance = (walletAddress: string) =>
+    Promise.resolve({ address: walletAddress, balance: 10 });
 }

@@ -15,6 +15,15 @@ export function jwkToPem(jwk: JWKInterface, makePublicKey?: boolean): string {
   return jwkKeyObject.export({ format: "pem", type: "pkcs1" }).toString();
 }
 
+export function formatPublicKey(publicKey: string) {
+  const header = "-----BEGIN RSA PUBLIC KEY-----";
+  const footer = "-----END RSA PUBLIC KEY-----";
+  const base64Key = publicKey.replace(header, "").replace(footer, "");
+
+  const formattedKeyData = base64Key.replace(/(.{64})/g, "$1\n");
+  return `${header}\n${formattedKeyData}${footer}`;
+}
+
 export function pemToJwk(pem: string, makePublicKey?: boolean): JWKInterface {
   const isPrivate =
     makePublicKey === true

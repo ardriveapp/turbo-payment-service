@@ -1,3 +1,4 @@
+import Arweave from "arweave/node/common";
 import axios from "axios";
 import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
@@ -5,8 +6,10 @@ import { Server } from "http";
 
 import logger from "../src/logger";
 import { createServer } from "../src/server";
+import { jwkToPem } from "../src/utils/pem";
+import { signData } from "./helpers/signData";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
-import { localTestUrl } from "./helpers/testHelpers";
+import { localTestUrl, testWallet } from "./helpers/testHelpers";
 
 describe("Router tests", () => {
   let server: Server;
@@ -93,5 +96,46 @@ describe("Router tests", () => {
       }
     );
     expect(status).to.equal(502);
+  });
+
+  it("GET /balance returns 200 for correct signature", async () => {
+    const nonce = "123";
+    const publicKey = jwkToPem(testWallet, true);
+    const signature = await signData(jwkToPem(testWallet), nonce);
+
+    const { status, statusText, data } = await axios.get(
+      `${localTestUrl}/v1/balance`,
+      {
+        headers: {
+          "x-public-key": publicKey.replace(/\r?\n|\r/g, ""),
+          "x-nonce": nonce,
+          "x-signature": Arweave.utils.bufferTob64Url(signature),
+        },
+      }
+    );
+
+    const balance = Number(data);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    expect(balance).to.be.a("number");
+  });
+
+  it("GET /balance returns 403 for correct signature", async () => {
+    const nonce = "123";
+    const publicKey = jwkToPem(testWallet, true);
+    const signature = await signData(jwkToPem(testWallet), "another nonce");
+
+    const { status } = await axios.get(`${localTestUrl}/v1/balance`, {
+      headers: {
+        "x-public-key": publicKey.replace(/\r?\n|\r/g, ""),
+        "x-nonce": nonce,
+        "x-signature": Arweave.utils.bufferTob64Url(signature),
+      },
+      validateStatus: () => true,
+    });
+
+    expect(status).to.equal(403);
   });
 });

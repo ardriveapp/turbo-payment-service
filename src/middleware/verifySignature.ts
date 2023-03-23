@@ -1,6 +1,8 @@
 import Arweave from "arweave";
-import crypto from "crypto";
+import crypto, { createHash } from "crypto";
 import { Context, Next } from "koa";
+
+import { formatPublicKey } from "../utils/pem";
 
 export interface VerifySignatureParams {
   publicKey: string;
@@ -25,13 +27,16 @@ export async function verifyArweaveSignature({
   } else {
     dataToVerify = nonce;
   }
+  try {
+    const verifier = crypto.createVerify("SHA256");
+    verifier.update(dataToVerify);
 
-  const verifier = crypto.createVerify("SHA256");
-  verifier.update(dataToVerify);
+    const isVerified = verifier.verify(publicKey, signature);
 
-  const isVerified = verifier.verify(publicKey, signature);
-
-  return isVerified;
+    return isVerified;
+  } catch (error) {
+    return false;
+  }
 }
 
 export async function verifySignature(ctx: Context, next: Next): Promise<void> {
@@ -41,16 +46,20 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
     const nonce = ctx.request.headers["x-nonce"];
 
     const isVerified = await verifyArweaveSignature({
-      publicKey: publicKey as string,
-      signature: Arweave.utils.stringToBuffer(signature as string),
+      publicKey: formatPublicKey(publicKey as string),
+      signature: Arweave.utils.b64UrlToBuffer(signature as string),
       additionalData: Object.keys(ctx.request.query).length
         ? JSON.stringify(ctx.request.query)
         : undefined,
       nonce: nonce as string,
     });
-
     if (isVerified) {
-      ctx.state.walletAddress = ctx.request.headers["x-public-key"];
+      //Attach wallet address for the next middleware
+      const hash = createHash("sha256");
+      hash.update(Arweave.utils.b64UrlToBuffer(publicKey as string));
+      const buffer = hash.digest();
+      const walletAddress = Arweave.utils.bufferTob64(buffer);
+      ctx.state.walletAddress = walletAddress;
       await next();
     } else {
       ctx.status = isVerified ? 0 : 403;
