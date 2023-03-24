@@ -14,6 +14,10 @@ import {
 export interface Database {
   createTopUpQuote: (topUpQuote: CreateTopUpQuoteParams) => Promise<void>;
   getTopUpQuote: (topUpQuoteId: TopUpQuoteId) => Promise<TopUpQuote>;
+  updatePromoInfo: (
+    userAddress: UserAddress,
+    promoInfo: PromotionalInfo
+  ) => Promise<void>;
   getPromoInfo: (userAddress: UserAddress) => Promise<PromotionalInfo>;
   getUser: (userAddress: UserAddress) => Promise<User>;
   createPaymentReceipt: (

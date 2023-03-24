@@ -66,6 +66,17 @@ export class PostgresDatabase implements Database {
     ).map(topUpQuoteDBMap)[0];
   }
 
+  public async updatePromoInfo(
+    userAddress: string,
+    promoInfo: PromotionalInfo
+  ): Promise<void> {
+    await this.knex<UserDBResult>(tableNames.user)
+      .where({
+        user_address: userAddress,
+      })
+      .update({ promotional_info: promoInfo });
+  }
+
   public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {
     return (await this.getUser(userAddress)).promotionalInfo;
   }
