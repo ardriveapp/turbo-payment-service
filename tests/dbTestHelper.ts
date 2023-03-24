@@ -54,15 +54,19 @@ function stubPaymentReceiptInsert({
   };
 }
 
+interface StubUserParams {
+  user_address?: string;
+  winston_credit_balance?: string;
+}
+
 function stubUserInsert({
   user_address = "The Stubbiest User",
-}: {
-  user_address?: string;
-}): UserDBInsert {
+  winston_credit_balance = "101010101",
+}: StubUserParams): UserDBInsert {
   return {
     user_address,
     user_address_type: "arweave",
-    winston_credit_balance: "101010101",
+    winston_credit_balance,
   };
 }
 
@@ -73,9 +77,7 @@ export class DbTestHelper {
     return this.db["knex"];
   }
 
-  public async insertStubUser(insertParams: {
-    user_address?: string;
-  }): Promise<void> {
+  public async insertStubUser(insertParams: StubUserParams): Promise<void> {
     return this.knex(tableNames.user).insert(stubUserInsert(insertParams));
   }
 

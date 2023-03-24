@@ -1,6 +1,7 @@
 import { expect } from "chai";
 
 import { DbTestHelper } from "../../tests/dbTestHelper";
+import { expectAsyncErrorThrow } from "../../tests/helpers/testHelpers";
 import { Winston } from "../types/winston";
 import { tableNames } from "./dbConstants";
 import { PaymentReceiptDBResult, TopUpQuoteDBResult } from "./dbTypes";
@@ -222,9 +223,48 @@ describe("PostgresDatabase class", () => {
     it("gets the expected user database entities", async () => {
       const promoInfo = await db.getPromoInfo(unicornAddress);
 
-      expect(promoInfo).to.equal({});
+      expect(promoInfo).to.deep.equal({});
     });
   });
 
   // TODO: Add method and test updatePromoInfo(promoInfo): Promise<void>
+
+  describe("reserveBalance method", () => {
+    const richAddress = "Rich 💸";
+    const poorAddress = "Poor 👨🏻‍🏫";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: richAddress,
+        winston_credit_balance: "100000000000",
+      });
+      await dbTestHelper.insertStubUser({
+        user_address: poorAddress,
+        winston_credit_balance: "10",
+      });
+    });
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb(tableNames.user, richAddress);
+      await dbTestHelper.cleanUpEntityInDb(tableNames.user, poorAddress);
+    });
+
+    it("reserves the balance as expected when winston balance is available", async () => {
+      await db.reserveBalance(richAddress, new Winston(500));
+
+      const richUser = await db.getUser(richAddress);
+
+      expect(+richUser.winstonCreditBalance).to.equal(99_999_999_500);
+    });
+
+    it("throws an error as expected when winston balance is not available", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.reserveBalance(poorAddress, new Winston(200)),
+        errorMessage: "User does not have enough balance!",
+      });
+
+      const poorUser = await db.getUser(poorAddress);
+
+      expect(+poorUser.winstonCreditBalance).to.equal(10);
+    });
+  });
 });
