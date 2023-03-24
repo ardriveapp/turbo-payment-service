@@ -5,6 +5,7 @@ import { expectAsyncErrorThrow } from "../../tests/helpers/testHelpers";
 import { Winston } from "../types/winston";
 import { tableNames } from "./dbConstants";
 import {
+  ChargebackReceiptDBResult,
   PaymentReceiptDBResult,
   TopUpQuoteDBResult,
   UserDBResult,
@@ -307,6 +308,174 @@ describe("PostgresDatabase class", () => {
         promiseToError: db.getPaymentReceipt("Non Existent ID"),
         errorMessage:
           "No payment receipt found in database with ID 'Non Existent ID'",
+      });
+    });
+  });
+
+  describe("createChargebackReceipt method", () => {
+    const naughtyUserAddress = "Naughty User 💀";
+
+    const naughtyUserBalance = new Winston("1000");
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: naughtyUserAddress,
+        winston_credit_balance: naughtyUserBalance.toString(),
+      });
+      await db.createChargebackReceipt({
+        amount: 11_111,
+        currencyType: "eth",
+        destinationAddress: naughtyUserAddress,
+        destinationAddressType: "arweave",
+        paymentReceiptId: "Bad Payment Receipt Address",
+        paymentProvider: "stripe",
+        chargebackReceiptId: "A great Unique Identifier",
+        chargebackReason: "Evil",
+        winstonCreditAmount: new Winston(999),
+      });
+    });
+
+    after(async () => {
+      await Promise.all([
+        dbTestHelper.cleanUpEntityInDb(
+          tableNames.chargebackReceipt,
+          "A great Unique Identifier"
+        ),
+
+        dbTestHelper.cleanUpEntityInDb(tableNames.user, naughtyUserAddress),
+      ]);
+    });
+
+    it("creates the expected chargeback receipt in the database", async () => {
+      const chargebackReceipt = await db["knex"]<ChargebackReceiptDBResult>(
+        tableNames.chargebackReceipt
+      ).where({ chargeback_receipt_id: "Unique Identifier" });
+      expect(chargebackReceipt.length).to.equal(1);
+
+      const {
+        amount,
+        currency_type,
+        destination_address,
+        destination_address_type,
+        payment_provider,
+        chargeback_receipt_date,
+        chargeback_receipt_id,
+        payment_receipt_id,
+        winston_credit_amount,
+      } = chargebackReceipt[0];
+
+      expect(amount).to.equal("11111");
+      expect(currency_type).to.equal("eth");
+      expect(destination_address).to.equal(naughtyUserAddress);
+      expect(destination_address_type).to.equal("arweave");
+      expect(payment_provider).to.equal("stripe");
+      expect(chargeback_receipt_date).to.exist;
+      expect(chargeback_receipt_id).to.equal("Unique Identifier");
+      expect(payment_receipt_id).to.equal("Bad Payment Receipt Address");
+      expect(winston_credit_amount).to.equal("999");
+    });
+
+    it("decrements user's balance as expected", async () => {
+      const oldUser = await db["knex"]<UserDBResult>(tableNames.user).where({
+        user_address: naughtyUserAddress,
+      });
+      expect(oldUser.length).to.equal(1);
+
+      expect(oldUser[0].winston_credit_balance).to.equal(
+        naughtyUserBalance.minus(new Winston("999")).toString()
+      );
+    });
+
+    it("errors as expected when no user can be found to decrement balance", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.createChargebackReceipt({
+          amount: 1,
+          currencyType: "usd",
+          destinationAddress: "Non Existent User Address",
+          destinationAddressType: "arweave",
+          paymentReceiptId: "Anything that can error",
+          paymentProvider: "stripe",
+          chargebackReceiptId: "Hey there",
+          chargebackReason: "What is this column will be?",
+          winstonCreditAmount: new Winston(500),
+        }),
+        errorMessage:
+          "No user found in database with address 'Non Existent User Address'",
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.chargebackReceipt).where({
+            chargeback_receipt_id: "Hey there",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
+    it("errors as expected when user has no funds to decrement balance", async () => {
+      const underfundedUserAddress = "Broke 😭";
+
+      await dbTestHelper.insertStubUser({
+        user_address: underfundedUserAddress,
+        winston_credit_balance: "200",
+      });
+
+      await expectAsyncErrorThrow({
+        promiseToError: db.createChargebackReceipt({
+          amount: 1,
+          currencyType: "eur",
+          destinationAddress: underfundedUserAddress,
+          destinationAddressType: "arweave",
+          paymentReceiptId: "New ID",
+          paymentProvider: "stripe",
+          chargebackReceiptId: "Great value",
+          chargebackReason: "What ?",
+          winstonCreditAmount: new Winston(500),
+        }),
+        errorMessage: `User with address '${underfundedUserAddress}' does not have enough balance to decrement this chargeback!`,
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.chargebackReceipt).where({
+            chargeback_receipt_id: "Great value",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
+    describe("getChargebackReceipt method", () => {
+      const breadId = "Bread 🍞";
+      const greensId = "Greens 🥬";
+
+      before(async () => {
+        await dbTestHelper.insertStubChargebackReceipt({
+          chargeback_receipt_id: breadId,
+        });
+        await dbTestHelper.insertStubChargebackReceipt({
+          chargeback_receipt_id: greensId,
+        });
+      });
+
+      after(async () => {
+        await dbTestHelper.cleanUpEntityInDb("chargeback_receipt", breadId);
+        await dbTestHelper.cleanUpEntityInDb("chargeback_receipt", greensId);
+      });
+
+      it("returns the expected chargeback receipt database entities", async () => {
+        const grapesReceipt = await db.getChargebackReceipt(breadId);
+        const strawberriesReceipt = await db.getChargebackReceipt(greensId);
+
+        expect(grapesReceipt.chargebackReceiptId).to.equal(breadId);
+        expect(strawberriesReceipt.chargebackReceiptId).to.equal(greensId);
+      });
+
+      it("errors as expected when chargeback receipt cannot be found", async () => {
+        await expectAsyncErrorThrow({
+          promiseToError: db.getChargebackReceipt("Non Existent ID"),
+          errorMessage:
+            "No chargeback receipt found in database with ID 'Non Existent ID'",
+        });
       });
     });
   });

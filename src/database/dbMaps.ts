@@ -73,7 +73,7 @@ export function paymentReceiptDBMap({
   };
 }
 
-export function ChargebackReceiptDBMap({
+export function chargebackReceiptDBMap({
   payment_provider,
   chargeback_receipt_date,
   chargeback_receipt_id,

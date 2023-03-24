@@ -3,6 +3,7 @@ import { Knex } from "knex";
 
 import { tableNames } from "../src/database/dbConstants";
 import {
+  ChargebackReceiptDBInsert,
   PaymentReceiptDBInsert,
   TopUpQuoteDBInsert,
   UserAddress,
@@ -54,6 +55,26 @@ function stubPaymentReceiptInsert({
   };
 }
 
+function stubChargebackReceiptInsert({
+  chargeback_receipt_id = "The Stubbiest Chargeback Receipt",
+  payment_receipt_id = "The Stubbiest Payment Receipt Id",
+}: {
+  chargeback_receipt_id?: string;
+  payment_receipt_id?: string;
+}): ChargebackReceiptDBInsert {
+  return {
+    amount: "100",
+    currency_type: "usd",
+    destination_address: stubArweaveUserAddress,
+    destination_address_type: "arweave",
+    payment_receipt_id,
+    payment_provider: "stripe",
+    chargeback_receipt_id,
+    winston_credit_amount: "1337",
+    chargeback_reason: "What is the reason?",
+  };
+}
+
 interface StubUserParams {
   user_address?: string;
   winston_credit_balance?: string;
@@ -95,6 +116,15 @@ export class DbTestHelper {
   }): Promise<void> {
     return this.knex(tableNames.paymentReceipt).insert(
       stubPaymentReceiptInsert(insertParams)
+    );
+  }
+
+  public async insertStubChargebackReceipt(insertParams: {
+    chargeback_receipt_id?: string;
+    top_up_quote_id?: string;
+  }): Promise<void> {
+    return this.knex(tableNames.chargebackReceipt).insert(
+      stubChargebackReceiptInsert(insertParams)
     );
   }
 

@@ -1,5 +1,8 @@
 import { WC } from "../types/arc";
 import {
+  ChargebackReceipt,
+  ChargebackReceiptId,
+  CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
   PaymentReceipt,
@@ -34,4 +37,10 @@ export interface Database {
     userAddress: UserAddress,
     winstonCreditAmount: WC
   ) => Promise<void>;
+  createChargebackReceipt: (
+    chargebackReceipt: CreateChargebackReceiptParams
+  ) => Promise<void>;
+  getChargebackReceipt: (
+    chargebackReceiptId: ChargebackReceiptId
+  ) => Promise<ChargebackReceipt>;
 }
