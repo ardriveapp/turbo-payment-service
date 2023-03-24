@@ -1,5 +1,6 @@
-import { JWKInterface } from "arweave/node/lib/wallet";
 import { createPrivateKey, createPublicKey } from "crypto";
+
+import { JWKInterface } from "../types/jwkTypes";
 
 export function jwkToPem(jwk: JWKInterface, makePublicKey?: boolean): string {
   const isPrivate = makePublicKey === true ? false : !!jwk.d;
