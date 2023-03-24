@@ -1,5 +1,6 @@
 import { expect } from "chai";
 
+import { DbTestHelper } from "../../tests/dbTestHelper";
 import { Winston } from "../types/winston";
 import { TopUpQuoteDBResult } from "./dbTypes";
 import { PostgresDatabase } from "./postgres";
@@ -8,6 +9,7 @@ import { PostgresDatabase } from "./postgres";
 
 describe("PostgresDatabase class", () => {
   const db = new PostgresDatabase();
+  const dbTestHelper = new DbTestHelper(db);
 
   describe("createTopUpQuote method", () => {
     const quoteExpirationDate = new Date(
@@ -64,6 +66,29 @@ describe("PostgresDatabase class", () => {
       );
       expect(top_up_quote_id).to.equal("Unique Identifier");
       expect(winston_credit_amount).to.equal("500");
+    });
+  });
+
+  describe("getTopUpQuote method", () => {
+    const pantsId = "Pants 👖";
+    const shortsId = "Shorts 🩳";
+
+    before(async () => {
+      await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: pantsId });
+      await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: shortsId });
+    });
+
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb("top_up_quote", pantsId);
+      await dbTestHelper.cleanUpEntityInDb("top_up_quote", shortsId);
+    });
+
+    it("gets the expected top_up_quote database entities", async () => {
+      const pantsQuote = await db.getTopUpQuote(pantsId);
+      const shortsQuote = await db.getTopUpQuote(shortsId);
+
+      expect(pantsQuote.topUpQuoteId).to.equal(pantsId);
+      expect(shortsQuote.topUpQuoteId).to.equal(shortsId);
     });
   });
 });
