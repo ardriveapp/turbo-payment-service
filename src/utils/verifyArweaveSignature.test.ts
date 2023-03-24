@@ -1,12 +1,12 @@
-import Arweave from "arweave";
-import { JWKInterface } from "arweave/node/lib/wallet";
 import { expect } from "chai";
 import { ParsedUrlQuery } from "querystring";
 
 import { signData } from "../../tests/helpers/signData";
 import { testWallet } from "../../tests/helpers/testHelpers";
-import { jwkToPem } from "../utils/pem";
-import { verifyArweaveSignature } from "./verifySignature";
+import { JWKInterface } from "../types/jwkTypes";
+import { fromB64UrlToBuffer } from "./base64";
+import { jwkToPem } from "./pem";
+import { verifyArweaveSignature } from "./verifyArweaveSignature";
 
 describe("verifyArweaveSignature", () => {
   let wallet: JWKInterface = testWallet;
@@ -57,7 +57,7 @@ describe("verifyArweaveSignature", () => {
 
     const isVerified = await verifyArweaveSignature({
       publicKey,
-      signature: Arweave.utils.stringToBuffer(invalidSignature),
+      signature: fromB64UrlToBuffer(invalidSignature),
       nonce,
     });
 

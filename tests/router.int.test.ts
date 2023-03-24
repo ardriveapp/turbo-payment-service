@@ -1,4 +1,3 @@
-import Arweave from "arweave/node/common";
 import axios from "axios";
 import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
@@ -6,6 +5,7 @@ import { Server } from "http";
 
 import logger from "../src/logger";
 import { createServer } from "../src/server";
+import { toB64Url } from "../src/utils/base64";
 import { jwkToPem } from "../src/utils/pem";
 import { signData } from "./helpers/signData";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
@@ -107,9 +107,9 @@ describe("Router tests", () => {
       `${localTestUrl}/v1/balance`,
       {
         headers: {
-          "x-public-key": publicKey.replace(/\r?\n|\r/g, ""),
+          "x-public-key": toB64Url(Buffer.from(publicKey)),
           "x-nonce": nonce,
-          "x-signature": Arweave.utils.bufferTob64Url(signature),
+          "x-signature": toB64Url(Buffer.from(signature)),
         },
       }
     );
@@ -127,15 +127,16 @@ describe("Router tests", () => {
     const publicKey = jwkToPem(testWallet, true);
     const signature = await signData(jwkToPem(testWallet), "another nonce");
 
-    const { status } = await axios.get(`${localTestUrl}/v1/balance`, {
+    const { status, data } = await axios.get(`${localTestUrl}/v1/balance`, {
       headers: {
         "x-public-key": publicKey.replace(/\r?\n|\r/g, ""),
         "x-nonce": nonce,
-        "x-signature": Arweave.utils.bufferTob64Url(signature),
+        "x-signature": toB64Url(Buffer.from(signature)),
       },
       validateStatus: () => true,
     });
 
+    expect(data).to.equal("Invalid signature or missing required headers");
     expect(status).to.equal(403);
   });
 });

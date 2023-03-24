@@ -1,6 +1,7 @@
-import { JWKInterface } from "arweave/node/lib/wallet";
 import { expect } from "chai";
 import { Knex } from "knex";
+
+import { JWKInterface } from "../../src/types/jwkTypes";
 
 export const localTestUrl = "http://localhost:1235";
 
