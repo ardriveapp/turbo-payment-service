@@ -243,6 +243,7 @@ describe("PostgresDatabase class", () => {
         winston_credit_balance: "10",
       });
     });
+
     after(async () => {
       await dbTestHelper.cleanUpEntityInDb(tableNames.user, richAddress);
       await dbTestHelper.cleanUpEntityInDb(tableNames.user, poorAddress);
@@ -265,6 +266,29 @@ describe("PostgresDatabase class", () => {
       const poorUser = await db.getUser(poorAddress);
 
       expect(+poorUser.winstonCreditBalance).to.equal(10);
+    });
+  });
+
+  describe("refundBalance method", () => {
+    const happyAddress = "Happy 😁";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: happyAddress,
+        winston_credit_balance: "2000",
+      });
+    });
+
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb(tableNames.user, happyAddress);
+    });
+
+    it("refunds the balance as expected", async () => {
+      await db.refundBalance(happyAddress, new Winston(100_000));
+
+      const happyUser = await db.getUser(happyAddress);
+
+      expect(+happyUser.winstonCreditBalance).to.equal(102_000);
     });
   });
 });
