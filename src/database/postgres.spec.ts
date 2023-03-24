@@ -227,7 +227,31 @@ describe("PostgresDatabase class", () => {
     });
   });
 
-  // TODO: Add method and test updatePromoInfo(promoInfo): Promise<void>
+  describe("getPromoInfo method", () => {
+    const privilegedAddress = "Privileged 🎫";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({ user_address: privilegedAddress });
+    });
+
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb(tableNames.user, privilegedAddress);
+    });
+
+    it("updates a user's promotional information as expected", async () => {
+      await db.updatePromoInfo(privilegedAddress, {
+        arioTokenHodler: true,
+        underOneHundredKiBFreeBytes: 100_000_000_000,
+      });
+
+      const promoInfo = await db.getPromoInfo(privilegedAddress);
+
+      expect(promoInfo).to.deep.equal({
+        arioTokenHodler: true,
+        underOneHundredKiBFreeBytes: 100_000_000_000,
+      });
+    });
+  });
 
   describe("reserveBalance method", () => {
     const richAddress = "Rich 💸";
