@@ -207,4 +207,24 @@ describe("PostgresDatabase class", () => {
       expect(shortsQuote.userAddress).to.equal(evilAddress);
     });
   });
+
+  describe("getPromoInfo method", () => {
+    const unicornAddress = "Unicorn 🦄";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({ user_address: unicornAddress });
+    });
+
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb(tableNames.user, unicornAddress);
+    });
+
+    it("gets the expected user database entities", async () => {
+      const promoInfo = await db.getPromoInfo(unicornAddress);
+
+      expect(promoInfo).to.equal({});
+    });
+  });
+
+  // TODO: Add method and test updatePromoInfo(promoInfo): Promise<void>
 });
