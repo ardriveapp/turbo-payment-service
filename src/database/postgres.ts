@@ -5,7 +5,7 @@ import logger from "../logger";
 import { Winston } from "../types/types";
 import { Database } from "./database";
 import { tableNames } from "./dbConstants";
-import { paymentReceiptDBMap, topUpQuoteDBMap } from "./dbMaps";
+import { paymentReceiptDBMap, topUpQuoteDBMap, userDBMap } from "./dbMaps";
 import {
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
@@ -15,6 +15,7 @@ import {
   TopUpQuote,
   TopUpQuoteDBResult,
   User,
+  UserDBResult,
 } from "./dbTypes";
 import * as knexConfig from "./knexfile";
 
@@ -26,6 +27,7 @@ export class PostgresDatabase implements Database {
   constructor(private readonly knex: Knex = pg) {
     this.log = logger.child({ class: this.constructor.name });
   }
+
   public async createTopUpQuote(
     topUpQuote: CreateTopUpQuoteParams
   ): Promise<void> {
@@ -64,9 +66,17 @@ export class PostgresDatabase implements Database {
     ).map(topUpQuoteDBMap)[0];
   }
 
-  public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {}
+  public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {
+    return (await this.getUser(userAddress)).promotionalInfo;
+  }
 
-  public async getUser(userAddress: string): Promise<User> {}
+  public async getUser(userAddress: string): Promise<User> {
+    return (
+      await this.knex<UserDBResult>(tableNames.user).where({
+        user_address: userAddress,
+      })
+    ).map(userDBMap)[0];
+  }
 
   public async createPaymentReceipt(
     paymentReceipt: CreatePaymentReceiptParams
@@ -86,6 +96,8 @@ export class PostgresDatabase implements Database {
       winstonCreditAmount,
     } = paymentReceipt;
 
+    // TODO: Create user if none exists
+
     await this.knex<PaymentReceiptDBResult>(tableNames.paymentReceipt).insert({
       amount: amount.toString(),
       currency_type: currencyType,
@@ -96,6 +108,14 @@ export class PostgresDatabase implements Database {
       payment_receipt_id: paymentReceiptId,
       winston_credit_amount: winstonCreditAmount.toString(),
     });
+
+    // TODO: Increment Balance of User
+    // TODO: Mark Price Quote as Expired
+
+    // TODO: Use a Transaction for all of these:
+    // - Mark Expiration Date of Price Quote to Now
+    // - Create User If not Exist, Increment The Balance
+    // - Create Payment Receipt
   }
 
   public async getPaymentReceipt(
