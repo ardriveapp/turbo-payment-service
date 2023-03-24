@@ -18,7 +18,7 @@ describe("Schema class", () => {
     await Schema.create(knex);
 
     // Run integration tests after schema tests to avoid race conditions in the test env database
-    // require("./postgres.spec");
+    require("./postgres.spec");
   });
 
   it("after running latest knex migrations with knex CLI from docker-test.sh, all expected tables exists", async () => {
