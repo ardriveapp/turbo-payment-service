@@ -248,14 +248,13 @@ describe("PostgresDatabase class", () => {
           "No top up quote found in database for payment receipt id 'This is fine'",
       });
 
-      const k = await db.getPaymentReceipt("This is fine");
-      console.log("k", k);
-
-      await expectAsyncErrorThrow({
-        promiseToError: db.getPaymentReceipt("This is fine"),
-        errorMessage:
-          "No top up quote found in database for payment receipt id 'This is fine'",
-      });
+      expect(
+        (
+          await db["knex"](tableNames.paymentReceipt).where({
+            payment_receipt_id: "This is fine",
+          })
+        ).length
+      ).to.equal(0);
     });
   });
 

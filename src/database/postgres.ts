@@ -107,26 +107,64 @@ export class PostgresDatabase implements Database {
       winstonCreditAmount,
     } = paymentReceipt;
 
-    // TODO: Create user if none exists
+    await this.knex.transaction(async (knexTransaction) => {
+      const topUp = await knexTransaction<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      ).where({
+        top_up_quote_id: topUpQuoteId,
+      });
+      if (topUp.length === 0) {
+        throw Error(
+          `No top up quote found in database for payment receipt id '${paymentReceiptId}'`
+        );
+      }
 
-    await this.knex<PaymentReceiptDBResult>(tableNames.paymentReceipt).insert({
-      amount: amount.toString(),
-      currency_type: currencyType,
-      destination_address: destinationAddress,
-      destination_address_type: destinationAddressType,
-      payment_provider: paymentProvider,
-      top_up_quote_id: topUpQuoteId,
-      payment_receipt_id: paymentReceiptId,
-      winston_credit_amount: winstonCreditAmount.toString(),
+      // Expire the existing top up quote
+      await knexTransaction<TopUpQuoteDBResult>(tableNames.topUpQuote)
+        .where({
+          top_up_quote_id: topUpQuoteId,
+        })
+        .update({ quote_expiration_date: new Date().toISOString() });
+
+      const destinationUser = (
+        await knexTransaction<UserDBResult>(tableNames.user).where({
+          user_address: destinationAddress,
+        })
+      )[0];
+      if (destinationUser === undefined) {
+        // No user exists, create new user with balance
+        await knexTransaction<UserDBResult>(tableNames.user).insert({
+          user_address: destinationAddress,
+          user_address_type: destinationAddressType,
+          winston_credit_balance: winstonCreditAmount.toString(),
+        });
+      } else {
+        // Increment balance of existing user
+        const currentBalance = new Winston(
+          destinationUser.winston_credit_balance
+        );
+        const newBalance = currentBalance.plus(winstonCreditAmount);
+        await knexTransaction<UserDBResult>(tableNames.user)
+          .where({
+            user_address: destinationAddress,
+          })
+          .update({ winston_credit_balance: newBalance.toString() });
+      }
+
+      // Create Payment Receipt
+      await knexTransaction<PaymentReceiptDBResult>(
+        tableNames.paymentReceipt
+      ).insert({
+        amount: amount.toString(),
+        currency_type: currencyType,
+        destination_address: destinationAddress,
+        destination_address_type: destinationAddressType,
+        payment_provider: paymentProvider,
+        top_up_quote_id: topUpQuoteId,
+        payment_receipt_id: paymentReceiptId,
+        winston_credit_amount: winstonCreditAmount.toString(),
+      });
     });
-
-    // TODO: Increment Balance of User
-    // TODO: Mark Price Quote as Expired
-
-    // TODO: Use a Transaction for all of these:
-    // - Mark Expiration Date of Price Quote to Now
-    // - Create User If not Exist, Increment The Balance
-    // - Create Payment Receipt
   }
 
   public async getPaymentReceipt(
