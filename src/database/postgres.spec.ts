@@ -4,7 +4,11 @@ import { DbTestHelper } from "../../tests/dbTestHelper";
 import { expectAsyncErrorThrow } from "../../tests/helpers/testHelpers";
 import { Winston } from "../types/winston";
 import { tableNames } from "./dbConstants";
-import { PaymentReceiptDBResult, TopUpQuoteDBResult } from "./dbTypes";
+import {
+  PaymentReceiptDBResult,
+  TopUpQuoteDBResult,
+  UserDBResult,
+} from "./dbTypes";
 import { PostgresDatabase } from "./postgres";
 
 /** Knex instance connected to a PostgreSQL database */
@@ -98,15 +102,20 @@ describe("PostgresDatabase class", () => {
   });
 
   describe("createPaymentReceipt method", () => {
+    const newUserAddress = "New User 👶";
+    const oldUserAddress = "Old User 🧓";
+
     before(async () => {
       // TODO: Before sending to DB and creating top up quote we should use safer types:
       // -  validate this address is a public arweave address (and address type is arweave for MVP)
       // -  validate payment provider is expected
       // -  validate currency type is supported
+
+      // Create Payment Receipt for New User
       await db.createPaymentReceipt({
         amount: 10101,
         currencyType: "can",
-        destinationAddress: "A Grand Address :)",
+        destinationAddress: newUserAddress,
         destinationAddressType: "arweave",
         topUpQuoteId: "A New Top Up ID",
         paymentProvider: "stripe",
@@ -114,6 +123,23 @@ describe("PostgresDatabase class", () => {
         winstonCreditAmount: new Winston(
           Number.MAX_SAFE_INTEGER.toString() + "00"
         ),
+      });
+
+      await dbTestHelper.insertStubUser({
+        user_address: oldUserAddress,
+        winston_credit_balance: "100",
+      });
+
+      // Create Payment Receipt for Existing User
+      await db.createPaymentReceipt({
+        amount: 1337,
+        currencyType: "fra",
+        destinationAddress: oldUserAddress,
+        destinationAddressType: "arweave",
+        topUpQuoteId: "Another New Top Up ID",
+        paymentProvider: "stripe",
+        paymentReceiptId: "An Existing User's Unique Identifier",
+        winstonCreditAmount: new Winston(500),
       });
     });
 
@@ -123,8 +149,6 @@ describe("PostgresDatabase class", () => {
         "A New Top Up ID"
       );
     });
-
-    // TODO: On Payment Receipt Creation, we expect a new user to be created if it does not exist
 
     it("creates the expected payment_receipt in the database entity", async () => {
       const paymentReceipt = await db["knex"]<PaymentReceiptDBResult>(
@@ -146,7 +170,7 @@ describe("PostgresDatabase class", () => {
 
       expect(amount).to.equal("10101");
       expect(currency_type).to.equal("can");
-      expect(destination_address).to.equal("A Grand Address :)");
+      expect(destination_address).to.equal(newUserAddress);
       expect(destination_address_type).to.equal("arweave");
       expect(payment_provider).to.equal("stripe");
       expect(payment_receipt_date).to.exist;
@@ -155,6 +179,46 @@ describe("PostgresDatabase class", () => {
       expect(winston_credit_amount).to.equal(
         Number.MAX_SAFE_INTEGER.toString() + "00"
       );
+    });
+
+    it("creates the expected new user as expected when an existing user address cannot be found", async () => {
+      const user = await db["knex"]<UserDBResult>(tableNames.user).where({
+        user_address: newUserAddress,
+      });
+      expect(user.length).to.equal(1);
+
+      const {
+        promotional_info,
+        user_address,
+        user_address_type,
+        winston_credit_balance,
+      } = user[0];
+
+      expect(promotional_info).to.equal({});
+      expect(user_address).to.equal(newUserAddress);
+      expect(user_address_type).to.equal("arweave");
+      expect(winston_credit_balance).to.equal(
+        Number.MAX_SAFE_INTEGER.toString() + "00"
+      );
+    });
+
+    it("increments existing user's balance as expected", async () => {
+      const user = await db["knex"]<UserDBResult>(tableNames.user).where({
+        user_address: oldUserAddress,
+      });
+      expect(user.length).to.equal(1);
+
+      const {
+        promotional_info,
+        user_address,
+        user_address_type,
+        winston_credit_balance,
+      } = user[0];
+
+      expect(promotional_info).to.equal({});
+      expect(user_address).to.equal(oldUserAddress);
+      expect(user_address_type).to.equal("arweave");
+      expect(winston_credit_balance).to.equal("600");
     });
   });
 
