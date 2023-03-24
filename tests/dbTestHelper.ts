@@ -100,7 +100,8 @@ export class DbTestHelper {
     tableName: TableNameValues,
     pk_val: string
   ): Promise<void> {
-    const where = { [`${tableName}_id`]: pk_val };
+    const pkColumnName = tableName === "user" ? "_address" : "_id";
+    const where = { [`${tableName}${pkColumnName}`]: pk_val };
 
     await this.knex(tableName).where(where).del();
     expect((await this.knex(tableName).where(where)).length).to.equal(0);
