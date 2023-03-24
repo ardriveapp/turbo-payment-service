@@ -61,8 +61,8 @@ export class Schema {
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(paymentProvider).notNullable();
-      t.timestamp(quoteExpirationDate, this.noTimeZone).notNullable();
-      t.timestamp(quoteCreationDate, this.noTimeZone)
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
@@ -78,7 +78,7 @@ export class Schema {
       t.string(winstonCreditAmount).notNullable();
       t.string(topUpQuoteId).notNullable();
       t.string(paymentProvider).notNullable();
-      t.timestamp(paymentReceiptDate, this.noTimeZone)
+      t.timestamp(paymentReceiptDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
@@ -95,7 +95,7 @@ export class Schema {
       t.string(paymentReceiptId).notNullable();
       t.string(paymentProvider).notNullable();
       t.string(chargebackReason).notNullable();
-      t.timestamp(chargebackReceiptDate, this.noTimeZone)
+      t.timestamp(chargebackReceiptDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
@@ -104,8 +104,6 @@ export class Schema {
   private defaultTimestamp() {
     return this.pg.fn.now();
   }
-
-  private noTimeZone = { useTz: false };
 }
 
 const { chargebackReceipt, paymentReceipt, topUpQuote, user } = tableNames;

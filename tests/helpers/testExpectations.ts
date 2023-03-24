@@ -23,7 +23,7 @@ const expectedHeadersWithContentLength = (contentLength: number) => {
 
 const expectedDateColumn = (defaultValue = true) => {
   return {
-    type: "timestamp without time zone",
+    type: "timestamp with time zone",
     maxLength: null,
     nullable: false,
     defaultValue: defaultValue ? "CURRENT_TIMESTAMP" : null,
