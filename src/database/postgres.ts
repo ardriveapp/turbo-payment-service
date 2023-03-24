@@ -2,20 +2,18 @@ import knex, { Knex } from "knex";
 import winston from "winston";
 
 import logger from "../logger";
-import { WC, Winston } from "../types/types";
+import { Winston } from "../types/types";
 import { Database } from "./database";
 import { tableNames } from "./dbConstants";
+import { topUpQuoteDBMap } from "./dbMaps";
 import {
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
   PaymentReceipt,
-  PaymentReceiptId,
   PromotionalInfo,
   TopUpQuote,
   TopUpQuoteDBResult,
-  TopUpQuoteId,
   User,
-  UserAddress,
 } from "./dbTypes";
 import * as knexConfig from "./knexfile";
 
@@ -57,7 +55,13 @@ export class PostgresDatabase implements Database {
     });
   }
 
-  public async getTopUpQuote(topUpQuoteId: string): Promise<TopUpQuote> {}
+  public async getTopUpQuote(topUpQuoteId: string): Promise<TopUpQuote> {
+    return (
+      await this.knex<TopUpQuoteDBResult>(tableNames.topUpQuote).where({
+        top_up_quote_id: topUpQuoteId,
+      })
+    ).map(topUpQuoteDBMap)[0];
+  }
 
   public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {}
 
