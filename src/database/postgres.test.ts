@@ -2,6 +2,7 @@ import { expect } from "chai";
 
 import { DbTestHelper } from "../../tests/dbTestHelper";
 import { Winston } from "../types/winston";
+import { tableNames } from "./dbConstants";
 import { PaymentReceiptDBResult, TopUpQuoteDBResult } from "./dbTypes";
 import { PostgresDatabase } from "./postgres";
 
@@ -34,12 +35,15 @@ describe("PostgresDatabase class", () => {
     });
 
     after(async () => {
-      await dbTestHelper.cleanUpEntityInDb("top_up_quote", "Unique Identifier");
+      await dbTestHelper.cleanUpEntityInDb(
+        tableNames.topUpQuote,
+        "Unique Identifier"
+      );
     });
 
     it("creates the expected top_up_quote in the database entity", async () => {
       const topUpQuote = await db["knex"]<TopUpQuoteDBResult>(
-        "top_up_quote"
+        tableNames.topUpQuote
       ).where({ top_up_quote_id: "Unique Identifier" });
       expect(topUpQuote.length).to.equal(1);
 
@@ -79,8 +83,8 @@ describe("PostgresDatabase class", () => {
     });
 
     after(async () => {
-      await dbTestHelper.cleanUpEntityInDb("top_up_quote", pantsId);
-      await dbTestHelper.cleanUpEntityInDb("top_up_quote", shortsId);
+      await dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, pantsId);
+      await dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, shortsId);
     });
 
     it("gets the expected top_up_quote database entities", async () => {
@@ -93,10 +97,6 @@ describe("PostgresDatabase class", () => {
   });
 
   describe("createPaymentReceipt method", () => {
-    const quoteExpirationDate = new Date(
-      "2023-03-23 12:34:56.789Z"
-    ).toISOString();
-
     before(async () => {
       // TODO: Before sending to DB and creating top up quote we should use safer types:
       // -  validate this address is a public arweave address (and address type is arweave)
@@ -117,12 +117,15 @@ describe("PostgresDatabase class", () => {
     });
 
     after(async () => {
-      await dbTestHelper.cleanUpEntityInDb("top_up_quote", "Unique Identifier");
+      await dbTestHelper.cleanUpEntityInDb(
+        tableNames.paymentReceipt,
+        "A New Top Up ID"
+      );
     });
 
-    it("creates the expected top_up_quote in the database entity", async () => {
+    it("creates the expected payment_receipt in the database entity", async () => {
       const paymentReceipt = await db["knex"]<PaymentReceiptDBResult>(
-        "top_up_quote"
+        tableNames.paymentReceipt
       ).where({ payment_receipt_id: "Unique Identifier" });
       expect(paymentReceipt.length).to.equal(1);
 

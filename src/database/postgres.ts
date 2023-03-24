@@ -70,7 +70,33 @@ export class PostgresDatabase implements Database {
 
   public async createPaymentReceipt(
     paymentReceipt: CreatePaymentReceiptParams
-  ): Promise<void> {}
+  ): Promise<void> {
+    this.log.info("Inserting new payment receipt...", {
+      paymentReceipt,
+    });
+
+    const {
+      amount,
+      currencyType,
+      destinationAddress,
+      destinationAddressType,
+      paymentProvider,
+      topUpQuoteId,
+      paymentReceiptId,
+      winstonCreditAmount,
+    } = paymentReceipt;
+
+    await this.knex<PaymentReceiptDBResult>(tableNames.paymentReceipt).insert({
+      amount: amount.toString(),
+      currency_type: currencyType,
+      destination_address: destinationAddress,
+      destination_address_type: destinationAddressType,
+      payment_provider: paymentProvider,
+      top_up_quote_id: topUpQuoteId,
+      payment_receipt_id: paymentReceiptId,
+      winston_credit_amount: winstonCreditAmount.toString(),
+    });
+  }
 
   public async getPaymentReceipt(
     paymentReceiptId: string
