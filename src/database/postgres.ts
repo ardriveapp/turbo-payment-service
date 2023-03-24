@@ -4,7 +4,7 @@ import winston from "winston";
 import logger from "../logger";
 import { Winston } from "../types/types";
 import { Database } from "./database";
-import { tableNames } from "./dbConstants";
+import { columnNames, tableNames } from "./dbConstants";
 import { paymentReceiptDBMap, topUpQuoteDBMap, userDBMap } from "./dbMaps";
 import {
   CreatePaymentReceiptParams,
@@ -59,34 +59,53 @@ export class PostgresDatabase implements Database {
   }
 
   public async getTopUpQuote(topUpQuoteId: string): Promise<TopUpQuote> {
-    return (
-      await this.knex<TopUpQuoteDBResult>(tableNames.topUpQuote).where({
-        top_up_quote_id: topUpQuoteId,
-      })
-    ).map(topUpQuoteDBMap)[0];
+    const topUpQuoteDbResult = await this.knex<TopUpQuoteDBResult>(
+      tableNames.topUpQuote
+    ).where({
+      [columnNames.topUpQuoteId]: topUpQuoteId,
+    });
+    if (topUpQuoteDbResult.length === 0) {
+      throw Error(
+        `No top up quote found in database with ID '${topUpQuoteId}'`
+      );
+    }
+
+    return topUpQuoteDbResult.map(topUpQuoteDBMap)[0];
   }
 
   public async updatePromoInfo(
     userAddress: string,
     promoInfo: PromotionalInfo
   ): Promise<void> {
-    await this.knex<UserDBResult>(tableNames.user)
-      .where({
-        user_address: userAddress,
-      })
-      .update({ promotional_info: promoInfo });
+    await this.knex.transaction(async (knexTransaction) => {
+      await this.getUser(userAddress, knexTransaction);
+
+      await knexTransaction<UserDBResult>(tableNames.user)
+        .where({
+          user_address: userAddress,
+        })
+        .update({ promotional_info: promoInfo });
+    });
   }
 
   public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {
     return (await this.getUser(userAddress)).promotionalInfo;
   }
 
-  public async getUser(userAddress: string): Promise<User> {
-    return (
-      await this.knex<UserDBResult>(tableNames.user).where({
-        user_address: userAddress,
-      })
-    ).map(userDBMap)[0];
+  public async getUser(
+    userAddress: string,
+    knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
+  ): Promise<User> {
+    const userDbResult = await knexTransaction<UserDBResult>(
+      tableNames.user
+    ).where({
+      user_address: userAddress,
+    });
+    if (userDbResult.length === 0) {
+      throw Error(`No user found in database with address '${userAddress}'`);
+    }
+
+    return userDbResult.map(userDBMap)[0];
   }
 
   public async createPaymentReceipt(
@@ -170,11 +189,18 @@ export class PostgresDatabase implements Database {
   public async getPaymentReceipt(
     paymentReceiptId: string
   ): Promise<PaymentReceipt> {
-    return (
-      await this.knex<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
-        payment_receipt_id: paymentReceiptId,
-      })
-    ).map(paymentReceiptDBMap)[0];
+    const paymentReceiptDbResult = await this.knex<PaymentReceiptDBResult>(
+      tableNames.paymentReceipt
+    ).where({
+      [columnNames.paymentReceiptId]: paymentReceiptId,
+    });
+    if (paymentReceiptDbResult.length === 0) {
+      throw Error(
+        `No payment receipt found in database with ID '${paymentReceiptId}'`
+      );
+    }
+
+    return paymentReceiptDbResult.map(paymentReceiptDBMap)[0];
   }
 
   public async reserveBalance(
@@ -182,11 +208,7 @@ export class PostgresDatabase implements Database {
     winstonCreditAmount: Winston
   ): Promise<void> {
     await this.knex.transaction(async (knexTransaction) => {
-      const user = (
-        await knexTransaction<UserDBResult>(tableNames.user).where({
-          user_address: userAddress,
-        })
-      ).map(userDBMap)[0];
+      const user = await this.getUser(userAddress, knexTransaction);
 
       const currentWinstonBalance = user.winstonCreditBalance;
       let newBalance: Winston;
@@ -210,11 +232,7 @@ export class PostgresDatabase implements Database {
     winstonCreditAmount: Winston
   ): Promise<void> {
     await this.knex.transaction(async (knexTransaction) => {
-      const user = (
-        await knexTransaction<UserDBResult>(tableNames.user).where({
-          user_address: userAddress,
-        })
-      ).map(userDBMap)[0];
+      const user = await this.getUser(userAddress, knexTransaction);
 
       const currentWinstonBalance = user.winstonCreditBalance;
       const newBalance = currentWinstonBalance.plus(winstonCreditAmount);
