@@ -13,11 +13,11 @@ export type Timestamp = string;
 export type PromotionalInfo = Record<string, unknown>;
 
 // TODO: Use all generated UUIDs or use IDs from payment providers?
-type idType = string;
+type IdType = string;
 
-export type TopUpQuoteId = idType;
-export type PaymentReceiptId = idType;
-export type ChargebackReceiptId = idType;
+export type TopUpQuoteId = IdType;
+export type PaymentReceiptId = IdType;
+export type ChargebackReceiptId = IdType;
 
 export type Amount = number;
 
@@ -46,6 +46,8 @@ export interface TopUpQuote {
   quoteCreationDate: Timestamp;
 }
 
+export type CreateTopUpQuoteParams = Omit<TopUpQuote, "quoteCreationDate">;
+
 export interface PaymentReceipt {
   paymentReceiptId: PaymentReceiptId;
   destinationAddress: UserAddress;
@@ -57,6 +59,11 @@ export interface PaymentReceipt {
   paymentProvider: PaymentProvider;
   paymentReceiptDate: Timestamp;
 }
+
+export type CreatePaymentReceiptParams = Omit<
+  PaymentReceipt,
+  "paymentReceiptDate"
+>;
 
 export interface ChargebackReceipt {
   chargebackReceiptId: ChargebackReceiptId;
@@ -70,6 +77,11 @@ export interface ChargebackReceipt {
   chargebackReason: string;
   chargebackReceiptDate: Timestamp;
 }
+
+export type CreateChargebackReceiptParams = Omit<
+  ChargebackReceipt,
+  "chargebackReceiptDate"
+>;
 
 export interface UserDBInsert {
   user_address: string;
