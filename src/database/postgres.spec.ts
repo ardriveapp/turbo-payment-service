@@ -105,6 +105,9 @@ describe("PostgresDatabase class", () => {
     const newUserAddress = "New User 👶";
     const oldUserAddress = "Old User 🧓";
 
+    const newUserTopUpId = "New Top Up ID";
+    const oldUserTopUpId = "Old Top Up ID";
+
     before(async () => {
       // TODO: Before sending to DB and creating top up quote we should use safer types:
       // -  validate this address is a public arweave address (and address type is arweave for MVP)
@@ -112,12 +115,15 @@ describe("PostgresDatabase class", () => {
       // -  validate currency type is supported
 
       // Create Payment Receipt for New User
+      await dbTestHelper.insertStubTopUpQuote({
+        top_up_quote_id: newUserTopUpId,
+      });
       await db.createPaymentReceipt({
         amount: 10101,
         currencyType: "can",
         destinationAddress: newUserAddress,
         destinationAddressType: "arweave",
-        topUpQuoteId: "A New Top Up ID",
+        topUpQuoteId: newUserTopUpId,
         paymentProvider: "stripe",
         paymentReceiptId: "Unique Identifier",
         winstonCreditAmount: new Winston(
@@ -131,12 +137,15 @@ describe("PostgresDatabase class", () => {
       });
 
       // Create Payment Receipt for Existing User
+      await dbTestHelper.insertStubTopUpQuote({
+        top_up_quote_id: oldUserTopUpId,
+      });
       await db.createPaymentReceipt({
         amount: 1337,
         currencyType: "fra",
         destinationAddress: oldUserAddress,
         destinationAddressType: "arweave",
-        topUpQuoteId: "Another New Top Up ID",
+        topUpQuoteId: oldUserTopUpId,
         paymentProvider: "stripe",
         paymentReceiptId: "An Existing User's Unique Identifier",
         winstonCreditAmount: new Winston(500),
@@ -219,6 +228,43 @@ describe("PostgresDatabase class", () => {
       expect(user_address).to.equal(oldUserAddress);
       expect(user_address_type).to.equal("arweave");
       expect(winston_credit_balance).to.equal("600");
+    });
+
+    it("expires the top up quotes as expected", async () => {
+      const newUserTopUpQuote = await db.getTopUpQuote(newUserTopUpId);
+      const oldUserTopUpQuote = await db.getTopUpQuote(oldUserTopUpId);
+
+      expect(
+        new Date(newUserTopUpQuote.quoteExpirationDate).getTime()
+      ).to.be.lessThan(new Date().getTime());
+      expect(
+        new Date(oldUserTopUpQuote.quoteExpirationDate).getTime()
+      ).to.be.lessThan(new Date().getTime());
+    });
+
+    it("errors as expected when no top up quote can be expired", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.createPaymentReceipt({
+          amount: 1,
+          currencyType: "usd",
+          destinationAddress: "will fail",
+          destinationAddressType: "arweave",
+          topUpQuoteId: "A Top Up Quote ID That will be NOT FOUND",
+          paymentProvider: "stripe",
+          paymentReceiptId: "This is fine",
+          winstonCreditAmount: new Winston(500),
+        }),
+        errorMessage:
+          "No top up quote found in database for payment receipt id 'This is fine'!",
+      });
+
+      const k = await db.getPaymentReceipt("This is fine");
+
+      await expectAsyncErrorThrow({
+        promiseToError: db.getPaymentReceipt("This is fine"),
+        errorMessage:
+          "No top up quote found in database for payment receipt id 'This is fine'!",
+      });
     });
   });
 
