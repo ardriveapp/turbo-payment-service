@@ -159,5 +159,22 @@ export class PostgresDatabase implements Database {
   public async refundBalance(
     userAddress: string,
     winstonCreditAmount: Winston
-  ): Promise<void> {}
+  ): Promise<void> {
+    await this.knex.transaction(async (knexTransaction) => {
+      const user = (
+        await knexTransaction<UserDBResult>(tableNames.user).where({
+          user_address: userAddress,
+        })
+      ).map(userDBMap)[0];
+
+      const currentWinstonBalance = user.winstonCreditBalance;
+      const newBalance = currentWinstonBalance.plus(winstonCreditAmount);
+
+      await knexTransaction<UserDBResult>(tableNames.user)
+        .where({
+          user_address: userAddress,
+        })
+        .update({ winston_credit_balance: newBalance.toString() });
+    });
+  }
 }
