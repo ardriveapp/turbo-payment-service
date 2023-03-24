@@ -2,7 +2,11 @@ import { expect } from "chai";
 import { Knex } from "knex";
 
 import { tableNames } from "../src/database/dbConstants";
-import { TopUpQuoteDBInsert, UserAddress } from "../src/database/dbTypes";
+import {
+  PaymentReceiptDBInsert,
+  TopUpQuoteDBInsert,
+  UserAddress,
+} from "../src/database/dbTypes";
 import { PostgresDatabase } from "../src/database/postgres";
 
 type TableNameKeys = keyof typeof tableNames;
@@ -30,6 +34,25 @@ function stubTopUpQuoteInsert({
   };
 }
 
+function stubPaymentReceiptInsert({
+  payment_receipt_id = "The Stubbiest Payment Receipt",
+  top_up_quote_id = "The Stubbiest Top Up Quote",
+}: {
+  payment_receipt_id?: string;
+  top_up_quote_id?: string;
+}): PaymentReceiptDBInsert {
+  return {
+    amount: "100",
+    currency_type: "usd",
+    destination_address: stubArweaveUserAddress,
+    destination_address_type: "arweave",
+    top_up_quote_id,
+    payment_provider: "stripe",
+    payment_receipt_id,
+    winston_credit_amount: "1337",
+  };
+}
+
 export class DbTestHelper {
   constructor(public readonly db: PostgresDatabase) {}
 
@@ -40,9 +63,17 @@ export class DbTestHelper {
   public async insertStubTopUpQuote(insertParams: {
     top_up_quote_id?: string;
   }): Promise<void> {
-    console.log("inserting");
     return this.knex(tableNames.topUpQuote).insert(
       stubTopUpQuoteInsert(insertParams)
+    );
+  }
+
+  public async insertStubPaymentReceipt(insertParams: {
+    payment_receipt_id?: string;
+    top_up_quote_id?: string;
+  }): Promise<void> {
+    return this.knex(tableNames.paymentReceipt).insert(
+      stubPaymentReceiptInsert(insertParams)
     );
   }
 

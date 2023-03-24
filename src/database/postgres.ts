@@ -5,11 +5,12 @@ import logger from "../logger";
 import { Winston } from "../types/types";
 import { Database } from "./database";
 import { tableNames } from "./dbConstants";
-import { topUpQuoteDBMap } from "./dbMaps";
+import { paymentReceiptDBMap, topUpQuoteDBMap } from "./dbMaps";
 import {
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
   PaymentReceipt,
+  PaymentReceiptDBResult,
   PromotionalInfo,
   TopUpQuote,
   TopUpQuoteDBResult,
@@ -73,7 +74,13 @@ export class PostgresDatabase implements Database {
 
   public async getPaymentReceipt(
     paymentReceiptId: string
-  ): Promise<PaymentReceipt> {}
+  ): Promise<PaymentReceipt> {
+    return (
+      await this.knex<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
+        payment_receipt_id: paymentReceiptId,
+      })
+    ).map(paymentReceiptDBMap)[0];
+  }
 
   public async reserveBalance(
     userAddress: string,

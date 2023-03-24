@@ -91,4 +91,32 @@ describe("PostgresDatabase class", () => {
       expect(shortsQuote.topUpQuoteId).to.equal(shortsId);
     });
   });
+
+  describe("getPaymentReceipt method", () => {
+    const grapesId = "Grapes 🍇";
+    const strawberriesId = "Strawberries 🍓";
+
+    before(async () => {
+      // TODO: At a database level, should we disallow two payment receipts with the same top_up_quote_id?
+      await dbTestHelper.insertStubPaymentReceipt({
+        payment_receipt_id: grapesId,
+      });
+      await dbTestHelper.insertStubPaymentReceipt({
+        payment_receipt_id: strawberriesId,
+      });
+    });
+
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb("payment_receipt", grapesId);
+      await dbTestHelper.cleanUpEntityInDb("payment_receipt", strawberriesId);
+    });
+
+    it("gets the expected top_up_quote database entities", async () => {
+      const grapesReceipt = await db.getPaymentReceipt(grapesId);
+      const strawberriesReceipt = await db.getPaymentReceipt(strawberriesId);
+
+      expect(grapesReceipt.paymentReceiptId).to.equal(grapesId);
+      expect(strawberriesReceipt.paymentReceiptId).to.equal(strawberriesId);
+    });
+  });
 });
