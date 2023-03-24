@@ -99,7 +99,7 @@ describe("PostgresDatabase class", () => {
   describe("createPaymentReceipt method", () => {
     before(async () => {
       // TODO: Before sending to DB and creating top up quote we should use safer types:
-      // -  validate this address is a public arweave address (and address type is arweave)
+      // -  validate this address is a public arweave address (and address type is arweave for MVP)
       // -  validate payment provider is expected
       // -  validate currency type is supported
       await db.createPaymentReceipt({
@@ -122,6 +122,8 @@ describe("PostgresDatabase class", () => {
         "A New Top Up ID"
       );
     });
+
+    // TODO: On Payment Receipt Creation, we expect a new user to be created if it does not exist
 
     it("creates the expected payment_receipt in the database entity", async () => {
       const paymentReceipt = await db["knex"]<PaymentReceiptDBResult>(
@@ -180,6 +182,29 @@ describe("PostgresDatabase class", () => {
 
       expect(grapesReceipt.paymentReceiptId).to.equal(grapesId);
       expect(strawberriesReceipt.paymentReceiptId).to.equal(strawberriesId);
+    });
+  });
+
+  describe("getUser method", () => {
+    const goodAddress = "Good 😇";
+    const evilAddress = "Evil 😈";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({ user_address: goodAddress });
+      await dbTestHelper.insertStubUser({ user_address: evilAddress });
+    });
+
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb(tableNames.user, goodAddress);
+      await dbTestHelper.cleanUpEntityInDb(tableNames.user, evilAddress);
+    });
+
+    it("gets the expected user database entities", async () => {
+      const pantsQuote = await db.getUser(goodAddress);
+      const shortsQuote = await db.getUser(evilAddress);
+
+      expect(pantsQuote.userAddress).to.equal(goodAddress);
+      expect(shortsQuote.userAddress).to.equal(evilAddress);
     });
   });
 });

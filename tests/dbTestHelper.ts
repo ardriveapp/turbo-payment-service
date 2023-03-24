@@ -6,6 +6,7 @@ import {
   PaymentReceiptDBInsert,
   TopUpQuoteDBInsert,
   UserAddress,
+  UserDBInsert,
 } from "../src/database/dbTypes";
 import { PostgresDatabase } from "../src/database/postgres";
 
@@ -53,11 +54,29 @@ function stubPaymentReceiptInsert({
   };
 }
 
+function stubUserInsert({
+  user_address = "The Stubbiest User",
+}: {
+  user_address?: string;
+}): UserDBInsert {
+  return {
+    user_address,
+    user_address_type: "arweave",
+    winston_credit_balance: "101010101",
+  };
+}
+
 export class DbTestHelper {
   constructor(public readonly db: PostgresDatabase) {}
 
   private get knex(): Knex {
     return this.db["knex"];
+  }
+
+  public async insertStubUser(insertParams: {
+    user_address?: string;
+  }): Promise<void> {
+    return this.knex(tableNames.user).insert(stubUserInsert(insertParams));
   }
 
   public async insertStubTopUpQuote(insertParams: {
