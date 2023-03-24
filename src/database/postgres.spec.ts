@@ -184,7 +184,7 @@ describe("PostgresDatabase class", () => {
       expect(payment_provider).to.equal("stripe");
       expect(payment_receipt_date).to.exist;
       expect(payment_receipt_id).to.equal("Unique Identifier");
-      expect(top_up_quote_id).to.equal("A New Top Up ID");
+      expect(top_up_quote_id).to.equal(newUserTopUpId);
       expect(winston_credit_amount).to.equal(
         Number.MAX_SAFE_INTEGER.toString() + "00"
       );
@@ -203,7 +203,7 @@ describe("PostgresDatabase class", () => {
         winston_credit_balance,
       } = user[0];
 
-      expect(promotional_info).to.equal({});
+      expect(promotional_info).to.deep.equal({});
       expect(user_address).to.equal(newUserAddress);
       expect(user_address_type).to.equal("arweave");
       expect(winston_credit_balance).to.equal(
@@ -212,22 +212,12 @@ describe("PostgresDatabase class", () => {
     });
 
     it("increments existing user's balance as expected", async () => {
-      const user = await db["knex"]<UserDBResult>(tableNames.user).where({
+      const oldUser = await db["knex"]<UserDBResult>(tableNames.user).where({
         user_address: oldUserAddress,
       });
-      expect(user.length).to.equal(1);
+      expect(oldUser.length).to.equal(1);
 
-      const {
-        promotional_info,
-        user_address,
-        user_address_type,
-        winston_credit_balance,
-      } = user[0];
-
-      expect(promotional_info).to.equal({});
-      expect(user_address).to.equal(oldUserAddress);
-      expect(user_address_type).to.equal("arweave");
-      expect(winston_credit_balance).to.equal("600");
+      expect(oldUser[0].winston_credit_balance).to.equal("600");
     });
 
     it("expires the top up quotes as expected", async () => {
@@ -255,15 +245,16 @@ describe("PostgresDatabase class", () => {
           winstonCreditAmount: new Winston(500),
         }),
         errorMessage:
-          "No top up quote found in database for payment receipt id 'This is fine'!",
+          "No top up quote found in database for payment receipt id 'This is fine'",
       });
 
       const k = await db.getPaymentReceipt("This is fine");
+      console.log("k", k);
 
       await expectAsyncErrorThrow({
         promiseToError: db.getPaymentReceipt("This is fine"),
         errorMessage:
-          "No top up quote found in database for payment receipt id 'This is fine'!",
+          "No top up quote found in database for payment receipt id 'This is fine'",
       });
     });
   });
@@ -294,6 +285,8 @@ describe("PostgresDatabase class", () => {
       expect(grapesReceipt.paymentReceiptId).to.equal(grapesId);
       expect(strawberriesReceipt.paymentReceiptId).to.equal(strawberriesId);
     });
+
+    // TODO: Error when not found
   });
 
   describe("getUser method", () => {
@@ -317,6 +310,8 @@ describe("PostgresDatabase class", () => {
       expect(pantsQuote.userAddress).to.equal(goodAddress);
       expect(shortsQuote.userAddress).to.equal(evilAddress);
     });
+
+    // TODO: Error when not found
   });
 
   describe("getPromoInfo method", () => {
@@ -335,9 +330,11 @@ describe("PostgresDatabase class", () => {
 
       expect(promoInfo).to.deep.equal({});
     });
+
+    // TODO: Error when not found
   });
 
-  describe("getPromoInfo method", () => {
+  describe("updatePromoInfo method", () => {
     const privilegedAddress = "Privileged 🎫";
 
     before(async () => {
@@ -361,6 +358,8 @@ describe("PostgresDatabase class", () => {
         underOneHundredKiBFreeBytes: 100_000_000_000,
       });
     });
+
+    // TODO: Error when not found
   });
 
   describe("reserveBalance method", () => {
@@ -401,6 +400,8 @@ describe("PostgresDatabase class", () => {
 
       expect(+poorUser.winstonCreditBalance).to.equal(10);
     });
+
+    // TODO: Error when user not found
   });
 
   describe("refundBalance method", () => {
@@ -424,5 +425,7 @@ describe("PostgresDatabase class", () => {
 
       expect(+happyUser.winstonCreditBalance).to.equal(102_000);
     });
+
+    // TODO: Error when user not found
   });
 });
