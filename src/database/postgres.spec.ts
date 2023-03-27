@@ -349,7 +349,7 @@ describe("PostgresDatabase class", () => {
     it("creates the expected chargeback receipt in the database", async () => {
       const chargebackReceipt = await db["knex"]<ChargebackReceiptDBResult>(
         tableNames.chargebackReceipt
-      ).where({ chargeback_receipt_id: "Unique Identifier" });
+      ).where({ chargeback_receipt_id: "A great Unique Identifier" });
       expect(chargebackReceipt.length).to.equal(1);
 
       const {
@@ -370,7 +370,7 @@ describe("PostgresDatabase class", () => {
       expect(destination_address_type).to.equal("arweave");
       expect(payment_provider).to.equal("stripe");
       expect(chargeback_receipt_date).to.exist;
-      expect(chargeback_receipt_id).to.equal("Unique Identifier");
+      expect(chargeback_receipt_id).to.equal("A great Unique Identifier");
       expect(payment_receipt_id).to.equal("Bad Payment Receipt Address");
       expect(winston_credit_amount).to.equal("999");
     });
