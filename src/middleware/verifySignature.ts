@@ -11,6 +11,11 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
     const publicKey = ctx.request.headers["x-public-key"] as string;
     const nonce = ctx.request.headers["x-nonce"];
 
+    if (!signature || !publicKey || !nonce) {
+      logger.info("Missing signature, public key or nonce");
+      return next();
+    }
+
     const isVerified = await verifyArweaveSignature({
       publicKey: fromB64UrlToBuffer(publicKey).toString(),
       signature: fromB64UrlToBuffer(signature as string),

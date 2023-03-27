@@ -13,9 +13,6 @@ export async function verifyArweaveSignature({
   additionalData,
   nonce,
 }: VerifySignatureParams): Promise<boolean> {
-  if (!signature || !publicKey || !nonce) {
-    return false;
-  }
   const dataToVerify = additionalData ? additionalData + nonce : nonce;
   try {
     const verifier = crypto.createVerify("SHA256");
