@@ -4,6 +4,7 @@ import { Stripe } from "stripe";
 
 import logger from "../../logger";
 import { KoaContext } from "../../server";
+import { handleDisputeCreatedEvent } from "./eventHandlers/disputeCreatedEventHandler";
 import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
@@ -48,38 +49,62 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
 
   // Extract the data from the event.
   const data: Stripe.Event.Data = event.data;
-  const paymentIntent: Stripe.PaymentIntent =
-    data.object as Stripe.PaymentIntent;
+  const eventObject = data.object as
+    | Stripe.PaymentIntent
+    | Stripe.Charge
+    | Stripe.Dispute;
   // Funds have been captured
-  const walletAddress = paymentIntent.metadata["address"];
+  const walletAddress = eventObject.metadata["address"];
   logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${paymentIntent.status}!`
+    `🔔  Webhook received for Wallet ${walletAddress}: ${eventObject.status}!`
   );
-  // Unawaited calls so we can return a response immediately.
-  // TODO - Set the events we want to handle on stripe dashboard
-  switch (event.type) {
-    case "payment_intent.succeeded":
-      handlePaymentSuccessEvent(paymentIntent, ctx);
-      break;
-    case "payment_intent.payment_failed":
-      handlePaymentFailedEvent(paymentIntent);
-      break;
-    case "charge.dispute.created":
-      logger.info(`Dispute created for ${walletAddress}`);
-      break;
-    case "charge.refund.created":
-      logger.info(`Refund created for ${walletAddress}`);
-      break;
-    // ... handle other event types
-    default:
-      logger.info(`Unhandled event type ${event.type}`);
-      return;
-  }
-
   // Return a 200 response to acknowledge receipt of the event.
   // Otherwise, Stripe will keep trying to send the event.
   // Handle errors internally
   ctx.status = 200;
+
+  // Unawaited calls so we can return a response immediately.
+  // TODO - Set the events we want to handle on stripe dashboard
+
+  switch (event.type) {
+    case "payment_intent.succeeded":
+      // Funds have been captured
+      try {
+        handlePaymentSuccessEvent(
+          data.object as Stripe.PaymentIntent,
+          ctx.state.paymentDatabase
+        );
+      } catch (error) {
+        logger.error("Payment Success Event handler failed", error);
+      }
+      break;
+    case "payment_intent.payment_failed":
+    case "payment_intent.canceled":
+      try {
+        handlePaymentFailedEvent(data.object as Stripe.PaymentIntent, ctx);
+      } catch (error) {
+        logger.error("Payment Failed/Cancelled Event handler failed", error);
+      }
+      break;
+    case "charge.dispute.created":
+      try {
+        handleDisputeCreatedEvent(
+          data.object as Stripe.Dispute,
+          ctx.state.paymentDatabase
+        );
+      } catch (error) {
+        logger.error("Dispute Created Event handler failed", error);
+      }
+
+      break;
+
+    // ... handle other event types
+    // If we see any events logged here that we don't handle, we should disable them on the stripe dashboard.
+    default:
+      logger.error(`Unhandled event type ${event.type}`);
+
+      return;
+  }
 
   return next;
 }
