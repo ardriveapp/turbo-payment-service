@@ -20,6 +20,7 @@ import {
   PaymentReceipt,
   PaymentReceiptDBResult,
   PromotionalInfo,
+  RescindedPaymentReceiptDBResult,
   TopUpQuote,
   TopUpQuoteDBResult,
   User,
@@ -82,11 +83,20 @@ export class PostgresDatabase implements Database {
   }
 
   public async expireTopUpQuote(topUpQuoteId: string): Promise<void> {
-    await this.knex<TopUpQuoteDBResult>(tableNames.topUpQuote)
-      .where({
-        [columnNames.topUpQuoteId]: topUpQuoteId,
-      })
-      .update({ quote_expiration_date: new Date().toISOString() });
+    await this.knex.transaction(async (knexTransaction) => {
+      const topUpQuoteResult = await knexTransaction<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      )
+        .where({
+          [columnNames.topUpQuoteId]: topUpQuoteId,
+        })
+        .del()
+        .returning("*");
+
+      await knexTransaction<TopUpQuoteDBResult>(
+        tableNames.failedTopUpQuote
+      ).insert(topUpQuoteResult);
+    });
   }
 
   public async updatePromoInfo(
@@ -204,13 +214,15 @@ export class PostgresDatabase implements Database {
   }
 
   public async getPaymentReceipt(
-    paymentReceiptId: string
+    paymentReceiptId: string,
+    knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
   ): Promise<PaymentReceipt> {
-    const paymentReceiptDbResult = await this.knex<PaymentReceiptDBResult>(
-      tableNames.paymentReceipt
-    ).where({
-      [columnNames.paymentReceiptId]: paymentReceiptId,
-    });
+    const paymentReceiptDbResult =
+      await knexTransaction<PaymentReceiptDBResult>(
+        tableNames.paymentReceipt
+      ).where({
+        [columnNames.paymentReceiptId]: paymentReceiptId,
+      });
     if (paymentReceiptDbResult.length === 0) {
       throw Error(
         `No payment receipt found in database with ID '${paymentReceiptId}'`
@@ -240,11 +252,13 @@ export class PostgresDatabase implements Database {
     } = chargebackReceipt;
 
     await this.knex.transaction(async (knexTransaction) => {
-      // TODO: First DO we only start this chargeback receipt if:
-      // - The Payment Receipt Exists
-      // - The User Exists and Has Balance
+      // This will throw if payment receipt does not exist
+      const paymentReceipt = await this.getPaymentReceipt(
+        paymentReceiptId,
+        knexTransaction
+      );
 
-      // TODO: We should Make this state in the database schema: charged_back_payment_receipt
+      // TODO: Should we assert that the amounts from payment receipt are the same as the incoming stripe chargeback receipt?
 
       const user = await this.getUser(destinationAddress, knexTransaction);
 
@@ -261,11 +275,32 @@ export class PostgresDatabase implements Database {
         );
       }
 
+      // Update the users balance.
       await knexTransaction<UserDBResult>(tableNames.user)
         .where({
           user_address: destinationAddress,
         })
         .update({ winston_credit_balance: newBalance.toString() });
+
+      // Remove from payment receipt table,
+      await knexTransaction<PaymentReceiptDBResult>(tableNames.paymentReceipt)
+        .where({ payment_receipt_id: paymentReceiptId })
+        .del();
+
+      // Insert into rescinded payment receipts table
+      await knexTransaction<RescindedPaymentReceiptDBResult>(
+        tableNames.rescindedPaymentReceipt
+      ).insert({
+        amount: amount.toString(),
+        currency_type: currencyType,
+        destination_address: destinationAddress,
+        destination_address_type: destinationAddressType,
+        payment_provider: paymentProvider,
+        payment_receipt_date: paymentReceipt.paymentReceiptDate,
+        payment_receipt_id: paymentReceiptId,
+        top_up_quote_id: paymentReceipt.topUpQuoteId,
+        winston_credit_amount: winstonCreditAmount.toString(),
+      });
 
       // Create Chargeback Receipt
       await knexTransaction<ChargebackReceiptDBResult>(
