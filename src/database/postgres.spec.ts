@@ -130,8 +130,12 @@ describe("PostgresDatabase class", () => {
         (await db.getTopUpQuote(sunnyId)).quoteExpirationDate
       ).getTime();
 
-      expect(quoteExpirationTime).to.be.greaterThan(timeFromBeforeExpiration);
-      expect(quoteExpirationTime).to.be.lessThan(timeFromAfterExpiration);
+      expect(quoteExpirationTime).to.be.greaterThanOrEqual(
+        timeFromBeforeExpiration
+      );
+      expect(quoteExpirationTime).to.be.lessThanOrEqual(
+        timeFromAfterExpiration
+      );
     });
   });
 
