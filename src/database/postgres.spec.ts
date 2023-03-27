@@ -110,6 +110,31 @@ describe("PostgresDatabase class", () => {
     });
   });
 
+  describe("expireTopUpQuote method", () => {
+    const sunnyId = "Sunny 🌞";
+
+    before(async () => {
+      await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: sunnyId });
+    });
+
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, sunnyId);
+    });
+
+    it("expires the expected top up quote", async () => {
+      const timeFromBeforeExpiration = new Date().getTime();
+      await db.expireTopUpQuote(sunnyId);
+      const timeFromAfterExpiration = new Date().getTime();
+
+      const quoteExpirationTime = new Date(
+        (await db.getTopUpQuote(sunnyId)).quoteExpirationDate
+      ).getTime();
+
+      expect(quoteExpirationTime).to.be.greaterThan(timeFromBeforeExpiration);
+      expect(quoteExpirationTime).to.be.lessThan(timeFromAfterExpiration);
+    });
+  });
+
   describe("createPaymentReceipt method", () => {
     const newUserAddress = "New User 👶";
     const oldUserAddress = "Old User 🧓";
