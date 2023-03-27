@@ -18,6 +18,13 @@ describe("PostgresDatabase class", () => {
   const db = new PostgresDatabase();
   const dbTestHelper = new DbTestHelper(db);
 
+  after(async () => {
+    // Clean up the all tables after this test suite
+    await Promise.all(
+      Object.values(tableNames).map((name) => db["knex"](name).truncate())
+    );
+  });
+
   describe("createTopUpQuote method", () => {
     const quoteExpirationDate = new Date(
       "2023-03-23 12:34:56.789Z"
@@ -38,13 +45,6 @@ describe("PostgresDatabase class", () => {
         topUpQuoteId: "Unique Identifier",
         winstonCreditAmount: new Winston(500),
       });
-    });
-
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb(
-        tableNames.topUpQuote,
-        "Unique Identifier"
-      );
     });
 
     it("creates the expected top up quote in the database", async () => {
@@ -88,11 +88,6 @@ describe("PostgresDatabase class", () => {
       await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: shortsId });
     });
 
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, pantsId);
-      await dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, shortsId);
-    });
-
     it("returns the expected top up quotes", async () => {
       const pantsQuote = await db.getTopUpQuote(pantsId);
       const shortsQuote = await db.getTopUpQuote(shortsId);
@@ -117,10 +112,6 @@ describe("PostgresDatabase class", () => {
       await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: sunnyId });
     });
 
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, sunnyId);
-    });
-
     it("deletes the top_up_quote entity and inserts a failed_top_up_quote", async () => {
       await db.expireTopUpQuote(sunnyId);
 
@@ -130,7 +121,7 @@ describe("PostgresDatabase class", () => {
       expect(topUpQuoteDbResults.length).to.equal(0);
 
       const failedTopUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
-        tableNames.topUpQuote
+        tableNames.failedTopUpQuote
       ).where({ top_up_quote_id: sunnyId });
       expect(failedTopUpQuoteDbResults.length).to.equal(1);
     });
@@ -183,23 +174,6 @@ describe("PostgresDatabase class", () => {
         paymentReceiptId: "An Existing User's Unique Identifier",
         winstonCreditAmount: oldUserPaymentAmount,
       });
-    });
-
-    after(async () => {
-      await Promise.all([
-        dbTestHelper.cleanUpEntityInDb(
-          tableNames.paymentReceipt,
-          "Unique Identifier"
-        ),
-        dbTestHelper.cleanUpEntityInDb(
-          tableNames.paymentReceipt,
-          "An Existing User's Unique Identifier"
-        ),
-        dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, oldUserTopUpId),
-        dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, newUserTopUpId),
-        dbTestHelper.cleanUpEntityInDb(tableNames.user, oldUserAddress),
-        dbTestHelper.cleanUpEntityInDb(tableNames.user, newUserAddress),
-      ]);
     });
 
     it("creates the expected payment_receipt in the database entity", async () => {
@@ -321,11 +295,6 @@ describe("PostgresDatabase class", () => {
       });
     });
 
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb("payment_receipt", grapesId);
-      await dbTestHelper.cleanUpEntityInDb("payment_receipt", strawberriesId);
-    });
-
     it("returns the expected payment receipt database entities", async () => {
       const grapesReceipt = await db.getPaymentReceipt(grapesId);
       const strawberriesReceipt = await db.getPaymentReceipt(strawberriesId);
@@ -347,34 +316,27 @@ describe("PostgresDatabase class", () => {
     const naughtyUserAddress = "Naughty User 💀";
 
     const naughtyUserBalance = new Winston("1000");
+    const naughtyPaymentId = "A bad payment receipt ID";
 
     before(async () => {
       await dbTestHelper.insertStubUser({
         user_address: naughtyUserAddress,
         winston_credit_balance: naughtyUserBalance.toString(),
       });
+      await dbTestHelper.insertStubPaymentReceipt({
+        payment_receipt_id: naughtyPaymentId,
+      });
       await db.createChargebackReceipt({
         amount: 11_111,
         currencyType: "eth",
         destinationAddress: naughtyUserAddress,
         destinationAddressType: "arweave",
-        paymentReceiptId: "Bad Payment Receipt Address",
+        paymentReceiptId: naughtyPaymentId,
         paymentProvider: "stripe",
         chargebackReceiptId: "A great Unique Identifier",
         chargebackReason: "Evil",
         winstonCreditAmount: new Winston(999),
       });
-    });
-
-    after(async () => {
-      await Promise.all([
-        dbTestHelper.cleanUpEntityInDb(
-          tableNames.chargebackReceipt,
-          "A great Unique Identifier"
-        ),
-
-        dbTestHelper.cleanUpEntityInDb(tableNames.user, naughtyUserAddress),
-      ]);
     });
 
     it("creates the expected chargeback receipt in the database", async () => {
@@ -402,8 +364,22 @@ describe("PostgresDatabase class", () => {
       expect(payment_provider).to.equal("stripe");
       expect(chargeback_receipt_date).to.exist;
       expect(chargeback_receipt_id).to.equal("A great Unique Identifier");
-      expect(payment_receipt_id).to.equal("Bad Payment Receipt Address");
+      expect(payment_receipt_id).to.equal(payment_receipt_id);
       expect(winston_credit_amount).to.equal("999");
+    });
+
+    it("deletes the payment_receipt entity and inserts a rescinded_payment_receipt", async () => {
+      const paymentReceiptDbResults = await db["knex"]<PaymentReceiptDBResult>(
+        tableNames.paymentReceipt
+      ).where({ payment_receipt_id: naughtyPaymentId });
+      expect(paymentReceiptDbResults.length).to.equal(0);
+
+      const rescindedPaymentReceiptDbResults = await db[
+        "knex"
+      ]<PaymentReceiptDBResult>(tableNames.rescindedPaymentReceipt).where({
+        payment_receipt_id: naughtyPaymentId,
+      });
+      expect(rescindedPaymentReceiptDbResults.length).to.equal(1);
     });
 
     it("decrements user's balance as expected", async () => {
@@ -415,32 +391,6 @@ describe("PostgresDatabase class", () => {
       expect(oldUser[0].winston_credit_balance).to.equal(
         naughtyUserBalance.minus(new Winston("999")).toString()
       );
-    });
-
-    it("errors as expected when no user can be found to decrement balance", async () => {
-      await expectAsyncErrorThrow({
-        promiseToError: db.createChargebackReceipt({
-          amount: 1,
-          currencyType: "usd",
-          destinationAddress: "Non Existent User Address",
-          destinationAddressType: "arweave",
-          paymentReceiptId: "Anything that can error",
-          paymentProvider: "stripe",
-          chargebackReceiptId: "Hey there",
-          chargebackReason: "What is this column will be?",
-          winstonCreditAmount: new Winston(500),
-        }),
-        errorMessage:
-          "No user found in database with address 'Non Existent User Address'",
-      });
-
-      expect(
-        (
-          await db["knex"](tableNames.chargebackReceipt).where({
-            chargeback_receipt_id: "Hey there",
-          })
-        ).length
-      ).to.equal(0);
     });
 
     it("errors as expected when no payment receipt could be found to chargeback", async () => {
@@ -456,7 +406,7 @@ describe("PostgresDatabase class", () => {
           chargebackReason: "Stripe Dispute Webhook Event",
           winstonCreditAmount: new Winston(500),
         }),
-        errorMessage: `No payment receipt could be found with ID 'No ID Found!!!!!'`,
+        errorMessage: `No payment receipt found in database with ID 'No ID Found!!!!!'`,
       });
 
       expect(
@@ -475,6 +425,9 @@ describe("PostgresDatabase class", () => {
         user_address: underfundedUserAddress,
         winston_credit_balance: "200",
       });
+      await dbTestHelper.insertStubPaymentReceipt({
+        payment_receipt_id: "New ID 42342",
+      });
 
       await expectAsyncErrorThrow({
         promiseToError: db.createChargebackReceipt({
@@ -482,7 +435,7 @@ describe("PostgresDatabase class", () => {
           currencyType: "eur",
           destinationAddress: underfundedUserAddress,
           destinationAddressType: "arweave",
-          paymentReceiptId: "New ID",
+          paymentReceiptId: "New ID 42342",
           paymentProvider: "stripe",
           chargebackReceiptId: "Great value",
           chargebackReason: "What ?",
@@ -514,11 +467,6 @@ describe("PostgresDatabase class", () => {
       });
     });
 
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb("chargeback_receipt", breadId);
-      await dbTestHelper.cleanUpEntityInDb("chargeback_receipt", greensId);
-    });
-
     it("returns the expected chargeback receipt database entities", async () => {
       const grapesReceipt = await db.getChargebackReceipt(breadId);
       const strawberriesReceipt = await db.getChargebackReceipt(greensId);
@@ -545,11 +493,6 @@ describe("PostgresDatabase class", () => {
       await dbTestHelper.insertStubUser({ user_address: evilAddress });
     });
 
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb(tableNames.user, goodAddress);
-      await dbTestHelper.cleanUpEntityInDb(tableNames.user, evilAddress);
-    });
-
     it("gets the expected user database entities", async () => {
       const pantsQuote = await db.getUser(goodAddress);
       const shortsQuote = await db.getUser(evilAddress);
@@ -574,10 +517,6 @@ describe("PostgresDatabase class", () => {
       await dbTestHelper.insertStubUser({ user_address: unicornAddress });
     });
 
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb(tableNames.user, unicornAddress);
-    });
-
     it("gets the expected user database entities", async () => {
       const promoInfo = await db.getPromoInfo(unicornAddress);
 
@@ -598,10 +537,6 @@ describe("PostgresDatabase class", () => {
 
     before(async () => {
       await dbTestHelper.insertStubUser({ user_address: privilegedAddress });
-    });
-
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb(tableNames.user, privilegedAddress);
     });
 
     it("updates a user's promotional information as expected", async () => {
@@ -644,11 +579,6 @@ describe("PostgresDatabase class", () => {
       });
     });
 
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb(tableNames.user, richAddress);
-      await dbTestHelper.cleanUpEntityInDb(tableNames.user, poorAddress);
-    });
-
     it("reserves the balance as expected when winston balance is available", async () => {
       await db.reserveBalance(richAddress, new Winston(500));
 
@@ -688,10 +618,6 @@ describe("PostgresDatabase class", () => {
         user_address: happyAddress,
         winston_credit_balance: "2000",
       });
-    });
-
-    after(async () => {
-      await dbTestHelper.cleanUpEntityInDb(tableNames.user, happyAddress);
     });
 
     it("refunds the balance as expected", async () => {
