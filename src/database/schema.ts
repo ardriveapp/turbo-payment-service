@@ -20,7 +20,10 @@ export class Schema {
 
     await this.createUserTable();
     await this.createTopUpQuoteTable();
+    await this.createFulfilledTopUpQuoteTable();
+    await this.createFailedTopUpQuoteTable();
     await this.createPaymentReceiptTable();
+    await this.createRescindedPaymentReceiptTable();
     await this.createChargebackReceiptTable();
 
     logger.info("Finished initial migration!", {
@@ -34,7 +37,10 @@ export class Schema {
 
     await this.pg.schema.dropTable(user);
     await this.pg.schema.dropTable(topUpQuote);
+    await this.pg.schema.dropTable(fulfilledTopUpQuote);
+    await this.pg.schema.dropTable(failedTopUpQuote);
     await this.pg.schema.dropTable(paymentReceipt);
+    await this.pg.schema.dropTable(rescindedPaymentReceipt);
     await this.pg.schema.dropTable(chargebackReceipt);
 
     logger.info("Schema dropped. Initial migration rollback successful!", {
@@ -68,6 +74,26 @@ export class Schema {
     });
   }
 
+  private async createFulfilledTopUpQuoteTable(): Promise<void> {
+    return this.pg.schema.createTableLike(
+      fulfilledTopUpQuote,
+      topUpQuote,
+      (t) => {
+        t.timestamp(quoteFulfilledDate)
+          .notNullable()
+          .defaultTo(this.defaultTimestamp());
+      }
+    );
+  }
+
+  private async createFailedTopUpQuoteTable(): Promise<void> {
+    return this.pg.schema.createTableLike(failedTopUpQuote, topUpQuote, (t) => {
+      t.timestamp(quoteFailedDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
+    });
+  }
+
   private async createPaymentReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(paymentReceipt, (t) => {
       t.string(paymentReceiptId).notNullable().primary();
@@ -82,6 +108,18 @@ export class Schema {
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
+  }
+
+  private async createRescindedPaymentReceiptTable(): Promise<void> {
+    return this.pg.schema.createTableLike(
+      rescindedPaymentReceipt,
+      paymentReceipt,
+      (t) => {
+        t.timestamp(paymentReceiptRescindedDate)
+          .notNullable()
+          .defaultTo(this.defaultTimestamp());
+      }
+    );
   }
 
   private async createChargebackReceiptTable(): Promise<void> {
@@ -106,7 +144,15 @@ export class Schema {
   }
 }
 
-const { chargebackReceipt, paymentReceipt, topUpQuote, user } = tableNames;
+const {
+  chargebackReceipt,
+  failedTopUpQuote,
+  fulfilledTopUpQuote,
+  rescindedPaymentReceipt,
+  paymentReceipt,
+  topUpQuote,
+  user,
+} = tableNames;
 
 const {
   amount,
@@ -119,9 +165,12 @@ const {
   paymentProvider,
   paymentReceiptDate,
   paymentReceiptId,
+  paymentReceiptRescindedDate,
   promotionalInfo,
   quoteCreationDate,
   quoteExpirationDate,
+  quoteFailedDate,
+  quoteFulfilledDate,
   topUpQuoteId,
   userAddress,
   userAddressType,
