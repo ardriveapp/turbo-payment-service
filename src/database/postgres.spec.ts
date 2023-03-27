@@ -121,21 +121,18 @@ describe("PostgresDatabase class", () => {
       await dbTestHelper.cleanUpEntityInDb(tableNames.topUpQuote, sunnyId);
     });
 
-    it("expires the expected top up quote", async () => {
-      const timeFromBeforeExpiration = new Date().getTime();
+    it("deletes the top_up_quote entity and inserts a failed_top_up_quote", async () => {
       await db.expireTopUpQuote(sunnyId);
-      const timeFromAfterExpiration = new Date().getTime();
 
-      const quoteExpirationTime = new Date(
-        (await db.getTopUpQuote(sunnyId)).quoteExpirationDate
-      ).getTime();
+      const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      ).where({ top_up_quote_id: sunnyId });
+      expect(topUpQuoteDbResults.length).to.equal(0);
 
-      expect(quoteExpirationTime).to.be.greaterThanOrEqual(
-        timeFromBeforeExpiration
-      );
-      expect(quoteExpirationTime).to.be.lessThanOrEqual(
-        timeFromAfterExpiration
-      );
+      const failedTopUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      ).where({ top_up_quote_id: sunnyId });
+      expect(failedTopUpQuoteDbResults.length).to.equal(1);
     });
   });
 
@@ -268,19 +265,24 @@ describe("PostgresDatabase class", () => {
       );
     });
 
-    it("expires the top up quotes as expected", async () => {
-      const newUserTopUpQuote = await db.getTopUpQuote(newUserTopUpId);
-      const oldUserTopUpQuote = await db.getTopUpQuote(oldUserTopUpId);
+    it("deletes the top_up_quote and inserts a new fulfilled_top_up_quote as expected", async () => {
+      const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      );
+      expect(topUpQuoteDbResults.map((r) => r.top_up_quote_id)).to.not.include([
+        newUserTopUpId,
+        oldUserTopUpId,
+      ]);
 
+      const fulfilledTopUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
+        tableNames.fulfilledTopUpQuote
+      );
       expect(
-        new Date(newUserTopUpQuote.quoteExpirationDate).getTime()
-      ).to.be.lessThan(new Date().getTime());
-      expect(
-        new Date(oldUserTopUpQuote.quoteExpirationDate).getTime()
-      ).to.be.lessThan(new Date().getTime());
+        fulfilledTopUpQuoteDbResults.map((r) => r.top_up_quote_id)
+      ).to.not.include([newUserTopUpId, oldUserTopUpId]);
     });
 
-    it("errors as expected when no top up quote can be expired", async () => {
+    it("errors as expected when no top up quote can not be expired", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.createPaymentReceipt({
           amount: 1,
@@ -441,6 +443,31 @@ describe("PostgresDatabase class", () => {
       ).to.equal(0);
     });
 
+    it("errors as expected when no payment receipt could be found to chargeback", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.createChargebackReceipt({
+          amount: 1337331,
+          currencyType: "val",
+          destinationAddress: "hello there",
+          destinationAddressType: "arweave",
+          paymentReceiptId: "No ID Found!!!!!",
+          paymentProvider: "stripe",
+          chargebackReceiptId: "chargeback receipts 1",
+          chargebackReason: "Stripe Dispute Webhook Event",
+          winstonCreditAmount: new Winston(500),
+        }),
+        errorMessage: `No payment receipt could be found with ID 'No ID Found!!!!!'`,
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.chargebackReceipt).where({
+            chargeback_receipt_id: "Great value",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
     it("errors as expected when user has no funds to decrement balance", async () => {
       const underfundedUserAddress = "Broke 😭";
 
@@ -472,39 +499,39 @@ describe("PostgresDatabase class", () => {
         ).length
       ).to.equal(0);
     });
+  });
 
-    describe("getChargebackReceipt method", () => {
-      const breadId = "Bread 🍞";
-      const greensId = "Greens 🥬";
+  describe("getChargebackReceipt method", () => {
+    const breadId = "Bread 🍞";
+    const greensId = "Greens 🥬";
 
-      before(async () => {
-        await dbTestHelper.insertStubChargebackReceipt({
-          chargeback_receipt_id: breadId,
-        });
-        await dbTestHelper.insertStubChargebackReceipt({
-          chargeback_receipt_id: greensId,
-        });
+    before(async () => {
+      await dbTestHelper.insertStubChargebackReceipt({
+        chargeback_receipt_id: breadId,
       });
-
-      after(async () => {
-        await dbTestHelper.cleanUpEntityInDb("chargeback_receipt", breadId);
-        await dbTestHelper.cleanUpEntityInDb("chargeback_receipt", greensId);
+      await dbTestHelper.insertStubChargebackReceipt({
+        chargeback_receipt_id: greensId,
       });
+    });
 
-      it("returns the expected chargeback receipt database entities", async () => {
-        const grapesReceipt = await db.getChargebackReceipt(breadId);
-        const strawberriesReceipt = await db.getChargebackReceipt(greensId);
+    after(async () => {
+      await dbTestHelper.cleanUpEntityInDb("chargeback_receipt", breadId);
+      await dbTestHelper.cleanUpEntityInDb("chargeback_receipt", greensId);
+    });
 
-        expect(grapesReceipt.chargebackReceiptId).to.equal(breadId);
-        expect(strawberriesReceipt.chargebackReceiptId).to.equal(greensId);
-      });
+    it("returns the expected chargeback receipt database entities", async () => {
+      const grapesReceipt = await db.getChargebackReceipt(breadId);
+      const strawberriesReceipt = await db.getChargebackReceipt(greensId);
 
-      it("errors as expected when chargeback receipt cannot be found", async () => {
-        await expectAsyncErrorThrow({
-          promiseToError: db.getChargebackReceipt("Non Existent ID"),
-          errorMessage:
-            "No chargeback receipt found in database with ID 'Non Existent ID'",
-        });
+      expect(grapesReceipt.chargebackReceiptId).to.equal(breadId);
+      expect(strawberriesReceipt.chargebackReceiptId).to.equal(greensId);
+    });
+
+    it("errors as expected when chargeback receipt cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.getChargebackReceipt("Non Existent ID"),
+        errorMessage:
+          "No chargeback receipt found in database with ID 'Non Existent ID'",
       });
     });
   });
