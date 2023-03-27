@@ -18,7 +18,7 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
   logger.info(" balance requested for ", { walletAddress });
 
   try {
-    const balance = await paymentDatabase.getBalance(walletAddress);
+    const balance = await paymentDatabase.getUserBalance(walletAddress);
     ctx.body = balance;
   } catch (error) {
     logger.error(error);
