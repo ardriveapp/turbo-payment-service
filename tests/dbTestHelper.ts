@@ -17,19 +17,21 @@ type TableNameValues = (typeof tableNames)[TableNameKeys];
 export const stubArweaveUserAddress: UserAddress =
   "1234567890123456789012345678901231234567890";
 
-const stubDate = new Date("2023-03-23 16:20:00").toISOString();
+interface StubTopUpQuoteParams {
+  top_up_quote_id?: string;
+  quote_expiration_date?: string;
+}
 
 function stubTopUpQuoteInsert({
   top_up_quote_id = "The Stubbiest Top Up Quote",
-}: {
-  top_up_quote_id?: string;
-}): TopUpQuoteDBInsert {
+  quote_expiration_date = new Date("2023-03-23 16:20:00").toISOString(),
+}: StubTopUpQuoteParams): TopUpQuoteDBInsert {
   return {
     amount: "100",
     currency_type: "usd",
     destination_address: stubArweaveUserAddress,
     destination_address_type: "arweave",
-    quote_expiration_date: stubDate,
+    quote_expiration_date,
     payment_provider: "stripe",
     top_up_quote_id,
     winston_credit_amount: "1337",
@@ -102,9 +104,9 @@ export class DbTestHelper {
     return this.knex(tableNames.user).insert(stubUserInsert(insertParams));
   }
 
-  public async insertStubTopUpQuote(insertParams: {
-    top_up_quote_id?: string;
-  }): Promise<void> {
+  public async insertStubTopUpQuote(
+    insertParams: StubTopUpQuoteParams
+  ): Promise<void> {
     return this.knex(tableNames.topUpQuote).insert(
       stubTopUpQuoteInsert(insertParams)
     );

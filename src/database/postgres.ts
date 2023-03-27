@@ -81,6 +81,14 @@ export class PostgresDatabase implements Database {
     return topUpQuoteDbResult.map(topUpQuoteDBMap)[0];
   }
 
+  public async expireTopUpQuote(topUpQuoteId: string): Promise<void> {
+    await this.knex<TopUpQuoteDBResult>(tableNames.topUpQuote)
+      .where({
+        [columnNames.topUpQuoteId]: topUpQuoteId,
+      })
+      .update({ quote_expiration_date: new Date().toISOString() });
+  }
+
   public async updatePromoInfo(
     userAddress: string,
     promoInfo: PromotionalInfo

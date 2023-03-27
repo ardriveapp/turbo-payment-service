@@ -16,14 +16,7 @@ export async function handlePaymentFailedEvent(
   logger.info(`💸 Payment failed. ${pi.amount}`);
   const paymentDatabase = ctx.state?.paymentDatabase as Database;
 
-  // TODO: Implement expireTopUpQuote
   // TODO: This should be the topUpQuote ID
-  const topUpQuote = await paymentDatabase.expireTopUpQuote(walletAddress);
-  if (topUpQuote) {
-    logger.info(`Payment Quote found for ${walletAddress}`);
-  } else {
-    logger.info(`No payment quote found for ${walletAddress}`);
-  }
-
+  await paymentDatabase.expireTopUpQuote(walletAddress);
   MetricRegistry.paymentFailedCounter.inc();
 }
