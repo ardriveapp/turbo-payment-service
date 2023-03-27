@@ -14,28 +14,29 @@ export async function handleDisputeCreatedEvent(
   );
   logger.info(`💸 Dispute Created. ${pi.amount}`);
 
-  const priceQuote = await paymentDatabase.expirePriceQuote(walletAddress);
+  // TODO: What ID is pi.charge? should we use this as Payment Receipt ID in this DB?
+  // pi.charge;
+
+  // What comes back from a dispute object?
+  // We could query the DB for a payment receipt based on the amount and address
   const oldPaymentReceipt = await paymentDatabase.getPaymentReceipt(
+    // TODO: This should be the payment receipt ID or top up quote ID
     walletAddress
   );
-  if (priceQuote) {
-    logger.info(`Payment Quote found for ${walletAddress}`);
-    const oldBalance = await paymentDatabase.getUserBalance(walletAddress);
-    //TODO: Use BigNumber or Winston types for balance
-    const balance = await paymentDatabase.updateUserBalance(
-      walletAddress,
-      oldBalance.balance - oldPaymentReceipt.balance
-    );
-    logger.info("Balance updated: ", balance);
-  } else {
-    logger.info(
-      `No payment quote found for ${walletAddress}. Creating refund anyway.`
-    );
-  }
-  const receipt = await paymentDatabase.createRefundReceipt(walletAddress);
-  logger.info(
-    `Refund Receipt created for ${walletAddress} ${JSON.stringify(receipt)}`
-  );
 
-  MetricRegistry.paymentFailedCounter.inc();
+  if (oldPaymentReceipt) {
+    const receipt = await paymentDatabase.createChargebackReceipt({
+      ...oldPaymentReceipt,
+      chargebackReason: "Stripe Webhook Dispute Event",
+      chargebackReceiptId: pi.id,
+    });
+    MetricRegistry.paymentFailedCounter.inc();
+    logger.info(
+      `Chargeback Receipt created for ${walletAddress} ${JSON.stringify(
+        receipt
+      )}`
+    );
+  } else {
+    throw Error(`No payment receipt found for ${walletAddress}!`);
+  }
 }
