@@ -45,8 +45,15 @@ export interface TopUpQuote {
   quoteExpirationDate: Timestamp;
   quoteCreationDate: Timestamp;
 }
-
 export type CreateTopUpQuoteParams = Omit<TopUpQuote, "quoteCreationDate">;
+
+export interface FulfilledTopUpQuote extends TopUpQuote {
+  quoteFulfilledDate: Timestamp;
+}
+
+export interface FailedTopUpQuote extends TopUpQuote {
+  quoteFailedDate: Timestamp;
+}
 
 export interface PaymentReceipt {
   paymentReceiptId: PaymentReceiptId;
@@ -59,11 +66,14 @@ export interface PaymentReceipt {
   paymentProvider: PaymentProvider;
   paymentReceiptDate: Timestamp;
 }
-
 export type CreatePaymentReceiptParams = Omit<
   PaymentReceipt,
   "paymentReceiptDate"
 >;
+
+export interface RescindedPaymentReceipt extends PaymentReceipt {
+  paymentReceiptRescindedDate: Timestamp;
+}
 
 export interface ChargebackReceipt {
   chargebackReceiptId: ChargebackReceiptId;
@@ -107,6 +117,16 @@ export interface TopUpQuoteDBResult extends TopUpQuoteDBInsert {
   quote_creation_date: string;
 }
 
+export type FulfilledTopUpQuoteDBInsert = TopUpQuoteDBResult;
+export interface FulfilledTopUpQuoteDBResult
+  extends FulfilledTopUpQuoteDBInsert {
+  quote_fulfilled_date: string;
+}
+
+export type FailedTopUpQuoteDBInsert = TopUpQuoteDBResult;
+export interface FailedTopUpQuoteDBResult extends FailedTopUpQuoteDBInsert {
+  quote_failed_date: string;
+}
 export interface PaymentReceiptDBInsert {
   payment_receipt_id: string;
   destination_address: string;
@@ -119,6 +139,12 @@ export interface PaymentReceiptDBInsert {
 }
 export interface PaymentReceiptDBResult extends PaymentReceiptDBInsert {
   payment_receipt_date: string;
+}
+
+export type RescindedPaymentReceiptDBInsert = PaymentReceiptDBResult;
+export interface RescindedPaymentReceiptDBResult
+  extends RescindedPaymentReceiptDBInsert {
+  payment_receipt_rescinded_date: string;
 }
 
 export interface ChargebackReceiptDBInsert {

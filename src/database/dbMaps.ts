@@ -2,9 +2,15 @@ import { Winston } from "../types/winston";
 import {
   ChargebackReceipt,
   ChargebackReceiptDBResult,
+  FailedTopUpQuote,
+  FailedTopUpQuoteDBResult,
+  FulfilledTopUpQuote,
+  FulfilledTopUpQuoteDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
   PromotionalInfo,
+  RescindedPaymentReceipt,
+  RescindedPaymentReceiptDBResult,
   TopUpQuote,
   TopUpQuoteDBResult,
   User,
@@ -49,6 +55,24 @@ export function topUpQuoteDBMap({
   };
 }
 
+export function fulfilledTopUpQuoteDBMap(
+  dbResult: FulfilledTopUpQuoteDBResult
+): FulfilledTopUpQuote {
+  return {
+    ...topUpQuoteDBMap(dbResult),
+    quoteFulfilledDate: dbResult.quote_fulfilled_date,
+  };
+}
+
+export function failedTopUpQuoteDBMap(
+  dbResult: FailedTopUpQuoteDBResult
+): FailedTopUpQuote {
+  return {
+    ...topUpQuoteDBMap(dbResult),
+    quoteFailedDate: dbResult.quote_failed_date,
+  };
+}
+
 export function paymentReceiptDBMap({
   amount,
   currency_type,
@@ -70,6 +94,15 @@ export function paymentReceiptDBMap({
     destinationAddress: destination_address,
     destinationAddressType: destination_address_type,
     winstonCreditAmount: new Winston(winston_credit_amount),
+  };
+}
+
+export function rescindedPaymentReceiptDBMap(
+  dbResult: RescindedPaymentReceiptDBResult
+): RescindedPaymentReceipt {
+  return {
+    ...paymentReceiptDBMap(dbResult),
+    paymentReceiptRescindedDate: dbResult.payment_receipt_rescinded_date,
   };
 }
 
