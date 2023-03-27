@@ -159,6 +159,7 @@ export class PostgresDatabase implements Database {
         .where({
           top_up_quote_id: topUpQuoteId,
         })
+        // TODO: Make these states in the database schema: fulfilled_top_up_quote , failed_top_up_quote
         .update({ quote_expiration_date: new Date().toISOString() });
 
       const destinationUser = (
@@ -239,6 +240,12 @@ export class PostgresDatabase implements Database {
     } = chargebackReceipt;
 
     await this.knex.transaction(async (knexTransaction) => {
+      // TODO: First DO we only start this chargeback receipt if:
+      // - The Payment Receipt Exists
+      // - The User Exists and Has Balance
+
+      // TODO: We should Make this state in the database schema: charged_back_payment_receipt
+
       const user = await this.getUser(destinationAddress, knexTransaction);
 
       // Decrement balance of existing user
