@@ -4,13 +4,11 @@ import { Stripe } from "stripe";
 import { Database } from "../../../database/database";
 import logger from "../../../logger";
 import { MetricRegistry } from "../../../metricRegistry";
-import { KoaContext } from "../../../server";
 
 export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
-  ctx: Partial<KoaContext>
+  paymentDatabase: Database
 ) {
-  const database = ctx.architecture.paymentDatabase as Database;
   const walletAddress = pi.metadata["address"];
   logger.info(
     `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
@@ -19,7 +17,7 @@ export async function handlePaymentSuccessEvent(
   logger.info(`💰 Payment captured!  ${pi.amount}}`);
 
   // TODO: We should pass the top up quote id
-  const topUpQuote = await database.getTopUpQuote(walletAddress);
+  const topUpQuote = await paymentDatabase.getTopUpQuote(walletAddress);
 
   const {
     amount,
@@ -37,7 +35,7 @@ export async function handlePaymentSuccessEvent(
 
   if (topUpQuote) {
     logger.info(`Payment Quote found for ${walletAddress}`);
-    const receipt = await database.createPaymentReceipt({
+    const receipt = await paymentDatabase.createPaymentReceipt({
       amount,
       currencyType,
       destinationAddress,

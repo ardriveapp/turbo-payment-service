@@ -2,9 +2,11 @@ import axios from "axios";
 import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
+import Stripe from "stripe";
 
 import logger from "../src/logger";
 import { createServer } from "../src/server";
+import { loadSecretsToEnv } from "../src/utils/loadSecretsToEnv";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import { localTestUrl } from "./helpers/testHelpers";
 
