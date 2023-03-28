@@ -53,7 +53,6 @@ export class Schema {
       t.string(userAddress).primary().notNullable();
       t.string(userAddressType).notNullable();
       t.string(winstonCreditBalance).notNullable();
-      // TODO: Will jsonb work for this promo info or should we use a string and JSON stringify/parse?
       t.jsonb(promotionalInfo).defaultTo({}).notNullable();
     });
   }

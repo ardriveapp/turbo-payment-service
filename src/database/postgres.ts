@@ -171,7 +171,6 @@ export class PostgresDatabase implements Database {
         .where({
           top_up_quote_id: topUpQuoteId,
         })
-        // TODO: Make these states in the database schema: fulfilled_top_up_quote , failed_top_up_quote
         .update({ quote_expiration_date: new Date().toISOString() });
 
       const destinationUser = (
