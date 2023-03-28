@@ -28,9 +28,9 @@ export async function publicPemToArweaveAddress(
   return toB64Url(address);
 }
 
-export function pemToJwk(pem: string, makePublicKey?: boolean): JWKInterface {
+export function pemToJwk(pem: string, makePublicKey = false): JWKInterface {
   const isPrivate =
-    makePublicKey === true
+    makePublicKey
       ? false
       : pem.includes("-----BEGIN RSA PRIVATE KEY-----");
   const pubKey = isPrivate
