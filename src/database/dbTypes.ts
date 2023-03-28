@@ -91,6 +91,7 @@ export interface ChargebackReceipt {
   currencyType: CurrencyType;
   winstonCreditAmount: WC;
   paymentReceiptId: PaymentReceiptId;
+  topUpQuoteId: TopUpQuoteId;
   paymentProvider: PaymentProvider;
   chargebackReason: string;
   chargebackReceiptDate: Timestamp;
@@ -164,6 +165,7 @@ export interface ChargebackReceiptDBInsert {
   currency_type: string;
   winston_credit_amount: string;
   payment_receipt_id: string;
+  top_up_quote_id: string;
   payment_provider: string;
   chargeback_reason: string;
 }

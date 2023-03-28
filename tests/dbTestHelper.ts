@@ -82,6 +82,7 @@ function stubChargebackReceiptInsert({
     destination_address: stubArweaveUserAddress,
     destination_address_type: "arweave",
     payment_receipt_id,
+    top_up_quote_id: "chargeback stub top up quote id",
     payment_provider: "stripe",
     chargeback_receipt_id,
     winston_credit_amount: "1337",

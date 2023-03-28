@@ -329,6 +329,7 @@ export class PostgresDatabase implements Database {
         destination_address_type: destinationAddressType,
         payment_provider: paymentProvider,
         payment_receipt_id: paymentReceiptId,
+        top_up_quote_id: topUpQuoteId,
         chargeback_reason: chargebackReason,
         chargeback_receipt_id: chargebackReceiptId,
         winston_credit_amount: winstonCreditAmount.toString(),

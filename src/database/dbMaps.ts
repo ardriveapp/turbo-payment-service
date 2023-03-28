@@ -116,6 +116,7 @@ export function chargebackReceiptDBMap({
   currency_type,
   destination_address,
   destination_address_type,
+  top_up_quote_id,
   winston_credit_amount,
 }: ChargebackReceiptDBResult): ChargebackReceipt {
   return {
@@ -128,6 +129,7 @@ export function chargebackReceiptDBMap({
     currencyType: currency_type,
     destinationAddress: destination_address,
     destinationAddressType: destination_address_type,
+    topUpQuoteId: top_up_quote_id,
     winstonCreditAmount: new Winston(winston_credit_amount),
   };
 }
