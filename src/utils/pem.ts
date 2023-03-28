@@ -1,6 +1,7 @@
-import { createPrivateKey, createPublicKey } from "crypto";
+import { createHash, createPrivateKey, createPublicKey } from "crypto";
 
 import { JWKInterface } from "../types/jwkTypes";
+import { fromB64UrlToBuffer, toB64Url } from "./base64";
 
 export function jwkToPem(jwk: JWKInterface, makePublicKey?: boolean): string {
   const isPrivate = makePublicKey === true ? false : !!jwk.d;
@@ -16,13 +17,17 @@ export function jwkToPem(jwk: JWKInterface, makePublicKey?: boolean): string {
   return jwkKeyObject.export({ format: "pem", type: "pkcs1" }).toString();
 }
 
-export function formatPublicKey(publicKey: string) {
-  const header = "-----BEGIN RSA PUBLIC KEY-----";
-  const footer = "-----END RSA PUBLIC KEY-----";
-  const base64Key = publicKey.replace(header, "").replace(footer, "");
+export async function publicPemToArweaveAddress(
+  publicKey: string
+): Promise<string> {
+  const jwk = pemToJwk(publicKey, true);
+  const owner = jwk.n;
 
-  const formattedKeyData = base64Key.replace(/(.{64})/g, "$1\n");
-  return `${header}\n${formattedKeyData}${footer}`;
+  const address: Buffer = await new Promise((resolve) => {
+    resolve(createHash("SHA-256").update(fromB64UrlToBuffer(owner)).digest());
+  });
+
+  return toB64Url(address);
 }
 
 export function pemToJwk(pem: string, makePublicKey?: boolean): JWKInterface {
@@ -30,7 +35,6 @@ export function pemToJwk(pem: string, makePublicKey?: boolean): JWKInterface {
     makePublicKey === true
       ? false
       : pem.includes("-----BEGIN RSA PRIVATE KEY-----");
-
   const pubKey = isPrivate
     ? createPrivateKey({ key: pem, format: "pem" })
     : createPublicKey({ key: pem, format: "pem" });

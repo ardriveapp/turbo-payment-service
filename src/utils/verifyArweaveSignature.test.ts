@@ -17,10 +17,10 @@ describe("verifyArweaveSignature", () => {
     const dataToSign = nonce;
     const signature = await signData(jwkToPem(wallet), dataToSign);
 
-    const publicKey = jwkToPem(wallet, true);
+    const publicPem = jwkToPem(wallet, true);
 
     const isVerified = await verifyArweaveSignature({
-      publicKey,
+      publicPem,
       signature,
       nonce,
     });
@@ -39,9 +39,9 @@ describe("verifyArweaveSignature", () => {
     const additionalData = JSON.stringify(query);
     const signature = await signData(jwkToPem(wallet), additionalData + nonce);
 
-    const publicKey = jwkToPem(wallet, true);
+    const publicPem = jwkToPem(wallet, true);
     const isVerified = await verifyArweaveSignature({
-      publicKey,
+      publicPem,
       signature,
       additionalData,
       nonce,
@@ -53,10 +53,10 @@ describe("verifyArweaveSignature", () => {
   it("should fail for an invalid signature", async () => {
     const nonce = "should fail for an invalid signature nonce";
     const invalidSignature = "invalid_signature";
-    const publicKey = jwkToPem(wallet, true);
+    const publicPem = jwkToPem(wallet, true);
 
     const isVerified = await verifyArweaveSignature({
-      publicKey,
+      publicPem,
       signature: fromB64UrlToBuffer(invalidSignature),
       nonce,
     });

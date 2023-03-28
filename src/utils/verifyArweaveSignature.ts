@@ -1,14 +1,14 @@
 import crypto from "crypto";
 
 export interface VerifySignatureParams {
-  publicKey: string;
+  publicPem: string;
   signature: Uint8Array;
   additionalData?: string;
   nonce: string;
 }
 
 export async function verifyArweaveSignature({
-  publicKey,
+  publicPem,
   signature,
   additionalData,
   nonce,
@@ -18,7 +18,7 @@ export async function verifyArweaveSignature({
     const verifier = crypto.createVerify("SHA256");
     verifier.update(dataToVerify);
 
-    const isVerified = verifier.verify(publicKey, signature);
+    const isVerified = verifier.verify(publicPem, signature);
 
     return isVerified;
   } catch (error) {

@@ -1,8 +1,8 @@
-import { createHash } from "crypto";
 import { Context, Next } from "koa";
 
 import logger from "../logger";
-import { fromB64UrlToBuffer, toB64Url } from "../utils/base64";
+import { fromB64UrlToBuffer } from "../utils/base64";
+import { publicPemToArweaveAddress } from "../utils/pem";
 import { verifyArweaveSignature } from "../utils/verifyArweaveSignature";
 
 export async function verifySignature(ctx: Context, next: Next): Promise<void> {
@@ -15,9 +15,9 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
       logger.info("Missing signature, public key or nonce");
       return next();
     }
-
+    const publicPem = fromB64UrlToBuffer(publicKey).toString();
     const isVerified = await verifyArweaveSignature({
-      publicKey: fromB64UrlToBuffer(publicKey).toString(),
+      publicPem: publicPem,
       signature: fromB64UrlToBuffer(signature as string),
       additionalData: Object.keys(ctx.request.query).length
         ? JSON.stringify(ctx.request.query)
@@ -26,11 +26,7 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
     });
     if (isVerified) {
       //Attach wallet address for the next middleware
-      const hash = createHash("sha256");
-      hash.update(fromB64UrlToBuffer(publicKey as string));
-      const buffer = hash.digest();
-      const walletAddress = toB64Url(buffer);
-      ctx.state.walletAddress = walletAddress;
+      ctx.state.walletAddress = publicPemToArweaveAddress(publicKey);
       await next();
     }
   } catch (error) {

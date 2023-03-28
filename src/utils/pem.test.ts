@@ -1,7 +1,8 @@
 import Arweave from "arweave";
 import { expect } from "chai";
 
-import { jwkToPem, pemToJwk } from "./pem";
+import { testWallet } from "../../tests/helpers/testHelpers";
+import { jwkToPem, pemToJwk, publicPemToArweaveAddress } from "./pem";
 
 describe("pem", () => {
   describe("jwkToPem", () => {
@@ -56,5 +57,14 @@ describe("pem", () => {
       expect(jwkFromPem).to.have.property("n");
       expect(jwkFromPem).to.have.property("e");
     });
+  });
+
+  it("publicPemToArweaveAddress", async () => {
+    const wallet = testWallet;
+    const knownWalletAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
+
+    const publicPem = jwkToPem(wallet, true);
+    const computedAddress = await publicPemToArweaveAddress(publicPem);
+    expect(computedAddress).to.equal(knownWalletAddress);
   });
 });
