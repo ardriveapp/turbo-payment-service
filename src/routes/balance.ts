@@ -18,9 +18,12 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
   logger.info(" balance requested for ", { walletAddress });
 
   try {
-    const balance = await paymentDatabase.getUserBalance(walletAddress);
-    ctx.body = balance;
+    const balance = (await paymentDatabase.getUser(walletAddress))
+      .winstonCreditBalance;
+    ctx.body = balance.toString();
   } catch (error) {
+    // TODO: Check for user not found error (warning) from DB and add that status and test
+
     logger.error(error);
     ctx.response.status = 503;
     ctx.body = "Cloud Database Unavailable";
