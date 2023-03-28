@@ -12,8 +12,6 @@ import {
 } from "./dbTypes";
 import { PostgresDatabase } from "./postgres";
 
-/** Knex instance connected to a PostgreSQL database */
-
 describe("PostgresDatabase class", () => {
   const db = new PostgresDatabase();
   const dbTestHelper = new DbTestHelper(db);
