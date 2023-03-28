@@ -20,21 +20,25 @@ export const stubArweaveUserAddress: UserAddress =
 interface StubTopUpQuoteParams {
   top_up_quote_id?: string;
   quote_expiration_date?: string;
+  amount?: string;
+  winston_credit_amount?: string;
 }
 
 function stubTopUpQuoteInsert({
   top_up_quote_id = "The Stubbiest Top Up Quote",
   quote_expiration_date = new Date("2023-03-23 16:20:00").toISOString(),
+  amount = "100",
+  winston_credit_amount = "1337",
 }: StubTopUpQuoteParams): TopUpQuoteDBInsert {
   return {
-    amount: "100",
+    amount,
     currency_type: "usd",
     destination_address: stubArweaveUserAddress,
     destination_address_type: "arweave",
     quote_expiration_date,
     payment_provider: "stripe",
     top_up_quote_id,
-    winston_credit_amount: "1337",
+    winston_credit_amount,
   };
 }
 
