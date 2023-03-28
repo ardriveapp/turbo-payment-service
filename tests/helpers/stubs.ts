@@ -39,6 +39,7 @@ export const paymentIntentSucceededStub: Stripe.PaymentIntent = {
   transfer_data: null,
   transfer_group: null,
 };
+
 export const paymentIntentFailedStub: Stripe.PaymentIntent = {
   id: "pi_123",
   status: "canceled",
