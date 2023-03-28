@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Stripe } from "stripe";
 
 import { Database } from "../../../database/database";
@@ -8,35 +9,17 @@ export async function handleDisputeCreatedEvent(
   pi: Stripe.Dispute,
   paymentDatabase: Database
 ) {
-  const walletAddress = pi.metadata["address"];
-  logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
-  );
-  logger.info(`💸 Dispute Created. ${pi.amount}`);
+  // TODO: Can we depend on this to be here on every chargeback?
+  const topUpQuoteId = pi.metadata["top_up_quote_id"];
+  logger.info(`🔔  Webhook Dispute Created Event!`, { topUpQuoteId, pi });
+  const chargebackReceiptId = randomUUID();
 
-  // TODO: What ID is pi.charge? should we use this as Payment Receipt ID in this DB?
-  // pi.charge;
+  await paymentDatabase.createChargebackReceipt({
+    chargebackReason: pi.reason,
+    chargebackReceiptId,
+    topUpQuoteId,
+  });
+  MetricRegistry.paymentFailedCounter.inc();
 
-  // What comes back from a dispute object?
-  // We could query the DB for a payment receipt based on the amount and address
-  const oldPaymentReceipt = await paymentDatabase.getPaymentReceipt(
-    // TODO: This should be the payment receipt ID or top up quote ID
-    walletAddress
-  );
-
-  if (oldPaymentReceipt) {
-    const receipt = await paymentDatabase.createChargebackReceipt({
-      ...oldPaymentReceipt,
-      chargebackReason: "Stripe Webhook Dispute Event",
-      chargebackReceiptId: pi.id,
-    });
-    MetricRegistry.paymentFailedCounter.inc();
-    logger.info(
-      `Chargeback Receipt created for ${walletAddress} ${JSON.stringify(
-        receipt
-      )}`
-    );
-  } else {
-    throw Error(`No payment receipt found for ${walletAddress}!`);
-  }
+  logger.info("Chargeback receipt created!", { chargebackReceiptId });
 }
