@@ -9,52 +9,23 @@ export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
   paymentDatabase: Database
 ) {
-  const walletAddress = pi.metadata["address"];
-  logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
-  );
+  const topUpQuoteId = pi.metadata["top_up_quote_id"];
 
-  logger.info(`💰 Payment captured!  ${pi.amount}}`);
-
-  // TODO: We should pass the top up quote id
-  const topUpQuote = await paymentDatabase.getTopUpQuote(walletAddress);
-
-  const {
-    amount,
-    currencyType,
-    destinationAddress,
-    destinationAddressType,
-    paymentProvider,
-    quoteExpirationDate,
+  logger.info(`💰 Payment Success Event Triggered!`, {
     topUpQuoteId,
-    winstonCreditAmount,
-  } = topUpQuote;
+    amount: pi.amount,
+  });
 
-  // TODO: Check quote expiration date
-  logger.info(quoteExpirationDate);
+  const topUpQuote = await paymentDatabase.getTopUpQuote(topUpQuoteId);
+  const paymentReceiptId = randomUUID();
 
-  if (topUpQuote) {
-    logger.info(`Payment Quote found for ${walletAddress}`);
-    const receipt = await paymentDatabase.createPaymentReceipt({
-      amount,
-      currencyType,
-      destinationAddress,
-      destinationAddressType,
-      paymentProvider,
-      // TODO: Use a receipt ID from Stripe or other payment provider?
-      paymentReceiptId: randomUUID(),
-      topUpQuoteId,
-      winstonCreditAmount,
-    });
+  await paymentDatabase.createPaymentReceipt({
+    ...topUpQuote,
+    paymentReceiptId,
+  });
 
-    logger.info(
-      `Receipt created for ${walletAddress} ${JSON.stringify(receipt)}`
-    );
+  logger.info(`Payment Receipt created!`, { paymentReceiptId, topUpQuote });
 
-    MetricRegistry.paymentSuccessCounter.inc();
-    MetricRegistry.topUpsCounter.inc(Number(topUpQuote.winstonCreditAmount));
-  } else {
-    logger.info(`No payment quote found for ${walletAddress}`);
-    throw new Error(`No payment quote found for ${walletAddress}`);
-  }
+  MetricRegistry.paymentSuccessCounter.inc();
+  MetricRegistry.topUpsCounter.inc(Number(topUpQuote.winstonCreditAmount));
 }
