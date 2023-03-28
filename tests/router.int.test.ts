@@ -3,10 +3,12 @@ import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
 
+import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
 import { createServer } from "../src/server";
 import { toB64Url } from "../src/utils/base64";
 import { jwkToPem } from "../src/utils/pem";
+import { DbTestHelper } from "./dbTestHelper";
 import { signData } from "./helpers/signData";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import { localTestUrl, testWallet } from "./helpers/testHelpers";
@@ -98,16 +100,24 @@ describe("Router tests", () => {
     expect(status).to.equal(502);
   });
 
+  before(async () => {
+    new DbTestHelper(new PostgresDatabase()).insertStubUser({
+      user_address: "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830",
+      winston_credit_balance: "5000",
+    });
+  });
+
   it("GET /balance returns 200 for correct signature", async () => {
     const nonce = "123";
-    const publicKey = jwkToPem(testWallet, true);
+    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
     const signature = await signData(jwkToPem(testWallet), nonce);
+    console.log("publicKey", publicKey);
 
     const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/balance`,
       {
         headers: {
-          "x-public-key": toB64Url(Buffer.from(publicKey)),
+          "x-public-key": publicKey,
           "x-nonce": nonce,
           "x-signature": toB64Url(Buffer.from(signature)),
         },
@@ -119,17 +129,17 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(balance).to.be.a("number");
+    expect(balance).to.equal(5000);
   });
 
   it("GET /balance returns 403 for bad signature", async () => {
     const nonce = "123";
-    const publicKey = jwkToPem(testWallet, true);
+    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
     const signature = await signData(jwkToPem(testWallet), "another nonce");
 
     const { status, data } = await axios.get(`${localTestUrl}/v1/balance`, {
       headers: {
-        "x-public-key": publicKey.replace(/\r?\n|\r/g, ""),
+        "x-public-key": publicKey,
         "x-nonce": nonce,
         "x-signature": toB64Url(Buffer.from(signature)),
       },
