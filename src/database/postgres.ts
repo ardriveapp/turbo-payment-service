@@ -23,7 +23,6 @@ import {
   RescindedPaymentReceiptDBResult,
   TopUpQuote,
   TopUpQuoteDBResult,
-  TopUpQuoteId,
   User,
   UserDBResult,
 } from "./dbTypes";
