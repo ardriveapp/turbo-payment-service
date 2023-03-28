@@ -317,6 +317,7 @@ describe("PostgresDatabase class", () => {
 
     const naughtyUserBalance = new Winston("1000");
     const naughtyPaymentId = "A bad payment receipt ID";
+    const naughtyTopUpQuoteId = "A bad top up quote ID";
 
     before(async () => {
       await dbTestHelper.insertStubUser({
@@ -325,17 +326,14 @@ describe("PostgresDatabase class", () => {
       });
       await dbTestHelper.insertStubPaymentReceipt({
         payment_receipt_id: naughtyPaymentId,
+        top_up_quote_id: naughtyTopUpQuoteId,
+        destination_address: naughtyUserAddress,
+        winston_credit_amount: "100",
       });
       await db.createChargebackReceipt({
-        amount: 11_111,
-        currencyType: "eth",
-        destinationAddress: naughtyUserAddress,
-        destinationAddressType: "arweave",
-        paymentReceiptId: naughtyPaymentId,
-        paymentProvider: "stripe",
         chargebackReceiptId: "A great Unique Identifier",
         chargebackReason: "Evil",
-        winstonCreditAmount: new Winston(999),
+        topUpQuoteId: naughtyTopUpQuoteId,
       });
     });
 
@@ -355,17 +353,19 @@ describe("PostgresDatabase class", () => {
         chargeback_receipt_id,
         payment_receipt_id,
         winston_credit_amount,
+        chargeback_reason,
       } = chargebackReceipt[0];
 
-      expect(amount).to.equal("11111");
-      expect(currency_type).to.equal("eth");
+      expect(amount).to.equal("100");
+      expect(currency_type).to.equal("usd");
       expect(destination_address).to.equal(naughtyUserAddress);
       expect(destination_address_type).to.equal("arweave");
       expect(payment_provider).to.equal("stripe");
       expect(chargeback_receipt_date).to.exist;
       expect(chargeback_receipt_id).to.equal("A great Unique Identifier");
       expect(payment_receipt_id).to.equal(payment_receipt_id);
-      expect(winston_credit_amount).to.equal("999");
+      expect(winston_credit_amount).to.equal("100");
+      expect(chargeback_reason).to.equal("Evil");
     });
 
     it("deletes the payment_receipt entity and inserts a rescinded_payment_receipt", async () => {
@@ -389,24 +389,18 @@ describe("PostgresDatabase class", () => {
       expect(oldUser.length).to.equal(1);
 
       expect(oldUser[0].winston_credit_balance).to.equal(
-        naughtyUserBalance.minus(new Winston("999")).toString()
+        naughtyUserBalance.minus(new Winston("100")).toString()
       );
     });
 
     it("errors as expected when no payment receipt could be found to chargeback", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.createChargebackReceipt({
-          amount: 1337331,
-          currencyType: "val",
-          destinationAddress: "hello there",
-          destinationAddressType: "arweave",
-          paymentReceiptId: "No ID Found!!!!!",
-          paymentProvider: "stripe",
+          topUpQuoteId: "No ID Found!!!!!",
           chargebackReceiptId: "chargeback receipts 1",
           chargebackReason: "Stripe Dispute Webhook Event",
-          winstonCreditAmount: new Winston(500),
         }),
-        errorMessage: `No payment receipt found in database with ID 'No ID Found!!!!!'`,
+        errorMessage: `No payment receipt found in database with top up quote ID 'No ID Found!!!!!'`,
       });
 
       expect(
@@ -426,20 +420,15 @@ describe("PostgresDatabase class", () => {
         winston_credit_balance: "200",
       });
       await dbTestHelper.insertStubPaymentReceipt({
-        payment_receipt_id: "New ID 42342",
+        top_up_quote_id: "New ID 42342",
+        destination_address: underfundedUserAddress,
       });
 
       await expectAsyncErrorThrow({
         promiseToError: db.createChargebackReceipt({
-          amount: 1,
-          currencyType: "eur",
-          destinationAddress: underfundedUserAddress,
-          destinationAddressType: "arweave",
-          paymentReceiptId: "New ID 42342",
-          paymentProvider: "stripe",
+          topUpQuoteId: "New ID 42342",
           chargebackReceiptId: "Great value",
           chargebackReason: "What ?",
-          winstonCreditAmount: new Winston(500),
         }),
         errorMessage: `User with address '${underfundedUserAddress}' does not have enough balance to decrement this chargeback!`,
       });

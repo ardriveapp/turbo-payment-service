@@ -19,9 +19,9 @@ describe("handlePaymentSuccessEvent", () => {
   const paymentIntent = paymentIntentStub({
     top_up_quote_id: paymentSuccessTopUpQuoteId,
   });
+
   before(async () => {
     // Insert top up quote that success event depends on
-
     await dbTestHelper.insertStubTopUpQuote({
       top_up_quote_id: paymentSuccessTopUpQuoteId,
       winston_credit_amount: "500",

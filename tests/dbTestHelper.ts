@@ -42,22 +42,30 @@ function stubTopUpQuoteInsert({
   };
 }
 
-function stubPaymentReceiptInsert({
-  payment_receipt_id = "The Stubbiest Payment Receipt",
-  top_up_quote_id = "The Stubbiest Top Up Quote",
-}: {
+interface StubPaymentReceiptParams {
   payment_receipt_id?: string;
   top_up_quote_id?: string;
-}): PaymentReceiptDBInsert {
+  destination_address?: string;
+  amount?: string;
+  winston_credit_amount?: string;
+}
+
+function stubPaymentReceiptInsert({
+  amount = "100",
+  payment_receipt_id = "The Stubbiest Payment Receipt",
+  top_up_quote_id = "The Stubbiest Top Up Quote",
+  destination_address = stubArweaveUserAddress,
+  winston_credit_amount = "1337",
+}: StubPaymentReceiptParams): PaymentReceiptDBInsert {
   return {
-    amount: "100",
+    amount,
     currency_type: "usd",
-    destination_address: stubArweaveUserAddress,
+    destination_address,
     destination_address_type: "arweave",
     top_up_quote_id,
     payment_provider: "stripe",
     payment_receipt_id,
-    winston_credit_amount: "1337",
+    winston_credit_amount,
   };
 }
 
@@ -116,10 +124,9 @@ export class DbTestHelper {
     );
   }
 
-  public async insertStubPaymentReceipt(insertParams: {
-    payment_receipt_id?: string;
-    top_up_quote_id?: string;
-  }): Promise<void> {
+  public async insertStubPaymentReceipt(
+    insertParams: StubPaymentReceiptParams
+  ): Promise<void> {
     return this.knex(tableNames.paymentReceipt).insert(
       stubPaymentReceiptInsert(insertParams)
     );
