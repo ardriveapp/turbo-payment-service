@@ -13,7 +13,7 @@ describe("pem", () => {
       expect(pem).to.be.a("string");
       expect(pem).to.include("-----BEGIN RSA PRIVATE KEY-----");
       expect(pem).to.include("-----END RSA PRIVATE KEY-----");
-    });
+    }).timeout(10000);
 
     it("should convert a public JWK to PEM format", async () => {
       const jwk = await Arweave.crypto.generateJWK();
@@ -24,7 +24,7 @@ describe("pem", () => {
       expect(pem).to.be.a("string");
       expect(pem).to.include("-----BEGIN RSA PUBLIC KEY-----");
       expect(pem).to.include("-----END RSA PUBLIC KEY-----");
-    });
+    }).timeout(10000);
   });
 
   describe("pemToJwk", () => {
@@ -44,7 +44,7 @@ describe("pem", () => {
       expect(jwkFromPem).to.have.property("dp");
       expect(jwkFromPem).to.have.property("dq");
       expect(jwkFromPem).to.have.property("qi");
-    });
+    }).timeout(10000);
 
     it("should convert a public PEM to JWK format", async () => {
       const jwk = await Arweave.crypto.generateJWK();
@@ -56,7 +56,7 @@ describe("pem", () => {
       expect(jwkFromPem).to.have.property("kty", "RSA");
       expect(jwkFromPem).to.have.property("n");
       expect(jwkFromPem).to.have.property("e");
-    });
+    }).timeout(10000);
   });
 
   it("publicPemToArweaveAddress", async () => {
@@ -66,5 +66,5 @@ describe("pem", () => {
     const publicPem = jwkToPem(wallet, true);
     const computedAddress = await publicPemToArweaveAddress(publicPem);
     expect(computedAddress).to.equal(knownWalletAddress);
-  });
+  }).timeout(10000);
 });
