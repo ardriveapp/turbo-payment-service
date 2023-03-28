@@ -8,13 +8,13 @@ export async function handlePaymentFailedEvent(
   pi: Stripe.PaymentIntent,
   db: Database
 ) {
-  const walletAddress = pi.metadata["address"];
-  logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
-  );
+  const topUpQuoteId = pi.metadata["top_up_quote_id"];
+  logger.info(`🔔  Webhook event payment failed event received!`, {
+    topUpQuoteId,
+    pi,
+  });
   logger.info(`💸 Payment failed. ${pi.amount}`);
 
-  // TODO: This should be the topUpQuote ID
-  await db.expireTopUpQuote(walletAddress);
+  await db.expireTopUpQuote(topUpQuoteId);
   MetricRegistry.paymentFailedCounter.inc();
 }
