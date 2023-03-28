@@ -1,38 +1,29 @@
-import { TransformableInfo } from "logform";
 import { createLogger, format, transports } from "winston";
 
-const { combine, colorize, printf } = format;
+import { isTestEnv } from "./constants";
 
-const seemsLikeAnError = (info: TransformableInfo) =>
-  info && (info instanceof Error || (info.message && info.stack));
-
-const containsAnError = (info: TransformableInfo) =>
-  info && "error" in info && seemsLikeAnError(info.error);
-
-function devFormat() {
-  const formatSimple = (info: TransformableInfo) => {
-    const infoAfter = format.simple().transform(info) as TransformableInfo;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return `${infoAfter[Symbol.for("message") as any]}`;
-  };
-  const formatWrappedError = (info: TransformableInfo) =>
-    `${info.level} ${info.message}\n\n${info.error.stack}\n`;
-  const formatError = (info: TransformableInfo) =>
-    `${info.level} ${info.message}\n\n${info.stack}\n`;
-  const formatAny = (info: TransformableInfo) =>
-    seemsLikeAnError(info)
-      ? formatError(info)
-      : containsAnError(info)
-      ? formatWrappedError(info)
-      : formatSimple(info);
-  return combine(colorize(), printf(formatAny));
-}
+const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
+const LOG_ALL_STACKTRACES = process.env.LOG_ALL_STACKTRACES === "true";
+// TODO: Add "json" for dev and prod?
+const LOG_FORMAT = process.env.LOG_FORMAT ?? "simple";
 
 const logger = createLogger({
-  level: process.env.LOG_LEVEL ?? "info",
-  transports: [new transports.Console()],
-  format: process.env.DEV_LOGS === "1" ? devFormat() : format.simple(),
-  silent: process.env.NODE_ENV === "test",
+  level: LOG_LEVEL,
+  silent: !isTestEnv,
+  format: format.combine(
+    format((info) => {
+      // Only log stack traces when the log level is error or the
+      // LOG_ALL_STACKTRACES environment variable is set to true
+      if (info.stack && info.level !== "error" && !LOG_ALL_STACKTRACES) {
+        delete info.stack;
+      }
+      return info;
+    })(),
+    format.errors(),
+    format.timestamp(),
+    LOG_FORMAT === "json" ? format.json() : format.simple()
+  ),
+  transports: new transports.Console(),
 });
 
 export default logger;
