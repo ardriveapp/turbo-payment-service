@@ -115,7 +115,9 @@ export class PostgresDatabase implements Database {
   }
 
   public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {
-    return (await this.getUser(userAddress)).promotionalInfo;
+    const promoInfo = (await this.getUser(userAddress)).promotionalInfo;
+    logger.info("promo info:", { type: typeof promoInfo, promoInfo });
+    return promoInfo;
   }
 
   public async getUser(

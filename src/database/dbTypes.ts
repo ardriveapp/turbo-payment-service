@@ -9,8 +9,16 @@ export type UserAddressType = string;
 /** Currently using Postgres Date type (ISO String without Timezone) */
 export type Timestamp = string;
 
+export type JsonSerializable =
+  | string
+  | number
+  | boolean
+  | null
+  | { [member: string]: JsonSerializable }
+  | JsonSerializable[];
+
 // TODO: Promotional Info Schema. We will use JSON object
-export type PromotionalInfo = Record<string, unknown>;
+export type PromotionalInfo = JsonSerializable;
 
 // TODO: Use all generated UUIDs or use IDs from payment providers?
 type IdType = string;
@@ -98,9 +106,9 @@ export interface UserDBInsert {
   user_address_type: string;
   winston_credit_balance: string;
 }
+
 export interface UserDBResult extends UserDBInsert {
-  // TODO: Type that comes back from postgres
-  promotional_info: unknown;
+  promotional_info: JsonSerializable;
 }
 
 export interface TopUpQuoteDBInsert {
