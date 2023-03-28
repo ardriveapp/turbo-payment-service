@@ -256,7 +256,7 @@ describe("PostgresDatabase class", () => {
       ).to.not.include([newUserTopUpId, oldUserTopUpId]);
     });
 
-    it("errors as expected when no top up quote can not be expired", async () => {
+    it("errors as expected when no top up quote can be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.createPaymentReceipt({
           amount: 1,
