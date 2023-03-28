@@ -23,7 +23,7 @@ describe("handlePaymentFailedEvent", () => {
   });
 
   before(async () => {
-    // Insert top up quote that success event depends on
+    // Insert top up quote that failed event depends on
     await dbTestHelper.insertStubTopUpQuote({
       top_up_quote_id: paymentFailedTopUpQuoteId,
     });
