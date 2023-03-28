@@ -39,7 +39,7 @@ export interface Database {
     winstonCreditAmount: WC
   ) => Promise<void>;
   createChargebackReceipt: (
-    chargebackReceipt: CreateChargebackReceiptParams
+    createChargebackReceiptParams: CreateChargebackReceiptParams
   ) => Promise<void>;
   getChargebackReceipt: (
     chargebackReceiptId: ChargebackReceiptId

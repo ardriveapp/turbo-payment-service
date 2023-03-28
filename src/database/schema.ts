@@ -101,6 +101,7 @@ export class Schema {
       t.string(amount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
+      // TODO: Index this if we access it in the app
       t.string(topUpQuoteId).notNullable();
       t.string(paymentProvider).notNullable();
       t.timestamp(paymentReceiptDate)

@@ -23,6 +23,7 @@ import {
   RescindedPaymentReceiptDBResult,
   TopUpQuote,
   TopUpQuoteDBResult,
+  TopUpQuoteId,
   User,
   UserDBResult,
 } from "./dbTypes";
@@ -233,33 +234,49 @@ export class PostgresDatabase implements Database {
     return paymentReceiptDbResult.map(paymentReceiptDBMap)[0];
   }
 
-  public async createChargebackReceipt(
-    chargebackReceipt: CreateChargebackReceiptParams
-  ): Promise<void> {
-    this.log.info("Inserting new chargeback receipt...", {
-      chargebackReceipt,
-    });
+  public async getPaymentReceiptByTopUpQuoteId(
+    topUpQuoteId: string,
+    knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
+  ): Promise<PaymentReceipt> {
+    const paymentReceiptDbResult =
+      await knexTransaction<PaymentReceiptDBResult>(
+        tableNames.paymentReceipt
+      ).where({
+        [columnNames.topUpQuoteId]: topUpQuoteId,
+      });
+    if (paymentReceiptDbResult.length === 0) {
+      throw Error(
+        `No payment receipt found in database with top up quote ID '${topUpQuoteId}'`
+      );
+    }
 
-    const {
-      amount,
-      currencyType,
-      destinationAddress,
-      destinationAddressType,
-      paymentProvider,
-      paymentReceiptId,
-      chargebackReason,
-      chargebackReceiptId,
-      winstonCreditAmount,
-    } = chargebackReceipt;
+    return paymentReceiptDbResult.map(paymentReceiptDBMap)[0];
+  }
+
+  public async createChargebackReceipt({
+    topUpQuoteId,
+    chargebackReason,
+    chargebackReceiptId,
+  }: CreateChargebackReceiptParams): Promise<void> {
+    this.log.info("Inserting new chargeback receipt...", {
+      topUpQuoteId,
+    });
 
     await this.knex.transaction(async (knexTransaction) => {
       // This will throw if payment receipt does not exist
-      const paymentReceipt = await this.getPaymentReceipt(
+      const {
+        amount,
+        currencyType,
+        destinationAddress,
+        destinationAddressType,
+        paymentProvider,
         paymentReceiptId,
+        paymentReceiptDate,
+        winstonCreditAmount,
+      } = await this.getPaymentReceiptByTopUpQuoteId(
+        topUpQuoteId,
         knexTransaction
       );
-
-      // TODO: Should we assert that the amounts from payment receipt are the same as the incoming stripe chargeback receipt?
 
       const user = await this.getUser(destinationAddress, knexTransaction);
 
@@ -297,9 +314,9 @@ export class PostgresDatabase implements Database {
         destination_address: destinationAddress,
         destination_address_type: destinationAddressType,
         payment_provider: paymentProvider,
-        payment_receipt_date: paymentReceipt.paymentReceiptDate,
+        payment_receipt_date: paymentReceiptDate,
         payment_receipt_id: paymentReceiptId,
-        top_up_quote_id: paymentReceipt.topUpQuoteId,
+        top_up_quote_id: topUpQuoteId,
         winston_credit_amount: winstonCreditAmount.toString(),
       });
 

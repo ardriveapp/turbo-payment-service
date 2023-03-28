@@ -96,10 +96,11 @@ export interface ChargebackReceipt {
   chargebackReceiptDate: Timestamp;
 }
 
-export type CreateChargebackReceiptParams = Omit<
-  ChargebackReceipt,
-  "chargebackReceiptDate"
->;
+export type CreateChargebackReceiptParams = {
+  topUpQuoteId: TopUpQuoteId;
+  chargebackReason: string;
+  chargebackReceiptId: ChargebackReceiptId;
+};
 
 export interface UserDBInsert {
   user_address: string;

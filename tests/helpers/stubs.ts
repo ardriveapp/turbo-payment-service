@@ -103,7 +103,7 @@ export const chargeDisputeStub: Stripe.Dispute = {
   is_charge_refundable: true,
   livemode: false,
   metadata: {
-    address: "0x1234567890",
+    top_up_quote_id: "0x1234567890",
   },
   payment_intent: null,
   reason: "fraudulent",
