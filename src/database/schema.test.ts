@@ -137,6 +137,7 @@ describe("Schema class", () => {
       chargeback_receipt_date,
       destination_address,
       destination_address_type,
+      top_up_quote_id,
       amount,
       currency_type,
       winston_credit_amount,
