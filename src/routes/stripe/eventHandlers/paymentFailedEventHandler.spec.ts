@@ -41,15 +41,13 @@ describe("handlePaymentFailedEvent", () => {
     });
     expect(paymentReceiptDbResults).to.have.length(0);
 
-    // Top up quote was expired
+    // Top up quote was expired; which means deleted and re-inserted as failed
     const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
       tableNames.topUpQuote
     ).where({
       top_up_quote_id: paymentFailedTopUpQuoteId,
     });
     expect(topUpQuoteDbResults).to.have.length(0);
-
-    // Top up quote was expired; which means deleted and re-inserted as failed
     const failedTopUpQuoteDbResults = await db[
       "knex"
     ]<FailedTopUpQuoteDBResult>(tableNames.failedTopUpQuote).where({
