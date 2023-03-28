@@ -1,3 +1,4 @@
+import Arweave from "arweave";
 import { expect } from "chai";
 
 import { testWallet } from "../../tests/helpers/testHelpers";
@@ -6,7 +7,7 @@ import { jwkToPem, pemToJwk, publicPemToArweaveAddress } from "./pem";
 describe("pem", () => {
   describe("jwkToPem", () => {
     it("should convert a JWK to PEM format", async () => {
-      const jwk = testWallet;
+      const jwk = await Arweave.crypto.generateJWK();
       const pem = jwkToPem(jwk);
 
       expect(pem).to.be.a("string");
@@ -15,7 +16,7 @@ describe("pem", () => {
     });
 
     it("should convert a public JWK to PEM format", async () => {
-      const jwk = testWallet;
+      const jwk = await Arweave.crypto.generateJWK();
 
       jwk.d = undefined; // remove the private key property to make it a public key
       const pem = jwkToPem(jwk);
@@ -28,7 +29,7 @@ describe("pem", () => {
 
   describe("pemToJwk", () => {
     it("should convert a PEM to JWK format", async () => {
-      const jwk = testWallet;
+      const jwk = await Arweave.crypto.generateJWK();
 
       const pem = jwkToPem(jwk);
       const jwkFromPem = pemToJwk(pem);
@@ -46,7 +47,7 @@ describe("pem", () => {
     });
 
     it("should convert a public PEM to JWK format", async () => {
-      const jwk = testWallet;
+      const jwk = await Arweave.crypto.generateJWK();
 
       const pem = jwkToPem(jwk, true);
       const jwkFromPem = pemToJwk(pem, true);
