@@ -19,6 +19,9 @@ describe("Schema class", () => {
 
     // Run integration tests after schema tests to avoid race conditions in the test env database
     require("./postgres.spec");
+    require("../routes/stripe/eventHandlers/disputeCreatedEventHandler.spec");
+    require("../routes/stripe/eventHandlers/paymentFailedEventHandler.spec");
+    require("../routes/stripe/eventHandlers/paymentSuccessEventHandler.spec");
   });
 
   it("after running latest knex migrations with knex CLI from docker-test.sh, all expected tables exists", async () => {

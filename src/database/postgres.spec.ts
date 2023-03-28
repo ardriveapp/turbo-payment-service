@@ -18,13 +18,6 @@ describe("PostgresDatabase class", () => {
   const db = new PostgresDatabase();
   const dbTestHelper = new DbTestHelper(db);
 
-  after(async () => {
-    // Clean up the all tables after this test suite
-    await Promise.all(
-      Object.values(tableNames).map((name) => db["knex"](name).truncate())
-    );
-  });
-
   describe("createTopUpQuote method", () => {
     const quoteExpirationDate = new Date(
       "2023-03-23 12:34:56.789Z"
