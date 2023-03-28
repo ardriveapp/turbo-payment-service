@@ -6,13 +6,11 @@ import { fromB64UrlToBuffer, toB64Url } from "./base64";
 export function jwkToPem(jwk: JWKInterface, makePublicKey?: boolean): string {
   const isPrivate = makePublicKey === true ? false : !!jwk.d;
 
+  const jwkAsUnknown = jwk as unknown;
+  const jwkAsString = jwkAsUnknown as string; 
   const jwkKeyObject = isPrivate
-    ? // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      createPrivateKey({ key: jwk as unknown as string, format: "jwk" })
-    : // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-      // @ts-ignore
-      createPublicKey({ key: jwk as unknown as string, format: "jwk" });
+    ? createPrivateKey({ key: jwkAsString, format: "jwk" })
+    : createPublicKey({ key: jwkAsString, format: "jwk" });
 
   return jwkKeyObject.export({ format: "pem", type: "pkcs1" }).toString();
 }
