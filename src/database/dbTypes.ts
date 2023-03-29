@@ -66,17 +66,20 @@ export interface PaymentReceipt extends BaseQuote {
   paymentReceiptId: PaymentReceiptId;
   paymentReceiptDate: Timestamp;
 }
-export type CreatePaymentReceiptParams = Omit<
-  PaymentReceipt,
-  "paymentReceiptDate"
->;
+export interface CreatePaymentReceiptParams {
+  paymentReceiptId: PaymentReceiptId;
+  topUpQuoteId: TopUpQuoteId;
+  amount: PaymentAmount;
+  currencyType: CurrencyType;
+}
 
 export interface RescindedPaymentReceipt extends PaymentReceipt {
   paymentReceiptRescindedDate: Timestamp;
 }
 
-export interface ChargebackReceipt extends CreatePaymentReceiptParams {
+export interface ChargebackReceipt extends BaseQuote {
   chargebackReceiptId: ChargebackReceiptId;
+  paymentReceiptId: PaymentReceiptId;
   chargebackReason: string;
   chargebackReceiptDate: Timestamp;
 }

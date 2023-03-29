@@ -143,16 +143,8 @@ export class PostgresDatabase implements Database {
       paymentReceipt,
     });
 
-    const {
-      amount,
-      currencyType,
-      destinationAddress,
-      destinationAddressType,
-      paymentProvider,
-      topUpQuoteId,
-      paymentReceiptId,
-      winstonCreditAmount,
-    } = paymentReceipt;
+    const { topUpQuoteId, paymentReceiptId, amount, currencyType } =
+      paymentReceipt;
 
     await this.knex.transaction(async (knexTransaction) => {
       const topUpQuoteDbResults = await knexTransaction<TopUpQuoteDBResult>(
@@ -166,6 +158,22 @@ export class PostgresDatabase implements Database {
         );
       }
 
+      const {
+        amount: topUpAmount,
+        currency_type,
+        destination_address,
+        destination_address_type,
+        payment_provider,
+        winston_credit_amount,
+      } = topUpQuoteDbResults[0];
+
+      if (+topUpAmount !== amount || currencyType !== currency_type) {
+        // TODO: Whats the business logic to handle this. Refund the amount? Or credit the amount paid
+        throw Error(
+          `Amount from top up quote (${topUpAmount} ${currency_type}) does not match the amount paid on the payment receipt (${amount} ${currencyType})!`
+        );
+      }
+
       // Expire the existing top up quote
       await knexTransaction<TopUpQuoteDBResult>(tableNames.topUpQuote)
         .where({
@@ -175,25 +183,27 @@ export class PostgresDatabase implements Database {
 
       const destinationUser = (
         await knexTransaction<UserDBResult>(tableNames.user).where({
-          user_address: destinationAddress,
+          user_address: destination_address,
         })
       )[0];
       if (destinationUser === undefined) {
         // No user exists, create new user with balance
         await knexTransaction<UserDBResult>(tableNames.user).insert({
-          user_address: destinationAddress,
-          user_address_type: destinationAddressType,
-          winston_credit_balance: winstonCreditAmount.toString(),
+          user_address: destination_address,
+          user_address_type: destination_address_type,
+          winston_credit_balance: winston_credit_amount,
         });
       } else {
         // Increment balance of existing user
         const currentBalance = new Winston(
           destinationUser.winston_credit_balance
         );
-        const newBalance = currentBalance.plus(winstonCreditAmount);
+        const newBalance = currentBalance.plus(
+          new Winston(winston_credit_amount)
+        );
         await knexTransaction<UserDBResult>(tableNames.user)
           .where({
-            user_address: destinationAddress,
+            user_address: destination_address,
           })
           .update({ winston_credit_balance: newBalance.toString() });
       }
@@ -204,12 +214,12 @@ export class PostgresDatabase implements Database {
       ).insert({
         amount: amount.toString(),
         currency_type: currencyType,
-        destination_address: destinationAddress,
-        destination_address_type: destinationAddressType,
-        payment_provider: paymentProvider,
+        destination_address,
+        destination_address_type,
+        payment_provider,
         top_up_quote_id: topUpQuoteId,
         payment_receipt_id: paymentReceiptId,
-        winston_credit_amount: winstonCreditAmount.toString(),
+        winston_credit_amount,
       });
     });
   }

@@ -20,8 +20,10 @@ export async function handlePaymentSuccessEvent(
   const paymentReceiptId = randomUUID();
 
   await paymentDatabase.createPaymentReceipt({
-    ...topUpQuote,
     paymentReceiptId,
+    amount: pi.amount,
+    currencyType: pi.currency,
+    topUpQuoteId,
   });
 
   logger.info(`Payment Receipt created!`, { paymentReceiptId, topUpQuote });
