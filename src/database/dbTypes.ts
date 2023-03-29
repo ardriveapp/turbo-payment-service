@@ -18,7 +18,7 @@ export type JsonSerializable =
   | JsonSerializable[];
 
 // TODO: Promotional Info Schema. We will use JSON object
-export type PromotionalInfo = JsonSerializable;
+export type PromotionalInfo = Record<string, JsonSerializable>;
 
 // TODO: Use all generated UUIDs or use IDs from payment providers?
 type IdType = string;
