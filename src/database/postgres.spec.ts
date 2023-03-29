@@ -6,6 +6,7 @@ import { Winston } from "../types/winston";
 import { tableNames } from "./dbConstants";
 import {
   ChargebackReceiptDBResult,
+  FailedTopUpQuoteDBResult,
   PaymentReceiptDBResult,
   TopUpQuoteDBResult,
   UserDBResult,
@@ -111,10 +112,39 @@ describe("PostgresDatabase class", () => {
       ).where({ top_up_quote_id: sunnyId });
       expect(topUpQuoteDbResults.length).to.equal(0);
 
-      const failedTopUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
-        tableNames.failedTopUpQuote
-      ).where({ top_up_quote_id: sunnyId });
+      const failedTopUpQuoteDbResults = await db[
+        "knex"
+      ]<FailedTopUpQuoteDBResult>(tableNames.failedTopUpQuote).where({
+        top_up_quote_id: sunnyId,
+      });
       expect(failedTopUpQuoteDbResults.length).to.equal(1);
+
+      const {
+        amount,
+        currency_type,
+        destination_address,
+        destination_address_type,
+        payment_provider,
+        quote_creation_date,
+        quote_expiration_date,
+        quote_failed_date,
+        top_up_quote_id,
+        winston_credit_amount,
+      } = failedTopUpQuoteDbResults[0];
+      console.log("failedTopUpQuoteDbResults[0]", failedTopUpQuoteDbResults[0]);
+
+      expect(amount).to.equal("100");
+      expect(currency_type).to.equal("usd");
+      expect(destination_address).to.equal(
+        "1234567890123456789012345678901231234567890"
+      );
+      expect(destination_address_type).to.equal("arweave");
+      expect(payment_provider).to.equal("stripe");
+      expect(quote_creation_date).to.exist;
+      expect(quote_failed_date).to.exist;
+      expect(quote_expiration_date).to.exist;
+      expect(top_up_quote_id).to.equal(sunnyId);
+      expect(winston_credit_amount).to.equal("1337");
     });
   });
 
