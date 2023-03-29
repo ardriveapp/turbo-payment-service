@@ -17,6 +17,7 @@ import {
   CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
+  FulfilledTopUpQuoteDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
   PromotionalInfo,
@@ -175,11 +176,18 @@ export class PostgresDatabase implements Database {
       }
 
       // Expire the existing top up quote
-      await knexTransaction<TopUpQuoteDBResult>(tableNames.topUpQuote)
+      const topUpQuote = await knexTransaction<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      )
         .where({
           top_up_quote_id: topUpQuoteId,
         })
-        .update({ quote_expiration_date: new Date().toISOString() });
+        .del()
+        .returning("*");
+
+      await knexTransaction<FulfilledTopUpQuoteDBResult>(
+        tableNames.fulfilledTopUpQuote
+      ).insert(topUpQuote);
 
       const destinationUser = (
         await knexTransaction<UserDBResult>(tableNames.user).where({

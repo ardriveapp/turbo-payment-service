@@ -131,7 +131,6 @@ describe("PostgresDatabase class", () => {
         top_up_quote_id,
         winston_credit_amount,
       } = failedTopUpQuoteDbResults[0];
-      console.log("failedTopUpQuoteDbResults[0]", failedTopUpQuoteDbResults[0]);
 
       expect(amount).to.equal("100");
       expect(currency_type).to.equal("usd");
@@ -226,7 +225,7 @@ describe("PostgresDatabase class", () => {
       expect(winston_credit_amount).to.equal("60000");
     });
 
-    it("creates the expected new user as expected when an existing user address cannot be found", async () => {
+    it("creates the expected new user when an existing user address cannot be found", async () => {
       const user = await db["knex"]<UserDBResult>(tableNames.user).where({
         user_address: newUserAddress,
       });
@@ -260,17 +259,20 @@ describe("PostgresDatabase class", () => {
       const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       );
-      expect(topUpQuoteDbResults.map((r) => r.top_up_quote_id)).to.not.include([
-        newUserTopUpId,
-        oldUserTopUpId,
-      ]);
+      const topUpIds = topUpQuoteDbResults.map((r) => r.top_up_quote_id);
+
+      expect(topUpIds).to.not.include(newUserTopUpId);
+      expect(topUpIds).to.not.include(oldUserTopUpId);
 
       const fulfilledTopUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
         tableNames.fulfilledTopUpQuote
       );
-      expect(
-        fulfilledTopUpQuoteDbResults.map((r) => r.top_up_quote_id)
-      ).to.not.include([newUserTopUpId, oldUserTopUpId]);
+      const fulfilledTopUpIds = fulfilledTopUpQuoteDbResults.map(
+        (r) => r.top_up_quote_id
+      );
+
+      expect(fulfilledTopUpIds).to.include(newUserTopUpId);
+      expect(fulfilledTopUpIds).to.include(oldUserTopUpId);
     });
 
     it("errors as expected when top up quote amount is mismatched", async () => {
