@@ -228,38 +228,40 @@ export class PostgresDatabase implements Database {
     paymentReceiptId: string,
     knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
   ): Promise<PaymentReceipt> {
-    const paymentReceiptDbResult =
-      await knexTransaction<PaymentReceiptDBResult>(
-        tableNames.paymentReceipt
-      ).where({
-        [columnNames.paymentReceiptId]: paymentReceiptId,
-      });
-    if (paymentReceiptDbResult.length === 0) {
-      throw Error(
-        `No payment receipt found in database with ID '${paymentReceiptId}'`
-      );
-    }
-
-    return paymentReceiptDbResult.map(paymentReceiptDBMap)[0];
+    return this.getPaymentReceiptWhere(
+      { [columnNames.paymentReceiptId]: paymentReceiptId },
+      knexTransaction
+    );
   }
 
-  public async getPaymentReceiptByTopUpQuoteId(
+  private async getPaymentReceiptByTopUpQuoteId(
     topUpQuoteId: string,
     knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
   ): Promise<PaymentReceipt> {
-    const paymentReceiptDbResult =
+    return this.getPaymentReceiptWhere(
+      { [columnNames.topUpQuoteId]: topUpQuoteId },
+      knexTransaction
+    );
+  }
+
+  private async getPaymentReceiptWhere(
+    where: Partial<PaymentReceiptDBResult>,
+    knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
+  ): Promise<PaymentReceipt> {
+    const paymentReceiptDbResults =
       await knexTransaction<PaymentReceiptDBResult>(
         tableNames.paymentReceipt
-      ).where({
-        [columnNames.topUpQuoteId]: topUpQuoteId,
-      });
-    if (paymentReceiptDbResult.length === 0) {
+      ).where(where);
+
+    if (paymentReceiptDbResults.length === 0) {
       throw Error(
-        `No payment receipt found in database with top up quote ID '${topUpQuoteId}'`
+        `No payment receipts found in database with query ${JSON.stringify(
+          where
+        )}!`
       );
     }
 
-    return paymentReceiptDbResult.map(paymentReceiptDBMap)[0];
+    return paymentReceiptDbResults.map(paymentReceiptDBMap)[0];
   }
 
   public async createChargebackReceipt({

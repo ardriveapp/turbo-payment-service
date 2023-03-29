@@ -349,7 +349,7 @@ describe("PostgresDatabase class", () => {
       await expectAsyncErrorThrow({
         promiseToError: db.getPaymentReceipt("Non Existent ID"),
         errorMessage:
-          "No payment receipt found in database with ID 'Non Existent ID'",
+          'No payment receipts found in database with query {"payment_receipt_id":"Non Existent ID"}!',
       });
     });
   });
@@ -442,7 +442,7 @@ describe("PostgresDatabase class", () => {
           chargebackReceiptId: "chargeback receipts 1",
           chargebackReason: "Stripe Dispute Webhook Event",
         }),
-        errorMessage: `No payment receipt found in database with top up quote ID 'No ID Found!!!!!'`,
+        errorMessage: `No payment receipt found in database with query {"top_up_quote_id":"No ID Found!!!!!"}!`,
       });
 
       expect(
