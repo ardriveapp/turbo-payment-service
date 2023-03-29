@@ -442,7 +442,7 @@ describe("PostgresDatabase class", () => {
           chargebackReceiptId: "chargeback receipts 1",
           chargebackReason: "Stripe Dispute Webhook Event",
         }),
-        errorMessage: `No payment receipt found in database with query {"top_up_quote_id":"No ID Found!!!!!"}!`,
+        errorMessage: `No payment receipts found in database with query {"top_up_quote_id":"No ID Found!!!!!"}!`,
       });
 
       expect(
