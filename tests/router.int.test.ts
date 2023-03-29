@@ -129,7 +129,7 @@ describe("Router tests", () => {
 
     const { status, data } = await axios.get(`${localTestUrl}/v1/balance`, {
       headers: {
-        "x-public-key": publicKey.replace(/\r?\n|\r/g, ""),
+        "x-public-key": toB64Url(Buffer.from(publicKey)),
         "x-nonce": nonce,
         "x-signature": toB64Url(Buffer.from(signature)),
       },
