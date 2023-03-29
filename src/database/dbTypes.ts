@@ -1,10 +1,8 @@
 import { WC } from "../types/arc";
+import { PublicArweaveAddress } from "../types/types";
 
-/** In this MVP this will be an Arweave Public Address */
-export type UserAddress = string;
-
-/** For MVP, this is: "arweave" */
-export type UserAddressType = string;
+export type UserAddress = string | PublicArweaveAddress;
+export type UserAddressType = string | "arweave";
 
 /** Currently using Postgres Date type (ISO String without Timezone) */
 export type Timestamp = string;
@@ -20,20 +18,18 @@ export type JsonSerializable =
 // TODO: Promotional Info Schema. We will use JSON object
 export type PromotionalInfo = Record<string, JsonSerializable>;
 
-// TODO: Use all generated UUIDs or use IDs from payment providers?
 type IdType = string;
 
 export type TopUpQuoteId = IdType;
 export type PaymentReceiptId = IdType;
 export type ChargebackReceiptId = IdType;
 
-export type Amount = number;
+export type PaymentAmount = number;
 
-// TODO: Define these types here? e.g: `'usd' | 'etc'`
+// TODO: Should we define these types here? e.g: `'usd' | 'etc'`
 export type CurrencyType = string;
 
-// TODO: Define these types here? e.g: `'stripe' | 'apple-pay'`
-export type PaymentProvider = string;
+export type PaymentProvider = string | "stripe"; // TODO: "apple-pay"
 
 export interface User {
   userAddress: UserAddress;
@@ -42,14 +38,17 @@ export interface User {
   promotionalInfo: PromotionalInfo;
 }
 
-export interface TopUpQuote {
+interface BaseQuote {
   topUpQuoteId: TopUpQuoteId;
   destinationAddress: UserAddress;
   destinationAddressType: UserAddressType;
-  amount: Amount;
+  amount: PaymentAmount;
   currencyType: CurrencyType;
   winstonCreditAmount: WC;
   paymentProvider: PaymentProvider;
+}
+
+export interface TopUpQuote extends BaseQuote {
   quoteExpirationDate: Timestamp;
   quoteCreationDate: Timestamp;
 }
@@ -63,15 +62,8 @@ export interface FailedTopUpQuote extends TopUpQuote {
   quoteFailedDate: Timestamp;
 }
 
-export interface PaymentReceipt {
+export interface PaymentReceipt extends BaseQuote {
   paymentReceiptId: PaymentReceiptId;
-  destinationAddress: UserAddress;
-  destinationAddressType: UserAddressType;
-  amount: Amount;
-  currencyType: CurrencyType;
-  winstonCreditAmount: WC;
-  topUpQuoteId: TopUpQuoteId;
-  paymentProvider: PaymentProvider;
   paymentReceiptDate: Timestamp;
 }
 export type CreatePaymentReceiptParams = Omit<
@@ -83,16 +75,8 @@ export interface RescindedPaymentReceipt extends PaymentReceipt {
   paymentReceiptRescindedDate: Timestamp;
 }
 
-export interface ChargebackReceipt {
+export interface ChargebackReceipt extends CreatePaymentReceiptParams {
   chargebackReceiptId: ChargebackReceiptId;
-  destinationAddress: UserAddress;
-  destinationAddressType: UserAddressType;
-  amount: Amount;
-  currencyType: CurrencyType;
-  winstonCreditAmount: WC;
-  paymentReceiptId: PaymentReceiptId;
-  topUpQuoteId: TopUpQuoteId;
-  paymentProvider: PaymentProvider;
   chargebackReason: string;
   chargebackReceiptDate: Timestamp;
 }
@@ -113,7 +97,7 @@ export interface UserDBResult extends UserDBInsert {
   promotional_info: JsonSerializable;
 }
 
-export interface TopUpQuoteDBInsert {
+export interface BaseQuoteInsert {
   top_up_quote_id: string;
   destination_address: string;
   destination_address_type: string;
@@ -121,6 +105,9 @@ export interface TopUpQuoteDBInsert {
   currency_type: string;
   winston_credit_amount: string;
   payment_provider: string;
+}
+
+export interface TopUpQuoteDBInsert extends BaseQuoteInsert {
   quote_expiration_date: string;
 }
 export interface TopUpQuoteDBResult extends TopUpQuoteDBInsert {
@@ -137,15 +124,8 @@ export type FailedTopUpQuoteDBInsert = TopUpQuoteDBResult;
 export interface FailedTopUpQuoteDBResult extends FailedTopUpQuoteDBInsert {
   quote_failed_date: string;
 }
-export interface PaymentReceiptDBInsert {
+export interface PaymentReceiptDBInsert extends BaseQuoteInsert {
   payment_receipt_id: string;
-  destination_address: string;
-  destination_address_type: string;
-  amount: string;
-  currency_type: string;
-  winston_credit_amount: string;
-  top_up_quote_id: string;
-  payment_provider: string;
 }
 export interface PaymentReceiptDBResult extends PaymentReceiptDBInsert {
   payment_receipt_date: string;
@@ -157,16 +137,8 @@ export interface RescindedPaymentReceiptDBResult
   payment_receipt_rescinded_date: string;
 }
 
-export interface ChargebackReceiptDBInsert {
+export interface ChargebackReceiptDBInsert extends PaymentReceiptDBInsert {
   chargeback_receipt_id: string;
-  destination_address: string;
-  destination_address_type: string;
-  amount: string;
-  currency_type: string;
-  winston_credit_amount: string;
-  payment_receipt_id: string;
-  top_up_quote_id: string;
-  payment_provider: string;
   chargeback_reason: string;
 }
 export interface ChargebackReceiptDBResult extends ChargebackReceiptDBInsert {

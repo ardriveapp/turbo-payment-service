@@ -17,12 +17,7 @@ type TableNameValues = (typeof tableNames)[TableNameKeys];
 export const stubArweaveUserAddress: UserAddress =
   "1234567890123456789012345678901231234567890";
 
-interface StubTopUpQuoteParams {
-  top_up_quote_id?: string;
-  quote_expiration_date?: string;
-  amount?: string;
-  winston_credit_amount?: string;
-}
+type StubTopUpQuoteParams = Partial<TopUpQuoteDBInsert>;
 
 function stubTopUpQuoteInsert({
   top_up_quote_id = "The Stubbiest Top Up Quote",
@@ -42,13 +37,7 @@ function stubTopUpQuoteInsert({
   };
 }
 
-interface StubPaymentReceiptParams {
-  payment_receipt_id?: string;
-  top_up_quote_id?: string;
-  destination_address?: string;
-  amount?: string;
-  winston_credit_amount?: string;
-}
+type StubPaymentReceiptParams = Partial<PaymentReceiptDBInsert>;
 
 function stubPaymentReceiptInsert({
   amount = "100",
@@ -69,13 +58,12 @@ function stubPaymentReceiptInsert({
   };
 }
 
+type StubChargebackReceiptParams = Partial<ChargebackReceiptDBInsert>;
+
 function stubChargebackReceiptInsert({
   chargeback_receipt_id = "The Stubbiest Chargeback Receipt",
   payment_receipt_id = "The Stubbiest Payment Receipt Id",
-}: {
-  chargeback_receipt_id?: string;
-  payment_receipt_id?: string;
-}): ChargebackReceiptDBInsert {
+}: StubChargebackReceiptParams): ChargebackReceiptDBInsert {
   return {
     amount: "100",
     currency_type: "usd",
@@ -90,10 +78,7 @@ function stubChargebackReceiptInsert({
   };
 }
 
-interface StubUserParams {
-  user_address?: string;
-  winston_credit_balance?: string;
-}
+type StubUserParams = Partial<UserDBInsert>;
 
 function stubUserInsert({
   user_address = "The Stubbiest User",
