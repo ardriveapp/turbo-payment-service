@@ -155,12 +155,12 @@ export class PostgresDatabase implements Database {
     } = paymentReceipt;
 
     await this.knex.transaction(async (knexTransaction) => {
-      const topUp = await knexTransaction<TopUpQuoteDBResult>(
+      const topUpQuoteDbResults = await knexTransaction<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       ).where({
         top_up_quote_id: topUpQuoteId,
       });
-      if (topUp.length === 0) {
+      if (topUpQuoteDbResults.length === 0) {
         throw Error(
           `No top up quote found in database for payment receipt id '${paymentReceiptId}'`
         );
