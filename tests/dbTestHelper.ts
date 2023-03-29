@@ -24,11 +24,13 @@ function stubTopUpQuoteInsert({
   quote_expiration_date = new Date("2023-03-23 16:20:00").toISOString(),
   amount = "100",
   winston_credit_amount = "1337",
+  currency_type = "usd",
+  destination_address = stubArweaveUserAddress,
 }: StubTopUpQuoteParams): TopUpQuoteDBInsert {
   return {
     amount,
-    currency_type: "usd",
-    destination_address: stubArweaveUserAddress,
+    currency_type,
+    destination_address,
     destination_address_type: "arweave",
     quote_expiration_date,
     payment_provider: "stripe",

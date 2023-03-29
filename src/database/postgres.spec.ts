@@ -161,19 +161,18 @@ describe("PostgresDatabase class", () => {
     before(async () => {
       // Create Payment Receipt for New User
       await dbTestHelper.insertStubTopUpQuote({
+        amount: "10101",
+        currency_type: "can",
+        destination_address: newUserAddress,
+        destination_address_type: "arweave",
         top_up_quote_id: newUserTopUpId,
+        winston_credit_amount: "60000",
       });
       await db.createPaymentReceipt({
-        amount: 10101,
         currencyType: "can",
-        destinationAddress: newUserAddress,
-        destinationAddressType: "arweave",
+        amount: 10101,
         topUpQuoteId: newUserTopUpId,
-        paymentProvider: "stripe",
         paymentReceiptId: "Unique Identifier",
-        winstonCreditAmount: new Winston(
-          Number.MAX_SAFE_INTEGER.toString() + "00"
-        ),
       });
 
       await dbTestHelper.insertStubUser({
@@ -184,16 +183,17 @@ describe("PostgresDatabase class", () => {
       // Create Payment Receipt for Existing User
       await dbTestHelper.insertStubTopUpQuote({
         top_up_quote_id: oldUserTopUpId,
+        amount: "1337",
+        currency_type: "fra",
+        destination_address: oldUserAddress,
+        destination_address_type: "arweave",
+        winston_credit_amount: oldUserPaymentAmount.toString(),
       });
       await db.createPaymentReceipt({
         amount: 1337,
         currencyType: "fra",
-        destinationAddress: oldUserAddress,
-        destinationAddressType: "arweave",
         topUpQuoteId: oldUserTopUpId,
-        paymentProvider: "stripe",
         paymentReceiptId: "An Existing User's Unique Identifier",
-        winstonCreditAmount: oldUserPaymentAmount,
       });
     });
 
@@ -223,9 +223,7 @@ describe("PostgresDatabase class", () => {
       expect(payment_receipt_date).to.exist;
       expect(payment_receipt_id).to.equal("Unique Identifier");
       expect(top_up_quote_id).to.equal(newUserTopUpId);
-      expect(winston_credit_amount).to.equal(
-        Number.MAX_SAFE_INTEGER.toString() + "00"
-      );
+      expect(winston_credit_amount).to.equal("60000");
     });
 
     it("creates the expected new user as expected when an existing user address cannot be found", async () => {
@@ -244,9 +242,7 @@ describe("PostgresDatabase class", () => {
       expect(promotional_info).to.deep.equal({});
       expect(user_address).to.equal(newUserAddress);
       expect(user_address_type).to.equal("arweave");
-      expect(winston_credit_balance).to.equal(
-        Number.MAX_SAFE_INTEGER.toString() + "00"
-      );
+      expect(winston_credit_balance).to.equal("60000");
     });
 
     it("increments existing user's balance as expected", async () => {
@@ -277,17 +273,42 @@ describe("PostgresDatabase class", () => {
       ).to.not.include([newUserTopUpId, oldUserTopUpId]);
     });
 
+    it("errors as expected when top up quote amount is mismatched", async () => {
+      await dbTestHelper.insertStubTopUpQuote({
+        top_up_quote_id:
+          "A Top Up Quote ID That will be mismatched by currency amount",
+        amount: "500",
+        currency_type: "any",
+      });
+
+      await expectAsyncErrorThrow({
+        promiseToError: db.createPaymentReceipt({
+          amount: 200,
+          currencyType: "any",
+          topUpQuoteId:
+            "A Top Up Quote ID That will be mismatched by currency amount",
+          paymentReceiptId: "This is not fine",
+        }),
+        errorMessage:
+          "Amount from top up quote (500 any) does not match the amount paid on the payment receipt (200 any)!",
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.paymentReceipt).where({
+            payment_receipt_id: "This is fine",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
     it("errors as expected when no top up quote can be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.createPaymentReceipt({
           amount: 1,
           currencyType: "usd",
-          destinationAddress: "will fail",
-          destinationAddressType: "arweave",
           topUpQuoteId: "A Top Up Quote ID That will be NOT FOUND",
-          paymentProvider: "stripe",
           paymentReceiptId: "This is fine",
-          winstonCreditAmount: new Winston(500),
         }),
         errorMessage:
           "No top up quote found in database for payment receipt id 'This is fine'",
