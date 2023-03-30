@@ -25,8 +25,8 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
       nonce: nonce as string,
     });
     if (isVerified) {
-      //Attach wallet address for the next middleware
-      ctx.state.walletAddress = publicPemToArweaveAddress(publicKey);
+      // Attach wallet address for the next middleware
+      ctx.state.walletAddress = await publicPemToArweaveAddress(publicPem);
       await next();
     }
   } catch (error) {

@@ -18,7 +18,10 @@ describe("Schema class", () => {
     await Schema.create(knex);
 
     // Run integration tests after schema tests to avoid race conditions in the test env database
-    // require("./postgres.spec");
+    require("./postgres.spec");
+    require("../routes/stripe/eventHandlers/disputeCreatedEventHandler.spec");
+    require("../routes/stripe/eventHandlers/paymentFailedEventHandler.spec");
+    require("../routes/stripe/eventHandlers/paymentSuccessEventHandler.spec");
   });
 
   it("after running latest knex migrations with knex CLI from docker-test.sh, all expected tables exists", async () => {
@@ -27,9 +30,12 @@ describe("Schema class", () => {
     expect(allTables.rows.map((t) => t.table_name)).to.deep.equal([
       // Tables are returned alphabetized
       "chargeback_receipt",
+      "failed_top_up_quote",
+      "fulfilled_top_up_quote",
       "knex_migrations",
       "knex_migrations_lock",
       "payment_receipt",
+      "rescinded_payment_receipt",
       "top_up_quote",
       "user",
     ]);
@@ -60,11 +66,59 @@ describe("Schema class", () => {
     });
   });
 
+  it("creates a `fulfilled_top_up_quote` table that has the expected column structure", async () => {
+    const columnInfo = await knex("fulfilled_top_up_quote").columnInfo();
+    expect(columnInfo).to.deep.equal({
+      top_up_quote_id,
+      destination_address,
+      destination_address_type,
+      amount,
+      currency_type,
+      winston_credit_amount,
+      quote_expiration_date,
+      quote_creation_date,
+      quote_fulfilled_date,
+      payment_provider,
+    });
+  });
+
+  it("creates a `failed_top_up_quote` table that has the expected column structure", async () => {
+    const columnInfo = await knex("failed_top_up_quote").columnInfo();
+    expect(columnInfo).to.deep.equal({
+      top_up_quote_id,
+      destination_address,
+      destination_address_type,
+      amount,
+      currency_type,
+      winston_credit_amount,
+      quote_expiration_date,
+      quote_creation_date,
+      quote_failed_date,
+      payment_provider,
+    });
+  });
+
   it("creates a `payment_receipt` table that has the expected column structure", async () => {
     const columnInfo = await knex("payment_receipt").columnInfo();
     expect(columnInfo).to.deep.equal({
       payment_receipt_id,
       payment_receipt_date,
+      destination_address,
+      destination_address_type,
+      amount,
+      currency_type,
+      winston_credit_amount,
+      top_up_quote_id,
+      payment_provider,
+    });
+  });
+
+  it("creates a `rescinded_payment_receipt` table that has the expected column structure", async () => {
+    const columnInfo = await knex("rescinded_payment_receipt").columnInfo();
+    expect(columnInfo).to.deep.equal({
+      payment_receipt_id,
+      payment_receipt_date,
+      payment_receipt_rescinded_date,
       destination_address,
       destination_address_type,
       amount,
@@ -83,6 +137,7 @@ describe("Schema class", () => {
       chargeback_receipt_date,
       destination_address,
       destination_address_type,
+      top_up_quote_id,
       amount,
       currency_type,
       winston_credit_amount,
@@ -114,6 +169,9 @@ const {
   payment_provider,
   payment_receipt_date,
   payment_receipt_id,
+  payment_receipt_rescinded_date,
+  quote_failed_date,
+  quote_fulfilled_date,
   top_up_quote_id,
   promotional_info,
   quote_creation_date,

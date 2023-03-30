@@ -1,0 +1,675 @@
+import { expect } from "chai";
+
+import { DbTestHelper } from "../../tests/dbTestHelper";
+import { expectAsyncErrorThrow } from "../../tests/helpers/testHelpers";
+import { Winston } from "../types/winston";
+import { tableNames } from "./dbConstants";
+import {
+  ChargebackReceiptDBResult,
+  FailedTopUpQuoteDBResult,
+  PaymentReceiptDBResult,
+  TopUpQuoteDBResult,
+  UserDBResult,
+} from "./dbTypes";
+import { PostgresDatabase } from "./postgres";
+
+describe("PostgresDatabase class", () => {
+  const db = new PostgresDatabase();
+  const dbTestHelper = new DbTestHelper(db);
+
+  describe("createTopUpQuote method", () => {
+    const quoteExpirationDate = new Date(
+      "2023-03-23 12:34:56.789Z"
+    ).toISOString();
+
+    before(async () => {
+      // TODO: Before sending to DB and creating top up quote we should use safer types:
+      // -  validate this address is a public arweave address (and address type is arweave)
+      // -  validate payment provider is expected
+      // -  validate currency type is supported
+      await db.createTopUpQuote({
+        amount: 100,
+        currencyType: "usd",
+        destinationAddress: "XYZ",
+        destinationAddressType: "arweave",
+        quoteExpirationDate,
+        paymentProvider: "stripe",
+        topUpQuoteId: "Unique Identifier",
+        winstonCreditAmount: new Winston(500),
+      });
+    });
+
+    it("creates the expected top up quote in the database", async () => {
+      const topUpQuote = await db["knex"]<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      ).where({ top_up_quote_id: "Unique Identifier" });
+      expect(topUpQuote.length).to.equal(1);
+
+      const {
+        amount,
+        currency_type,
+        destination_address,
+        destination_address_type,
+        payment_provider,
+        quote_creation_date,
+        quote_expiration_date,
+        top_up_quote_id,
+        winston_credit_amount,
+      } = topUpQuote[0];
+
+      expect(amount).to.equal("100");
+      expect(currency_type).to.equal("usd");
+      expect(destination_address).to.equal("XYZ");
+      expect(destination_address_type).to.equal("arweave");
+      expect(payment_provider).to.equal("stripe");
+      expect(quote_creation_date).to.exist;
+      expect(new Date(quote_expiration_date).toISOString()).to.equal(
+        quoteExpirationDate
+      );
+      expect(top_up_quote_id).to.equal("Unique Identifier");
+      expect(winston_credit_amount).to.equal("500");
+    });
+  });
+
+  describe("getTopUpQuote method", () => {
+    const pantsId = "Pants 👖";
+    const shortsId = "Shorts 🩳";
+
+    before(async () => {
+      await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: pantsId });
+      await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: shortsId });
+    });
+
+    it("returns the expected top up quotes", async () => {
+      const pantsQuote = await db.getTopUpQuote(pantsId);
+      const shortsQuote = await db.getTopUpQuote(shortsId);
+
+      expect(pantsQuote.topUpQuoteId).to.equal(pantsId);
+      expect(shortsQuote.topUpQuoteId).to.equal(shortsId);
+    });
+
+    it("errors as expected when top up quote cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.getTopUpQuote("Non Existent ID"),
+        errorMessage:
+          "No top up quote found in database with ID 'Non Existent ID'",
+      });
+    });
+  });
+
+  describe("expireTopUpQuote method", () => {
+    const sunnyId = "Sunny 🌞";
+
+    before(async () => {
+      await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: sunnyId });
+    });
+
+    it("deletes the top_up_quote entity and inserts a failed_top_up_quote", async () => {
+      await db.expireTopUpQuote(sunnyId);
+
+      const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      ).where({ top_up_quote_id: sunnyId });
+      expect(topUpQuoteDbResults.length).to.equal(0);
+
+      const failedTopUpQuoteDbResults = await db[
+        "knex"
+      ]<FailedTopUpQuoteDBResult>(tableNames.failedTopUpQuote).where({
+        top_up_quote_id: sunnyId,
+      });
+      expect(failedTopUpQuoteDbResults.length).to.equal(1);
+
+      const {
+        amount,
+        currency_type,
+        destination_address,
+        destination_address_type,
+        payment_provider,
+        quote_creation_date,
+        quote_expiration_date,
+        quote_failed_date,
+        top_up_quote_id,
+        winston_credit_amount,
+      } = failedTopUpQuoteDbResults[0];
+
+      expect(amount).to.equal("100");
+      expect(currency_type).to.equal("usd");
+      expect(destination_address).to.equal(
+        "1234567890123456789012345678901231234567890"
+      );
+      expect(destination_address_type).to.equal("arweave");
+      expect(payment_provider).to.equal("stripe");
+      expect(quote_creation_date).to.exist;
+      expect(quote_failed_date).to.exist;
+      expect(quote_expiration_date).to.exist;
+      expect(top_up_quote_id).to.equal(sunnyId);
+      expect(winston_credit_amount).to.equal("1337");
+    });
+  });
+
+  describe("createPaymentReceipt method", () => {
+    const newUserAddress = "New User 👶";
+    const oldUserAddress = "Old User 🧓";
+
+    const newUserTopUpId = "New Top Up ID";
+    const oldUserTopUpId = "Old Top Up ID";
+
+    const oldUserBalance = new Winston("100");
+    const oldUserPaymentAmount = new Winston("500");
+
+    before(async () => {
+      // Create Payment Receipt for New User
+      await dbTestHelper.insertStubTopUpQuote({
+        amount: "10101",
+        currency_type: "can",
+        destination_address: newUserAddress,
+        destination_address_type: "arweave",
+        top_up_quote_id: newUserTopUpId,
+        winston_credit_amount: "60000",
+      });
+      await db.createPaymentReceipt({
+        currencyType: "can",
+        amount: 10101,
+        topUpQuoteId: newUserTopUpId,
+        paymentReceiptId: "Unique Identifier",
+      });
+
+      await dbTestHelper.insertStubUser({
+        user_address: oldUserAddress,
+        winston_credit_balance: oldUserBalance.toString(),
+      });
+
+      // Create Payment Receipt for Existing User
+      await dbTestHelper.insertStubTopUpQuote({
+        top_up_quote_id: oldUserTopUpId,
+        amount: "1337",
+        currency_type: "fra",
+        destination_address: oldUserAddress,
+        destination_address_type: "arweave",
+        winston_credit_amount: oldUserPaymentAmount.toString(),
+      });
+      await db.createPaymentReceipt({
+        amount: 1337,
+        currencyType: "fra",
+        topUpQuoteId: oldUserTopUpId,
+        paymentReceiptId: "An Existing User's Unique Identifier",
+      });
+    });
+
+    it("creates the expected payment_receipt in the database entity", async () => {
+      const paymentReceipt = await db["knex"]<PaymentReceiptDBResult>(
+        tableNames.paymentReceipt
+      ).where({ payment_receipt_id: "Unique Identifier" });
+      expect(paymentReceipt.length).to.equal(1);
+
+      const {
+        amount,
+        currency_type,
+        destination_address,
+        destination_address_type,
+        payment_provider,
+        payment_receipt_date,
+        payment_receipt_id,
+        top_up_quote_id,
+        winston_credit_amount,
+      } = paymentReceipt[0];
+
+      expect(amount).to.equal("10101");
+      expect(currency_type).to.equal("can");
+      expect(destination_address).to.equal(newUserAddress);
+      expect(destination_address_type).to.equal("arweave");
+      expect(payment_provider).to.equal("stripe");
+      expect(payment_receipt_date).to.exist;
+      expect(payment_receipt_id).to.equal("Unique Identifier");
+      expect(top_up_quote_id).to.equal(newUserTopUpId);
+      expect(winston_credit_amount).to.equal("60000");
+    });
+
+    it("creates the expected new user when an existing user address cannot be found", async () => {
+      const user = await db["knex"]<UserDBResult>(tableNames.user).where({
+        user_address: newUserAddress,
+      });
+      expect(user.length).to.equal(1);
+
+      const {
+        promotional_info,
+        user_address,
+        user_address_type,
+        winston_credit_balance,
+      } = user[0];
+
+      expect(promotional_info).to.deep.equal({});
+      expect(user_address).to.equal(newUserAddress);
+      expect(user_address_type).to.equal("arweave");
+      expect(winston_credit_balance).to.equal("60000");
+    });
+
+    it("increments existing user's balance as expected", async () => {
+      const oldUser = await db["knex"]<UserDBResult>(tableNames.user).where({
+        user_address: oldUserAddress,
+      });
+      expect(oldUser.length).to.equal(1);
+
+      expect(oldUser[0].winston_credit_balance).to.equal(
+        oldUserBalance.plus(oldUserPaymentAmount).toString()
+      );
+    });
+
+    it("deletes the top_up_quote and inserts a new fulfilled_top_up_quote as expected", async () => {
+      const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
+        tableNames.topUpQuote
+      );
+      const topUpIds = topUpQuoteDbResults.map((r) => r.top_up_quote_id);
+
+      expect(topUpIds).to.not.include(newUserTopUpId);
+      expect(topUpIds).to.not.include(oldUserTopUpId);
+
+      const fulfilledTopUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
+        tableNames.fulfilledTopUpQuote
+      );
+      const fulfilledTopUpIds = fulfilledTopUpQuoteDbResults.map(
+        (r) => r.top_up_quote_id
+      );
+
+      expect(fulfilledTopUpIds).to.include(newUserTopUpId);
+      expect(fulfilledTopUpIds).to.include(oldUserTopUpId);
+    });
+
+    it("errors as expected when top up quote amount is mismatched", async () => {
+      await dbTestHelper.insertStubTopUpQuote({
+        top_up_quote_id:
+          "A Top Up Quote ID That will be mismatched by currency amount",
+        amount: "500",
+        currency_type: "any",
+      });
+
+      await expectAsyncErrorThrow({
+        promiseToError: db.createPaymentReceipt({
+          amount: 200,
+          currencyType: "any",
+          topUpQuoteId:
+            "A Top Up Quote ID That will be mismatched by currency amount",
+          paymentReceiptId: "This is not fine",
+        }),
+        errorMessage:
+          "Amount from top up quote (500 any) does not match the amount paid on the payment receipt (200 any)!",
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.paymentReceipt).where({
+            payment_receipt_id: "This is fine",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
+    it("errors as expected when no top up quote can be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.createPaymentReceipt({
+          amount: 1,
+          currencyType: "usd",
+          topUpQuoteId: "A Top Up Quote ID That will be NOT FOUND",
+          paymentReceiptId: "This is fine",
+        }),
+        errorMessage:
+          "No top up quote found in database for payment receipt id 'This is fine'",
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.paymentReceipt).where({
+            payment_receipt_id: "This is fine",
+          })
+        ).length
+      ).to.equal(0);
+    });
+  });
+
+  describe("getPaymentReceipt method", () => {
+    const grapesId = "Grapes 🍇";
+    const strawberriesId = "Strawberries 🍓";
+
+    before(async () => {
+      await dbTestHelper.insertStubPaymentReceipt({
+        payment_receipt_id: grapesId,
+      });
+      await dbTestHelper.insertStubPaymentReceipt({
+        payment_receipt_id: strawberriesId,
+      });
+    });
+
+    it("returns the expected payment receipt database entities", async () => {
+      const grapesReceipt = await db.getPaymentReceipt(grapesId);
+      const strawberriesReceipt = await db.getPaymentReceipt(strawberriesId);
+
+      expect(grapesReceipt.paymentReceiptId).to.equal(grapesId);
+      expect(strawberriesReceipt.paymentReceiptId).to.equal(strawberriesId);
+    });
+
+    it("errors as expected when payment receipt cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.getPaymentReceipt("Non Existent ID"),
+        errorMessage:
+          'No payment receipts found in database with query {"payment_receipt_id":"Non Existent ID"}!',
+      });
+    });
+  });
+
+  describe("createChargebackReceipt method", () => {
+    const naughtyUserAddress = "Naughty User 💀";
+
+    const naughtyUserBalance = new Winston("1000");
+    const naughtyPaymentId = "A bad payment receipt ID";
+    const naughtyTopUpQuoteId = "A bad top up quote ID";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: naughtyUserAddress,
+        winston_credit_balance: naughtyUserBalance.toString(),
+      });
+      await dbTestHelper.insertStubPaymentReceipt({
+        payment_receipt_id: naughtyPaymentId,
+        top_up_quote_id: naughtyTopUpQuoteId,
+        destination_address: naughtyUserAddress,
+        winston_credit_amount: "100",
+      });
+      await db.createChargebackReceipt({
+        chargebackReceiptId: "A great Unique Identifier",
+        chargebackReason: "Evil",
+        topUpQuoteId: naughtyTopUpQuoteId,
+      });
+    });
+
+    it("creates the expected chargeback receipt in the database", async () => {
+      const chargebackReceipt = await db["knex"]<ChargebackReceiptDBResult>(
+        tableNames.chargebackReceipt
+      ).where({ chargeback_receipt_id: "A great Unique Identifier" });
+      expect(chargebackReceipt.length).to.equal(1);
+
+      const {
+        amount,
+        currency_type,
+        destination_address,
+        destination_address_type,
+        payment_provider,
+        chargeback_receipt_date,
+        chargeback_receipt_id,
+        payment_receipt_id,
+        winston_credit_amount,
+        chargeback_reason,
+      } = chargebackReceipt[0];
+
+      expect(amount).to.equal("100");
+      expect(currency_type).to.equal("usd");
+      expect(destination_address).to.equal(naughtyUserAddress);
+      expect(destination_address_type).to.equal("arweave");
+      expect(payment_provider).to.equal("stripe");
+      expect(chargeback_receipt_date).to.exist;
+      expect(chargeback_receipt_id).to.equal("A great Unique Identifier");
+      expect(payment_receipt_id).to.equal(payment_receipt_id);
+      expect(winston_credit_amount).to.equal("100");
+      expect(chargeback_reason).to.equal("Evil");
+    });
+
+    it("deletes the payment_receipt entity and inserts a rescinded_payment_receipt", async () => {
+      const paymentReceiptDbResults = await db["knex"]<PaymentReceiptDBResult>(
+        tableNames.paymentReceipt
+      ).where({ payment_receipt_id: naughtyPaymentId });
+      expect(paymentReceiptDbResults.length).to.equal(0);
+
+      const rescindedPaymentReceiptDbResults = await db[
+        "knex"
+      ]<PaymentReceiptDBResult>(tableNames.rescindedPaymentReceipt).where({
+        payment_receipt_id: naughtyPaymentId,
+      });
+      expect(rescindedPaymentReceiptDbResults.length).to.equal(1);
+    });
+
+    it("decrements user's balance as expected", async () => {
+      const oldUser = await db["knex"]<UserDBResult>(tableNames.user).where({
+        user_address: naughtyUserAddress,
+      });
+      expect(oldUser.length).to.equal(1);
+
+      expect(oldUser[0].winston_credit_balance).to.equal(
+        naughtyUserBalance.minus(new Winston("100")).toString()
+      );
+    });
+
+    it("errors as expected when no payment receipt could be found to chargeback", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.createChargebackReceipt({
+          topUpQuoteId: "No ID Found!!!!!",
+          chargebackReceiptId: "chargeback receipts 1",
+          chargebackReason: "Stripe Dispute Webhook Event",
+        }),
+        errorMessage: `No payment receipts found in database with query {"top_up_quote_id":"No ID Found!!!!!"}!`,
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.chargebackReceipt).where({
+            chargeback_receipt_id: "Great value",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
+    it("errors as expected when user has no funds to decrement balance", async () => {
+      const underfundedUserAddress = "Broke 😭";
+
+      await dbTestHelper.insertStubUser({
+        user_address: underfundedUserAddress,
+        winston_credit_balance: "200",
+      });
+      await dbTestHelper.insertStubPaymentReceipt({
+        top_up_quote_id: "New ID 42342",
+        destination_address: underfundedUserAddress,
+      });
+
+      await expectAsyncErrorThrow({
+        promiseToError: db.createChargebackReceipt({
+          topUpQuoteId: "New ID 42342",
+          chargebackReceiptId: "Great value",
+          chargebackReason: "What ?",
+        }),
+        errorMessage: `User with address '${underfundedUserAddress}' does not have enough balance to decrement this chargeback!`,
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.chargebackReceipt).where({
+            chargeback_receipt_id: "Great value",
+          })
+        ).length
+      ).to.equal(0);
+    });
+  });
+
+  describe("getChargebackReceipt method", () => {
+    const breadId = "Bread 🍞";
+    const greensId = "Greens 🥬";
+
+    before(async () => {
+      await dbTestHelper.insertStubChargebackReceipt({
+        chargeback_receipt_id: breadId,
+      });
+      await dbTestHelper.insertStubChargebackReceipt({
+        chargeback_receipt_id: greensId,
+      });
+    });
+
+    it("returns the expected chargeback receipt database entities", async () => {
+      const grapesReceipt = await db.getChargebackReceipt(breadId);
+      const strawberriesReceipt = await db.getChargebackReceipt(greensId);
+
+      expect(grapesReceipt.chargebackReceiptId).to.equal(breadId);
+      expect(strawberriesReceipt.chargebackReceiptId).to.equal(greensId);
+    });
+
+    it("errors as expected when chargeback receipt cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.getChargebackReceipt("Non Existent ID"),
+        errorMessage:
+          "No chargeback receipt found in database with ID 'Non Existent ID'",
+      });
+    });
+  });
+
+  describe("getUser method", () => {
+    const goodAddress = "Good 😇";
+    const evilAddress = "Evil 😈";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({ user_address: goodAddress });
+      await dbTestHelper.insertStubUser({ user_address: evilAddress });
+    });
+
+    it("gets the expected user database entities", async () => {
+      const pantsQuote = await db.getUser(goodAddress);
+      const shortsQuote = await db.getUser(evilAddress);
+
+      expect(pantsQuote.userAddress).to.equal(goodAddress);
+      expect(shortsQuote.userAddress).to.equal(evilAddress);
+    });
+
+    it("errors as expected when user cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.getUser("Non Existent Address"),
+        errorMessage:
+          "No user found in database with address 'Non Existent Address'",
+      });
+    });
+  });
+
+  describe("getPromoInfo method", () => {
+    const unicornAddress = "Unicorn 🦄";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({ user_address: unicornAddress });
+    });
+
+    it("gets the expected user database entities", async () => {
+      const promoInfo = await db.getPromoInfo(unicornAddress);
+
+      expect(promoInfo).to.deep.equal({});
+    });
+
+    it("errors as expected when user cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.getPromoInfo("Non Existent Address"),
+        errorMessage:
+          "No user found in database with address 'Non Existent Address'",
+      });
+    });
+  });
+
+  describe("updatePromoInfo method", () => {
+    const privilegedAddress = "Privileged 🎫";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({ user_address: privilegedAddress });
+    });
+
+    it("updates a user's promotional information as expected", async () => {
+      await db.updatePromoInfo(privilegedAddress, {
+        arioTokenHodler: true,
+        underOneHundredKiBFreeBytes: 100_000_000_000,
+      });
+
+      const promoInfo = await db.getPromoInfo(privilegedAddress);
+
+      expect(promoInfo).to.deep.equal({
+        arioTokenHodler: true,
+        underOneHundredKiBFreeBytes: 100_000_000_000,
+      });
+    });
+
+    it("errors as expected when user cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.updatePromoInfo("Non Existent Address", {
+          newPromo: true,
+        }),
+        errorMessage:
+          "No user found in database with address 'Non Existent Address'",
+      });
+    });
+  });
+
+  describe("reserveBalance method", () => {
+    const richAddress = "Rich 💸";
+    const poorAddress = "Poor 👨🏻‍🏫";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: richAddress,
+        winston_credit_balance: "100000000000",
+      });
+      await dbTestHelper.insertStubUser({
+        user_address: poorAddress,
+        winston_credit_balance: "10",
+      });
+    });
+
+    it("reserves the balance as expected when winston balance is available", async () => {
+      await db.reserveBalance(richAddress, new Winston(500));
+
+      const richUser = await db.getUser(richAddress);
+
+      expect(+richUser.winstonCreditBalance).to.equal(99_999_999_500);
+    });
+
+    it("throws an error as expected when winston balance is not available", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.reserveBalance(poorAddress, new Winston(200)),
+        errorMessage: "User does not have enough balance!",
+      });
+
+      const poorUser = await db.getUser(poorAddress);
+
+      expect(+poorUser.winstonCreditBalance).to.equal(10);
+    });
+
+    it("errors as expected when user cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.reserveBalance(
+          "Non Existent Address",
+          new Winston(1337)
+        ),
+        errorMessage:
+          "No user found in database with address 'Non Existent Address'",
+      });
+    });
+  });
+
+  describe("refundBalance method", () => {
+    const happyAddress = "Happy 😁";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: happyAddress,
+        winston_credit_balance: "2000",
+      });
+    });
+
+    it("refunds the balance as expected", async () => {
+      await db.refundBalance(happyAddress, new Winston(100_000));
+
+      const happyUser = await db.getUser(happyAddress);
+
+      expect(+happyUser.winstonCreditBalance).to.equal(102_000);
+    });
+
+    it("errors as expected when user cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.refundBalance(
+          "Non Existent Address",
+          new Winston(1337)
+        ),
+        errorMessage:
+          "No user found in database with address 'Non Existent Address'",
+      });
+    });
+  });
+});
