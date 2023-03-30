@@ -8,7 +8,7 @@ COPY . .
 RUN yarn && yarn build
 
 # Extract dist
-FROM gcr.io/distroless/nodejs:16
+FROM gcr.io/distroless/nodejs:18
 WORKDIR /usr/src/app
 
 # Add shell

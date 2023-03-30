@@ -27,7 +27,6 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
     if (isVerified) {
       // Attach wallet address for the next middleware
       ctx.state.walletAddress = await publicPemToArweaveAddress(publicPem);
-      await next();
     }
   } catch (error) {
     logger.error(error);
