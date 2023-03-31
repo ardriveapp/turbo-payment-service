@@ -19,8 +19,8 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
   try {
     const price = await pricingService.getWCForFiat(currency, fiatAmount);
     ctx.body = price;
-  } catch (error) {
-    logger.error(error);
+  } catch (error: any) {
+    logger.error(error.message);
     ctx.response.status = 502;
     ctx.body = "Fiat Oracle Unavailable";
   }

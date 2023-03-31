@@ -1,0 +1,106 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      ACCOUNT_ID:
+        required: true
+        type: string
+      AWS_REGION:
+        required: true
+        type: string
+      ENVIRONMENT:
+        required: true
+        type: string
+      ECR_IMAGE:
+        required: true
+        type: string
+      SERVICE_NAME:
+        required: true
+        type: string
+      CLUSTER_NAME:
+        required: true
+        type: string
+      CONTAINER_NAME:
+        required: true
+        type: string
+      INFRA_ACCOUNT_ID:
+        required: true
+        type: string
+    secrets:
+      KEY_ID:
+        required: true
+      ACCESS_KEY:
+        required: true
+
+jobs:
+  configure-and-deploy:
+    # TODO: MOVE TO self-hosted and WAIT FOR DEPLOYMENTS TO FINISH
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ inputs.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.KEY_ID }}
+          aws-secret-access-key: ${{ secrets.ACCESS_KEY }}
+          role-skip-session-tagging: true
+          role-to-assume: arn:aws:iam::${{ inputs.ACCOUNT_ID }}:role/DeploymentRole
+          role-external-id: arn:aws:iam::${{ inputs.INFRA_ACCOUNT_ID }}:role/DeploymentRole
+          role-duration-seconds: 1800 # deploys may take up to 20 mins
+
+      - name: Set AppSpec Hooks from template
+        id: generate-appspec
+        run: |
+          CONTAINER=${{ inputs.CONTAINER_NAME }}
+          AFTER_ALLOW_TEST_TRAFFIC_HOOK=$(aws lambda get-function --function-name bundler-tests-lambda | jq '. | .Configuration.FunctionArn' | tr -d '"')
+          jq --arg AFTER_ALLOW_TEST_TRAFFIC_HOOK $AFTER_ALLOW_TEST_TRAFFIC_HOOK --arg CONTAINER $CONTAINER '.Resources[0].TargetService.Properties.LoadBalancerInfo.ContainerName = $CONTAINER | .Hooks[0].AfterAllowTestTraffic = $AFTER_ALLOW_TEST_TRAFFIC_HOOK' appspec.json | jq . > appspec_deploy.json
+
+      - name: Download task definitions
+        run: |
+          aws ecs describe-task-definition --task-definition ${{ inputs.SERVICE_NAME }} --query taskDefinition > task-definition.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-definition-codedeploy
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ inputs.CONTAINER_NAME }}
+          image: ${{ inputs.ECR_IMAGE }}
+
+      - name: Check and wait for any active deployments to finish
+        id: check-active-deployments
+        env:
+          RETRY_DELAY_SECONDS: 180 # 3 minutes
+          MAX_ATTEMPTS: 10 # 30 minutes total
+        run: |
+          attempts=0
+          in_progress=$(aws deploy list-deployments --application-name ${{ inputs.SERVICE_NAME }} --deployment-group-name ${{ inputs.SERVICE_NAME }} --include-only-statuses "Created" "Queued" "InProgress" | jq '.deployments | length')
+          echo "Deployments in progress: $in_progress"
+          while [ $in_progress -gt 0 ]
+          do
+              if [ $attempts -gt $MAX_ATTEMPTS ]; then
+                echo "Max time limit reached. Exiting deployment."
+                exit 1
+              fi
+              sleep $RETRY_DELAY_SECONDS
+              in_progress=$(aws deploy list-deployments --application-name ${{ inputs.SERVICE_NAME }} --deployment-group-name ${{ inputs.SERVICE_NAME }} --include-only-statuses "Created" "Queued" "InProgress" | jq '.deployments | length')
+              attempts=$((attempts+1))
+              echo "Deployment in progress..waiting for it to complete. Attempt ${attempts}"
+          done
+          echo "No active deployments, continuing with new deployment!"
+
+      - name: Deploy ECS task definition
+        id: codedeploy-deployment
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-definition-codedeploy.outputs.task-definition }}
+          service: ${{ inputs.SERVICE_NAME }}
+          cluster: ${{ inputs.CLUSTER_NAME }}
+          # TODO: ONCE RUNNING ON self-hosted WAIT FOR SERVICE TO FINISH DEPLOYING
+          wait-for-service-stability: false
+          codedeploy-appspec: appspec_deploy.json
+          codedeploy-application: ${{ inputs.SERVICE_NAME }}
+          codedeploy-deployment-group: ${{ inputs.SERVICE_NAME }}
+          codedeploy-deployment-description: ${{ github.sha }}

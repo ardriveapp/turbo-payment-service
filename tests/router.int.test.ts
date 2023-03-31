@@ -5,8 +5,11 @@ import { Server } from "http";
 
 import logger from "../src/logger";
 import { createServer } from "../src/server";
+import { toB64Url } from "../src/utils/base64";
+import { jwkToPem } from "../src/utils/pem";
+import { signData } from "./helpers/signData";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
-import { localTestUrl } from "./helpers/testHelpers";
+import { localTestUrl, testWallet } from "./helpers/testHelpers";
 
 describe("Router tests", () => {
   let server: Server;
@@ -17,8 +20,8 @@ describe("Router tests", () => {
   }
 
   let mock: MockAdapter;
-  beforeEach(() => {
-    server = createServer({});
+  beforeEach(async () => {
+    server = await createServer({});
     mock = new MockAdapter(axios, { onNoMatch: "passthrough" });
   });
 
@@ -93,5 +96,47 @@ describe("Router tests", () => {
       }
     );
     expect(status).to.equal(502);
+  });
+
+  it("GET /balance returns 200 for correct signature", async () => {
+    const nonce = "123";
+    const publicKey = jwkToPem(testWallet, true);
+    const signature = await signData(jwkToPem(testWallet), nonce);
+
+    const { status, statusText, data } = await axios.get(
+      `${localTestUrl}/v1/balance`,
+      {
+        headers: {
+          "x-public-key": toB64Url(Buffer.from(publicKey)),
+          "x-nonce": nonce,
+          "x-signature": toB64Url(Buffer.from(signature)),
+        },
+      }
+    );
+
+    const balance = Number(data);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    expect(balance).to.be.a("number");
+  });
+
+  it("GET /balance returns 403 for bad signature", async () => {
+    const nonce = "123";
+    const publicKey = jwkToPem(testWallet, true);
+    const signature = await signData(jwkToPem(testWallet), "another nonce");
+
+    const { status, data } = await axios.get(`${localTestUrl}/v1/balance`, {
+      headers: {
+        "x-public-key": toB64Url(Buffer.from(publicKey)),
+        "x-nonce": nonce,
+        "x-signature": toB64Url(Buffer.from(signature)),
+      },
+      validateStatus: () => true,
+    });
+
+    expect(data).to.equal("Invalid signature or missing required headers");
+    expect(status).to.equal(403);
   });
 });
