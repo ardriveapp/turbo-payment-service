@@ -5,6 +5,9 @@ import {
 
 import logger from "../logger";
 
+const stripeWebhookSecretName = "stripe-webhook-secret";
+const stripeSecretKeyName = "stripe-secret-key";
+
 export async function loadSecretsToEnv() {
   try {
     require("dotenv").config();
@@ -14,29 +17,29 @@ export async function loadSecretsToEnv() {
   }
 
   if (process.env.NODE_ENV === "test") {
-    //TODO - Just return for now until we handle more secrets
+    // TODO - Just return for now until we handle more secrets
     return;
   }
 
   if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET) {
     return; // Already loaded
   }
-  const stripeSecretKeyInput = {
-    SecretId: "STRIPE_SECRET_KEY",
-  };
 
-  const webhookSecretInput = {
-    SecretId: "STRIPE_WEBHOOK_SECRET",
-  };
-  const client = new SecretsManagerClient({ region: "REGION" });
-  const getStripeSecretKeyCommand = new GetSecretValueCommand(
-    stripeSecretKeyInput
-  );
-  const getWebhookSecretCommand = new GetSecretValueCommand(webhookSecretInput);
+  const client = new SecretsManagerClient({
+    region: process.env.AWS_REGION ?? "us-east-1",
+  });
 
-  const secretKeyResponse = await client.send(getStripeSecretKeyCommand);
-  const webhookSecretResponse = await client.send(getWebhookSecretCommand);
+  const getStripeSecretKeyCommand = new GetSecretValueCommand({
+    SecretId: stripeSecretKeyName,
+  });
+  const getWebhookSecretCommand = new GetSecretValueCommand({
+    SecretId: stripeWebhookSecretName,
+  });
 
-  process.env.STRIPE_SECRET_KEY = secretKeyResponse.SecretString;
-  process.env.STRIPE_WEBHOOK_SECRET = webhookSecretResponse.SecretString;
+  process.env.STRIPE_SECRET_KEY ??= (
+    await client.send(getStripeSecretKeyCommand)
+  ).SecretString;
+  process.env.STRIPE_WEBHOOK_SECRET ??= (
+    await client.send(getWebhookSecretCommand)
+  ).SecretString;
 }

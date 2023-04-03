@@ -9,7 +9,7 @@ const LOG_FORMAT = process.env.LOG_FORMAT ?? "simple";
 
 const logger = createLogger({
   level: LOG_LEVEL,
-  silent: !isTestEnv,
+  silent: isTestEnv,
   format: format.combine(
     format((info) => {
       // Only log stack traces when the log level is error or the
