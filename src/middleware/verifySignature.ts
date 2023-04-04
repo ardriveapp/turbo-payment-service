@@ -38,6 +38,7 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
       );
 
       ctx.set("Authorization", `Bearer ${token}`);
+
     }
   } catch (error) {
     logger.error(error);
