@@ -19,7 +19,7 @@ router.get("/v1/price/:amount", priceRoutes);
 router.get("/v1/price/bytes/:amount", priceRoutes);
 router.get("/v1/price/:currency/:amount", priceRoutes);
 
-router.post("/v1/price-quote", verifySignature, priceQuote);
+router.get("/v1/price-quote/:currency/:amount", verifySignature, priceQuote);
 
 router.post("/v1/balance/address", () => logger.info("TODO"));
 

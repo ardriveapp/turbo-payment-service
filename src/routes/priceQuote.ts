@@ -10,9 +10,8 @@ let stripe: Stripe;
 export async function priceQuote(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
   const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-  const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!STRIPE_SECRET_KEY || !WEBHOOK_SECRET) {
+  if (!STRIPE_SECRET_KEY) {
     throw new Error("Stripe secret key or webhook secret not set");
   }
 
@@ -52,21 +51,21 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
     winstonCreditAmount: quote,
     destinationAddress: walletAddress,
     currencyType: fiatCurrency,
-    quoteExpirationDate: (Date.now() + 1000 * 60 * 60 * 24 * 7).toString(),
+    quoteExpirationDate: new Date(
+      Date.now() + 1000 * 60 * 60 * 24 * 7
+    ).toISOString(),
     paymentProvider: "stripe",
   };
 
-  await paymentDatabase.createTopUpQuote(priceQuote);
-
-  const paymentIntent = await stripe.paymentIntents.create({
-    amount: Math.round(fiatValue * 100), // Convert to cents
-    currency: fiatCurrency,
-    metadata: {
-      topUpQuoteId: priceQuote.topUpQuoteId,
-    },
-  });
-
   try {
+    await paymentDatabase.createTopUpQuote(priceQuote);
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Math.round(fiatValue * 100), // Convert to cents
+      currency: fiatCurrency,
+      metadata: {
+        topUpQuoteId: priceQuote.topUpQuoteId,
+      },
+    });
     ctx.response.status = 200;
     ctx.body = {
       balance,
@@ -76,7 +75,7 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
   } catch (error) {
     logger.error(error);
     ctx.response.status = 502;
-    ctx.body = "Pricing Oracle Unavailable";
+    ctx.body = "Error creating payment intent";
   }
   return next;
 }

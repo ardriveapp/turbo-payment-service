@@ -14,7 +14,6 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
     const signature = ctx.request.headers["x-signature"];
     const publicKey = ctx.request.headers["x-public-key"] as string;
     const nonce = ctx.request.headers["x-nonce"];
-
     if (!signature || !publicKey || !nonce) {
       logger.info("Missing signature, public key or nonce");
       return next();
