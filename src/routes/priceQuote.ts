@@ -5,27 +5,12 @@ import Stripe from "stripe";
 import logger from "../logger";
 import { KoaContext } from "../server";
 
-let stripe: Stripe;
-
 export async function priceQuote(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
-  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
-  if (!STRIPE_SECRET_KEY) {
-    throw new Error("Stripe secret key or webhook secret not set");
-  }
+  const { pricingService, paymentDatabase, stripeInstance } = ctx.state;
 
-  stripe ??= new Stripe(STRIPE_SECRET_KEY, {
-    apiVersion: "2022-11-15",
-    appInfo: {
-      // For sample support and debugging, not required for production:
-      name: "ardrive-turbo",
-      version: "0.0.0",
-    },
-    typescript: true,
-  });
-
-  const { pricingService, paymentDatabase } = ctx.state;
+  const stripe = stripeInstance as Stripe;
 
   const fiatValue = ctx.params.amount;
   const fiatCurrency = ctx.params.currency;

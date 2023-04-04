@@ -31,6 +31,7 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
       // Attach wallet address for the next middleware
       ctx.state.walletAddress = await publicPemToArweaveAddress(publicPem);
       // Generate a JWT token for subsequent requests
+      logger.info("Generating JWT token for ", ctx.state.walletAddress);
       const token = jwt.sign(
         { walletAddress: ctx.state.walletAddress },
         JWT_SECRET,
@@ -38,7 +39,6 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
       );
 
       ctx.set("Authorization", `Bearer ${token}`);
-
     }
   } catch (error) {
     logger.error(error);

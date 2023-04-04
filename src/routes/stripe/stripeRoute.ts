@@ -8,25 +8,14 @@ import { handleDisputeCreatedEvent } from "./eventHandlers/disputeCreatedEventHa
 import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
-let stripe: Stripe;
-
 export async function stripeRoute(ctx: KoaContext, next: Next) {
-  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
   const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!STRIPE_SECRET_KEY || !WEBHOOK_SECRET) {
-    throw new Error("Stripe secret key or webhook secret not set");
+  if (!WEBHOOK_SECRET) {
+    throw new Error("Stripe webhook secret not set");
   }
 
-  stripe ??= new Stripe(STRIPE_SECRET_KEY, {
-    apiVersion: "2022-11-15",
-    appInfo: {
-      // For sample support and debugging, not required for production:
-      name: "ardrive-turbo",
-      version: "0.0.0",
-    },
-    typescript: true,
-  });
+  const stripe = ctx.state.stripeInstance as Stripe;
 
   logger.child({ path: ctx.path });
   //get the webhook signature for verification
