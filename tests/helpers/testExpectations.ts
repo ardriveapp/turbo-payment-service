@@ -23,7 +23,7 @@ const expectedHeadersWithContentLength = (contentLength: number) => {
 
 const expectedDateColumn = (defaultValue = true) => {
   return {
-    type: "timestamp without time zone",
+    type: "timestamp with time zone",
     maxLength: null,
     nullable: false,
     defaultValue: defaultValue ? "CURRENT_TIMESTAMP" : null,
@@ -64,10 +64,13 @@ export const expectedColumnInfo = {
   currency_type: expectedVarCharColumn({}),
   winston_credit_amount: expectedVarCharColumn({}),
   quote_expiration_date: expectedDateColumn(false),
+  quote_fulfilled_date: expectedDateColumn(),
+  quote_failed_date: expectedDateColumn(),
   quote_creation_date: expectedDateColumn(),
   payment_provider: expectedVarCharColumn({}),
   payment_receipt_id: expectedVarCharColumn({}),
   payment_receipt_date: expectedDateColumn(),
+  payment_receipt_rescinded_date: expectedDateColumn(),
   chargeback_receipt_id: expectedVarCharColumn({}),
   chargeback_reason: expectedVarCharColumn({}),
   chargeback_receipt_date: expectedDateColumn(),

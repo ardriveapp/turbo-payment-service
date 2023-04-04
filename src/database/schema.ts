@@ -20,7 +20,10 @@ export class Schema {
 
     await this.createUserTable();
     await this.createTopUpQuoteTable();
+    await this.createFulfilledTopUpQuoteTable();
+    await this.createFailedTopUpQuoteTable();
     await this.createPaymentReceiptTable();
+    await this.createRescindedPaymentReceiptTable();
     await this.createChargebackReceiptTable();
 
     logger.info("Finished initial migration!", {
@@ -34,7 +37,10 @@ export class Schema {
 
     await this.pg.schema.dropTable(user);
     await this.pg.schema.dropTable(topUpQuote);
+    await this.pg.schema.dropTable(fulfilledTopUpQuote);
+    await this.pg.schema.dropTable(failedTopUpQuote);
     await this.pg.schema.dropTable(paymentReceipt);
+    await this.pg.schema.dropTable(rescindedPaymentReceipt);
     await this.pg.schema.dropTable(chargebackReceipt);
 
     logger.info("Schema dropped. Initial migration rollback successful!", {
@@ -47,7 +53,6 @@ export class Schema {
       t.string(userAddress).primary().notNullable();
       t.string(userAddressType).notNullable();
       t.string(winstonCreditBalance).notNullable();
-      // TODO: Will jsonb work for this promo info or should we use a string and JSON stringify/parse?
       t.jsonb(promotionalInfo).defaultTo({}).notNullable();
     });
   }
@@ -61,8 +66,28 @@ export class Schema {
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(paymentProvider).notNullable();
-      t.timestamp(quoteExpirationDate, this.noTimeZone).notNullable();
-      t.timestamp(quoteCreationDate, this.noTimeZone)
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
+    });
+  }
+
+  private async createFulfilledTopUpQuoteTable(): Promise<void> {
+    return this.pg.schema.createTableLike(
+      fulfilledTopUpQuote,
+      topUpQuote,
+      (t) => {
+        t.timestamp(quoteFulfilledDate)
+          .notNullable()
+          .defaultTo(this.defaultTimestamp());
+      }
+    );
+  }
+
+  private async createFailedTopUpQuoteTable(): Promise<void> {
+    return this.pg.schema.createTableLike(failedTopUpQuote, topUpQuote, (t) => {
+      t.timestamp(quoteFailedDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
@@ -76,12 +101,24 @@ export class Schema {
       t.string(amount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
-      t.string(topUpQuoteId).notNullable();
+      t.string(topUpQuoteId).notNullable().index();
       t.string(paymentProvider).notNullable();
-      t.timestamp(paymentReceiptDate, this.noTimeZone)
+      t.timestamp(paymentReceiptDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
+  }
+
+  private async createRescindedPaymentReceiptTable(): Promise<void> {
+    return this.pg.schema.createTableLike(
+      rescindedPaymentReceipt,
+      paymentReceipt,
+      (t) => {
+        t.timestamp(paymentReceiptRescindedDate)
+          .notNullable()
+          .defaultTo(this.defaultTimestamp());
+      }
+    );
   }
 
   private async createChargebackReceiptTable(): Promise<void> {
@@ -93,9 +130,10 @@ export class Schema {
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(paymentReceiptId).notNullable();
+      t.string(topUpQuoteId).notNullable().index();
       t.string(paymentProvider).notNullable();
       t.string(chargebackReason).notNullable();
-      t.timestamp(chargebackReceiptDate, this.noTimeZone)
+      t.timestamp(chargebackReceiptDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
@@ -104,11 +142,17 @@ export class Schema {
   private defaultTimestamp() {
     return this.pg.fn.now();
   }
-
-  private noTimeZone = { useTz: false };
 }
 
-const { chargebackReceipt, paymentReceipt, topUpQuote, user } = tableNames;
+const {
+  chargebackReceipt,
+  failedTopUpQuote,
+  fulfilledTopUpQuote,
+  rescindedPaymentReceipt,
+  paymentReceipt,
+  topUpQuote,
+  user,
+} = tableNames;
 
 const {
   amount,
@@ -121,9 +165,12 @@ const {
   paymentProvider,
   paymentReceiptDate,
   paymentReceiptId,
+  paymentReceiptRescindedDate,
   promotionalInfo,
   quoteCreationDate,
   quoteExpirationDate,
+  quoteFailedDate,
+  quoteFulfilledDate,
   topUpQuoteId,
   userAddress,
   userAddressType,

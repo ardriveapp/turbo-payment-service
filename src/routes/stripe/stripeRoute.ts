@@ -81,7 +81,10 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     case "payment_intent.payment_failed":
     case "payment_intent.canceled":
       try {
-        handlePaymentFailedEvent(data.object as Stripe.PaymentIntent, ctx);
+        handlePaymentFailedEvent(
+          data.object as Stripe.PaymentIntent,
+          ctx.state.paymentDatabase
+        );
       } catch (error) {
         logger.error("Payment Failed/Cancelled Event handler failed", error);
       }

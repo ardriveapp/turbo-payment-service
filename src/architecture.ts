@@ -1,4 +1,5 @@
-import { Database, TestDatabase } from "./database/database";
+import { Database } from "./database/database";
+import { PostgresDatabase } from "./database/postgres";
 import { PricingService, TurboPricingService } from "./pricing/pricing";
 
 export interface Architecture {
@@ -7,7 +8,7 @@ export interface Architecture {
 }
 
 export const defaultArch: Architecture = {
-  paymentDatabase: new TestDatabase(),
+  paymentDatabase: new PostgresDatabase(),
   pricingService: new TurboPricingService({}),
 };
 

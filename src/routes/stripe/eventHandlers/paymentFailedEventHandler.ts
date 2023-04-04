@@ -3,29 +3,18 @@ import { Stripe } from "stripe";
 import { Database } from "../../../database/database";
 import logger from "../../../logger";
 import { MetricRegistry } from "../../../metricRegistry";
-import { KoaContext } from "../../../server";
 
 export async function handlePaymentFailedEvent(
   pi: Stripe.PaymentIntent,
-  ctx: Partial<KoaContext>
+  db: Database
 ) {
-  const walletAddress = pi.metadata["address"];
-  logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
-  );
+  const topUpQuoteId = pi.metadata["top_up_quote_id"];
+  logger.info(`🔔  Webhook event payment failed event received!`, {
+    topUpQuoteId,
+    pi,
+  });
   logger.info(`💸 Payment failed. ${pi.amount}`);
-  const paymentDatabase = ctx.state?.paymentDatabase as Database;
 
-  const priceQuote = await paymentDatabase.expirePriceQuote(walletAddress);
-  if (priceQuote) {
-    logger.info(`Payment Quote found for ${walletAddress}`);
-  } else {
-    logger.info(`No payment quote found for ${walletAddress}`);
-  }
-  const receipt = await paymentDatabase.createRefundReceipt(walletAddress);
-  logger.info(
-    `Refund Receipt created for ${walletAddress} ${JSON.stringify(receipt)}`
-  );
-
+  await db.expireTopUpQuote(topUpQuoteId);
   MetricRegistry.paymentFailedCounter.inc();
 }

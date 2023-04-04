@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Stripe } from "stripe";
 
 import { Database } from "../../../database/database";
@@ -8,26 +9,25 @@ export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
   paymentDatabase: Database
 ) {
-  const walletAddress = pi.metadata["address"];
-  logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
-  );
+  const topUpQuoteId = pi.metadata["top_up_quote_id"];
 
-  logger.info(`💰 Payment captured!  ${pi.amount}}`);
+  logger.info(`💰 Payment Success Event Triggered!`, {
+    topUpQuoteId,
+    amount: pi.amount,
+  });
 
-  const priceQuote = await paymentDatabase.getPriceQuote(walletAddress);
-  if (priceQuote) {
-    logger.info(`Payment Quote found for ${walletAddress}`);
-    const receipt = await paymentDatabase.createPaymentReceipt(walletAddress);
+  const topUpQuote = await paymentDatabase.getTopUpQuote(topUpQuoteId);
+  const paymentReceiptId = randomUUID();
 
-    logger.info(
-      `Receipt created for ${walletAddress} ${JSON.stringify(receipt)}`
-    );
+  await paymentDatabase.createPaymentReceipt({
+    paymentReceiptId,
+    amount: pi.amount,
+    currencyType: pi.currency,
+    topUpQuoteId,
+  });
 
-    MetricRegistry.paymentSuccessCounter.inc();
-    MetricRegistry.topUpsCounter.inc(Number(priceQuote.balance));
-  } else {
-    logger.info(`No payment quote found for ${walletAddress}`);
-    throw new Error(`No payment quote found for ${walletAddress}`);
-  }
+  logger.info(`Payment Receipt created!`, { paymentReceiptId, topUpQuote });
+
+  MetricRegistry.paymentSuccessCounter.inc();
+  MetricRegistry.topUpsCounter.inc(Number(topUpQuote.winstonCreditAmount));
 }

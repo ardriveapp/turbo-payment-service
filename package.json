@@ -15,7 +15,7 @@
     "ci": "yarn build && yarn docker-test",
     "build": "yarn clean && tsc --project ./tsconfig.prod.json",
     "dev": "yarn clean && tsc --project ./tsconfig.prod.json -w",
-    "start": "yarn node --inspect lib/index.js",
+    "start": "yarn node lib/index.js",
     "start:dev": "yarn nodemon lib/index.js",
     "start:watch": "yarn nodemon -r ./src/index.ts",
     "db:up": "docker run --init --rm -d --name payment-service-postgres -v payment-service-data:/var/lib/postgresql/payment-service-data -p 5432:5432 -e POSTGRES_PASSWORD=localTestPassword postgres:13.4",
