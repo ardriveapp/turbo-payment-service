@@ -149,7 +149,7 @@ describe("Router tests", () => {
     expect(status).to.equal(403);
   });
 
-  it("GET /price-quote returns 200 for correct signature", async () => {
+  it("GET /price-quote returns 200 and correct response for correct signature", async () => {
     const nonce = "123";
     const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
     const signature = await signData(jwkToPem(testWallet), nonce);
@@ -175,11 +175,10 @@ describe("Router tests", () => {
       }
     );
 
-    const priceQuote = Number(data);
-
+    expect(data).to.have.property("balance");
+    expect(data).to.have.property("priceQuote");
+    expect(data).to.have.property("paymentIntent");
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
-
-    expect(priceQuote).to.be.a("number");
   });
 });
