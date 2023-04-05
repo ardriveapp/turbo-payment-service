@@ -181,4 +181,64 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
   });
+
+  it("GET /price-quote returns 403 for bad signature", async () => {
+    const nonce = "123";
+    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
+    const signature = await signData(jwkToPem(testWallet), "somethingElse");
+
+    mock
+      .onGet(
+        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
+      )
+      .reply(200, {
+        arweave: {
+          usd: 10,
+        },
+      });
+
+    const { status, data } = await axios.get(
+      `${localTestUrl}/v1/price-quote/usd/100`,
+      {
+        headers: {
+          "x-public-key": publicKey,
+          "x-nonce": nonce,
+          "x-signature": toB64Url(Buffer.from(signature)),
+        },
+        validateStatus: () => true,
+      }
+    );
+    expect(status).to.equal(403);
+    expect(data).to.equal("Wallet address not provided");
+  });
+
+  it("GET /price-quote returns 400 for correct signature but invalid currency", async () => {
+    const nonce = "123";
+    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
+    const signature = await signData(jwkToPem(testWallet), nonce);
+
+    mock
+      .onGet(
+        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
+      )
+      .reply(200, {
+        arweave: {
+          usd: 10,
+        },
+      });
+
+    const { status, data } = await axios.get(
+      `${localTestUrl}/v1/price-quote/currencyThatDoesNotExist/100`,
+      {
+        headers: {
+          "x-public-key": publicKey,
+          "x-nonce": nonce,
+          "x-signature": toB64Url(Buffer.from(signature)),
+        },
+        validateStatus: () => true,
+      }
+    );
+    expect(status).to.equal(400);
+    expect(data).to.equal("Invalid currency or amount");
+  });
 });

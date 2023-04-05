@@ -17,7 +17,21 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
 
   const walletAddress = ctx.state.walletAddress;
 
-  const quote = await pricingService.getWCForFiat(fiatCurrency, fiatValue);
+  if (!walletAddress) {
+    ctx.response.status = 403;
+    ctx.body = "Wallet address not provided";
+    return next;
+  }
+  let quote;
+  try {
+    quote = await pricingService.getWCForFiat(fiatCurrency, fiatValue);
+  } catch (error) {
+    logger.error(error);
+    ctx.response.status = 400;
+    ctx.body = "Invalid currency or amount";
+    return next;
+  }
+
   const user = await paymentDatabase.getUser(walletAddress);
 
   if (!user) {
