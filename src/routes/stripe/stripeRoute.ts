@@ -15,7 +15,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     throw new Error("Stripe webhook secret not set");
   }
 
-  const stripe = ctx.state.stripeInstance as Stripe;
+  const stripe = ctx.state.stripe;
 
   logger.child({ path: ctx.path });
   //get the webhook signature for verification
