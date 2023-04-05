@@ -1,7 +1,7 @@
 import cors from "@koa/cors";
 import Koa, { DefaultState, ParameterizedContext } from "koa";
 
-import defaultArch, { Architecture } from "./architecture";
+import { Architecture, getDefaultArch } from "./architecture";
 import { defaultPort } from "./constants";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
@@ -25,6 +25,11 @@ export async function createServer(
   const app = new Koa();
 
   await loadSecretsToEnv();
+  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+
+  if (!STRIPE_SECRET_KEY) {
+    throw new Error("Stripe secret key or webhook secret not set");
+  }
 
   app.use(cors({ allowMethods: ["GET", "POST"] }));
   app.use(async (ctx: KoaContext, next) => {
@@ -38,10 +43,18 @@ export async function createServer(
   });
 
   function attachArchToKoaContext(ctx: KoaContext): void {
-    const { paymentDatabase, pricingService } = arch;
+    const { paymentDatabase, pricingService, stripe } = arch;
+
+    const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+
+    if (!STRIPE_SECRET_KEY) {
+      throw new Error("Stripe secret key or webhook secret not set");
+    }
+    const defaultArch = getDefaultArch();
 
     ctx.state.paymentDatabase = paymentDatabase ?? defaultArch.paymentDatabase;
     ctx.state.pricingService = pricingService ?? defaultArch.pricingService;
+    ctx.state.stripe = stripe ?? defaultArch.stripe;
   }
 
   app.use(router.routes());

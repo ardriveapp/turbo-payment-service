@@ -23,3 +23,6 @@ jobs:
 
       - name: Test and Build Codebase
         run: yarn ci
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}

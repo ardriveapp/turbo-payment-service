@@ -5,6 +5,7 @@ import * as promClient from "prom-client";
 import logger from "./logger";
 import { verifySignature } from "./middleware/verifySignature";
 import { balanceRoute } from "./routes/balance";
+import { priceQuote } from "./routes/priceQuote";
 import { priceRoutes } from "./routes/priceRoutes";
 import { stripeRoute } from "./routes/stripe/stripeRoute";
 import { KoaContext } from "./server";
@@ -18,7 +19,7 @@ router.get("/v1/price/:amount", priceRoutes);
 router.get("/v1/price/bytes/:amount", priceRoutes);
 router.get("/v1/price/:currency/:amount", priceRoutes);
 
-router.post("/v1/price-quote", () => logger.info("TODO"));
+router.get("/v1/price-quote/:currency/:amount", verifySignature, priceQuote);
 
 router.post("/v1/balance/address", () => logger.info("TODO"));
 
