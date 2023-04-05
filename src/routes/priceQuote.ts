@@ -29,17 +29,6 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
     return next;
   }
 
-  const user = await paymentDatabase.getUser(walletAddress);
-
-  if (!user) {
-    ctx.response.status = 404;
-    ctx.body = "User not found";
-    return next;
-  }
-
-  const balance = (await paymentDatabase.getUser(walletAddress))
-    .winstonCreditBalance;
-
   const priceQuote = {
     topUpQuoteId: randomUUID(),
     destinationAddressType: "arweave",
@@ -53,8 +42,18 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
     paymentProvider: "stripe",
   };
 
+  let user;
+  try {
+    user = await paymentDatabase.getUser(walletAddress);
+  } catch (error) {
+    logger.info("User not found, new user will be created on payment success");
+  }
+
   try {
     await paymentDatabase.createTopUpQuote(priceQuote);
+
+    const balance = user?.winstonCreditBalance || 0;
+
     const paymentIntent = await stripe.paymentIntents.create({
       amount: Math.round(fiatValue * 100), // Convert to cents
       currency: fiatCurrency,
@@ -63,6 +62,7 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
       },
     });
     ctx.response.status = 200;
+
     ctx.body = {
       balance,
       priceQuote,
