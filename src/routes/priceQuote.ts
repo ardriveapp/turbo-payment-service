@@ -1,6 +1,5 @@
 import { randomUUID } from "crypto";
 import { Next } from "koa";
-import Stripe from "stripe";
 
 import logger from "../logger";
 import { KoaContext } from "../server";
@@ -8,9 +7,7 @@ import { KoaContext } from "../server";
 export async function priceQuote(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
 
-  const { pricingService, paymentDatabase, stripeInstance } = ctx.state;
-
-  const stripe = stripeInstance as Stripe;
+  const { pricingService, paymentDatabase, stripe } = ctx.state;
 
   const fiatValue = ctx.params.amount;
   const fiatCurrency = ctx.params.currency;

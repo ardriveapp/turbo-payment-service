@@ -1,8 +1,7 @@
 import cors from "@koa/cors";
 import Koa, { DefaultState, ParameterizedContext } from "koa";
-import Stripe from "stripe";
 
-import defaultArch, { Architecture } from "./architecture";
+import { Architecture, getDefaultArch } from "./architecture";
 import { defaultPort } from "./constants";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
@@ -32,16 +31,6 @@ export async function createServer(
     throw new Error("Stripe secret key or webhook secret not set");
   }
 
-  const stripe = new Stripe(STRIPE_SECRET_KEY, {
-    apiVersion: "2022-11-15",
-    appInfo: {
-      // For sample support and debugging, not required for production:
-      name: "ardrive-turbo",
-      version: "0.0.0",
-    },
-    typescript: true,
-  });
-
   app.use(cors({ allowMethods: ["GET", "POST"] }));
   app.use(async (ctx: KoaContext, next) => {
     attachArchToKoaContext(ctx);
@@ -54,11 +43,18 @@ export async function createServer(
   });
 
   function attachArchToKoaContext(ctx: KoaContext): void {
-    const { paymentDatabase, pricingService } = arch;
+    const { paymentDatabase, pricingService, stripe } = arch;
+
+    const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+
+    if (!STRIPE_SECRET_KEY) {
+      throw new Error("Stripe secret key or webhook secret not set");
+    }
+    const defaultArch = getDefaultArch();
 
     ctx.state.paymentDatabase = paymentDatabase ?? defaultArch.paymentDatabase;
     ctx.state.pricingService = pricingService ?? defaultArch.pricingService;
-    ctx.state.stripeInstance = stripe;
+    ctx.state.stripe = stripe ?? defaultArch.stripe;
   }
 
   app.use(router.routes());
