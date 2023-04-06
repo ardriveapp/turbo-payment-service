@@ -25,9 +25,13 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
   } catch (error) {
     logger.error(error);
     ctx.response.status = 400;
-    ctx.body = "Invalid currency or amount";
+    ctx.body = "ArweaveToFiat Oracle Error";
     return next;
   }
+
+  const thirtyMinutesFromNow = new Date(
+    Date.now() + 1000 * 60 * 30
+  ).toISOString();
 
   const priceQuote = {
     topUpQuoteId: randomUUID(),
@@ -36,9 +40,7 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
     winstonCreditAmount: quote,
     destinationAddress: walletAddress,
     currencyType: fiatCurrency,
-    quoteExpirationDate: new Date(
-      Date.now() + 1000 * 60 * 60 * 24 * 7
-    ).toISOString(),
+    quoteExpirationDate: thirtyMinutesFromNow,
     paymentProvider: "stripe",
   };
 
@@ -55,7 +57,7 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
     const balance = user?.winstonCreditBalance || 0;
 
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(fiatValue * 100), // Convert to cents
+      amount: Math.round(fiatValue * 100), // TODO: Add proper types for fiat. Stripe takes amount in smallest unit of currency
       currency: fiatCurrency,
       metadata: {
         topUpQuoteId: priceQuote.topUpQuoteId,
