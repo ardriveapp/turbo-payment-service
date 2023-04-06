@@ -239,6 +239,6 @@ describe("Router tests", () => {
       }
     );
     expect(status).to.equal(400);
-    expect(data).to.equal("Invalid currency or amount");
+    expect(data).to.equal("ArweaveToFiat Oracle Error");
   });
 });
