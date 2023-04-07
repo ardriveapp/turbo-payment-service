@@ -17,7 +17,6 @@ import {
 export interface Database {
   createTopUpQuote: (topUpQuote: CreateTopUpQuoteParams) => Promise<void>;
   getTopUpQuote: (topUpQuoteId: TopUpQuoteId) => Promise<TopUpQuote>;
-  expireTopUpQuote: (topUpQuoteId: TopUpQuoteId) => Promise<void>;
   updatePromoInfo: (
     userAddress: UserAddress,
     promoInfo: PromotionalInfo

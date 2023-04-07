@@ -5,7 +5,6 @@ import { Stripe } from "stripe";
 import logger from "../../logger";
 import { KoaContext } from "../../server";
 import { handleDisputeCreatedEvent } from "./eventHandlers/disputeCreatedEventHandler";
-import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
 export async function stripeRoute(ctx: KoaContext, next: Next) {
@@ -65,17 +64,6 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
         );
       } catch (error) {
         logger.error("Payment Success Event handler failed", error);
-      }
-      break;
-    case "payment_intent.payment_failed":
-    case "payment_intent.canceled":
-      try {
-        handlePaymentFailedEvent(
-          data.object as Stripe.PaymentIntent,
-          ctx.state.paymentDatabase
-        );
-      } catch (error) {
-        logger.error("Payment Failed/Cancelled Event handler failed", error);
       }
       break;
     case "charge.dispute.created":

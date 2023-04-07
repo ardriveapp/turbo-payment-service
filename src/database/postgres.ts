@@ -84,23 +84,6 @@ export class PostgresDatabase implements Database {
     return topUpQuoteDbResult.map(topUpQuoteDBMap)[0];
   }
 
-  public async expireTopUpQuote(topUpQuoteId: string): Promise<void> {
-    await this.knex.transaction(async (knexTransaction) => {
-      const topUpQuoteResult = await knexTransaction<TopUpQuoteDBResult>(
-        tableNames.topUpQuote
-      )
-        .where({
-          [columnNames.topUpQuoteId]: topUpQuoteId,
-        })
-        .del()
-        .returning("*");
-
-      await knexTransaction<TopUpQuoteDBResult>(
-        tableNames.failedTopUpQuote
-      ).insert(topUpQuoteResult);
-    });
-  }
-
   public async updatePromoInfo(
     userAddress: string,
     promoInfo: PromotionalInfo
