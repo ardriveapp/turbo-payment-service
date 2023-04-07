@@ -8,6 +8,7 @@ import {
   ChargebackReceiptDBResult,
   FailedTopUpQuoteDBResult,
   PaymentReceiptDBResult,
+  RescindedPaymentReceiptDBResult,
   TopUpQuoteDBResult,
   UserDBResult,
 } from "./dbTypes";
@@ -304,6 +305,38 @@ describe("PostgresDatabase class", () => {
       ).to.equal(0);
     });
 
+    it("errors as expected when top_up_quote is beyond expiration date", async () => {
+      const quoteExpirationDateInThePast = new Date(
+        Date.now() - 1000
+      ).toISOString();
+
+      await dbTestHelper.insertStubTopUpQuote({
+        quote_expiration_date: quoteExpirationDateInThePast,
+        top_up_quote_id: "Expired Quote",
+        amount: "1",
+        currency_type: "marsToken",
+      });
+
+      await expectAsyncErrorThrow({
+        promiseToError: db.createPaymentReceipt({
+          amount: 1,
+          currencyType: "marsToken",
+          topUpQuoteId: "Expired Quote",
+          paymentReceiptId: "This is a string",
+        }),
+        errorMessage:
+          "Top up quote with id 'Expired Quote' has already been expired!",
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.paymentReceipt).where({
+            payment_receipt_id: "This is a string",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
     it("errors as expected when no top up quote can be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.createPaymentReceipt({
@@ -420,7 +453,9 @@ describe("PostgresDatabase class", () => {
 
       const rescindedPaymentReceiptDbResults = await db[
         "knex"
-      ]<PaymentReceiptDBResult>(tableNames.rescindedPaymentReceipt).where({
+      ]<RescindedPaymentReceiptDBResult>(
+        tableNames.rescindedPaymentReceipt
+      ).where({
         payment_receipt_id: naughtyPaymentId,
       });
       expect(rescindedPaymentReceiptDbResults.length).to.equal(1);
