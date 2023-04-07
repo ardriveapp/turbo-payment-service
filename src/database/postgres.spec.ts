@@ -569,9 +569,10 @@ describe("PostgresDatabase class", () => {
       expect(shortsQuote.userAddress).to.equal(evilAddress);
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.getUser("Non Existent Address"),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
@@ -591,9 +592,10 @@ describe("PostgresDatabase class", () => {
       expect(promoInfo).to.deep.equal({});
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.getPromoInfo("Non Existent Address"),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
@@ -621,11 +623,12 @@ describe("PostgresDatabase class", () => {
       });
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.updatePromoInfo("Non Existent Address", {
           newPromo: true,
         }),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
@@ -666,12 +669,13 @@ describe("PostgresDatabase class", () => {
       expect(+poorUser.winstonCreditBalance).to.equal(10);
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.reserveBalance(
           "Non Existent Address",
           new Winston(1337)
         ),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
@@ -696,12 +700,13 @@ describe("PostgresDatabase class", () => {
       expect(+happyUser.winstonCreditBalance).to.equal(102_000);
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.refundBalance(
           "Non Existent Address",
           new Winston(1337)
         ),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
