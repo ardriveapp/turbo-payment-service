@@ -2,7 +2,7 @@ import knex, { Knex } from "knex";
 import winston from "winston";
 
 import logger from "../logger";
-import { Winston } from "../types/types";
+import { WC, Winston } from "../types/types";
 import { Database } from "./database";
 import { columnNames, tableNames } from "./dbConstants";
 import {
@@ -131,11 +131,16 @@ export class PostgresDatabase implements Database {
     ).where({
       user_address: userAddress,
     });
+
     if (userDbResult.length === 0) {
-      throw Error(`No user found in database with address '${userAddress}'`);
+      throw new UserNotFoundWarning(userAddress);
     }
 
     return userDbResult.map(userDBMap)[0];
+  }
+
+  public async getBalance(userAddress: string): Promise<WC> {
+    return (await this.getUser(userAddress)).winstonCreditBalance;
   }
 
   public async createPaymentReceipt(

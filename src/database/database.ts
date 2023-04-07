@@ -24,6 +24,7 @@ export interface Database {
   ) => Promise<void>;
   getPromoInfo: (userAddress: UserAddress) => Promise<PromotionalInfo>;
   getUser: (userAddress: UserAddress) => Promise<User>;
+  getBalance: (userAddress: UserAddress) => Promise<WC>;
   createPaymentReceipt: (
     paymentReceipt: CreatePaymentReceiptParams
   ) => Promise<void>;
