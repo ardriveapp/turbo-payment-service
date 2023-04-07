@@ -27,6 +27,7 @@ import {
   User,
   UserDBResult,
 } from "./dbTypes";
+import { UserNotFoundWarning } from "./errors";
 import * as knexConfig from "./knexfile";
 
 /** Knex instance connected to a PostgreSQL database */
