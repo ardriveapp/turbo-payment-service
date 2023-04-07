@@ -102,7 +102,7 @@ describe("Router tests", () => {
   });
 
   before(async () => {
-    new DbTestHelper(new PostgresDatabase()).insertStubUser({
+    await new DbTestHelper(new PostgresDatabase()).insertStubUser({
       user_address: "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830",
       winston_credit_balance: "5000",
     });
