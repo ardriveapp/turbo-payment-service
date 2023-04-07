@@ -166,10 +166,17 @@ export class PostgresDatabase implements Database {
         destination_address_type,
         payment_provider,
         winston_credit_amount,
+        quote_expiration_date,
       } = topUpQuoteDbResults[0];
 
+      if (new Date(quote_expiration_date).getTime() < new Date().getTime()) {
+        throw Error(
+          `Top up quote with id '${topUpQuoteId}' has already been expired!`
+        );
+      }
+
       if (+topUpAmount !== amount || currencyType !== currency_type) {
-        // TODO: Whats the business logic to handle this. Refund the amount? Or credit the amount paid
+        // TODO: Whats the business logic to handle the below error cases. Refund the amount? Or credit the amount paid
         throw Error(
           `Amount from top up quote (${topUpAmount} ${currency_type}) does not match the amount paid on the payment receipt (${amount} ${currencyType})!`
         );

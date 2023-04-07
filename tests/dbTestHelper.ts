@@ -18,10 +18,11 @@ export const stubArweaveUserAddress: UserAddress =
   "1234567890123456789012345678901231234567890";
 
 type StubTopUpQuoteParams = Partial<TopUpQuoteDBInsert>;
+const oneHourFromNow = new Date(Date.now() + 1000 * 60 * 60).toISOString();
 
 function stubTopUpQuoteInsert({
   top_up_quote_id = "The Stubbiest Top Up Quote",
-  quote_expiration_date = new Date("2023-03-23 16:20:00").toISOString(),
+  quote_expiration_date = oneHourFromNow,
   amount = "100",
   winston_credit_amount = "1337",
   currency_type = "usd",
