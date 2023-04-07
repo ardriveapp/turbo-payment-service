@@ -579,6 +579,31 @@ describe("PostgresDatabase class", () => {
     });
   });
 
+  describe("getBalance method", () => {
+    const userWithBalanceAddress = "userWithBalanceAddress";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: userWithBalanceAddress,
+        winston_credit_balance: "500",
+      });
+    });
+
+    it("gets the expected user's balance", async () => {
+      const userBalance = await db.getBalance(userWithBalanceAddress);
+      expect(userBalance.toString()).to.equal("500");
+    });
+
+    it("throws a warning as expected when user cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.getUser("Non Existent Address"),
+        errorType: "UserNotFoundWarning",
+        errorMessage:
+          "No user found in database with address 'Non Existent Address'",
+      });
+    });
+  });
+
   describe("getPromoInfo method", () => {
     const unicornAddress = "Unicorn 🦄";
 
