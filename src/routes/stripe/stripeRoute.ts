@@ -27,6 +27,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     logger.info("Verifying webhook signature...");
 
     event = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     logger.info(`⚠️ Webhook signature verification failed.`);
     logger.info(err.message);
@@ -58,6 +59,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     case "payment_intent.succeeded":
       // Funds have been captured
       try {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handlePaymentSuccessEvent(
           data.object as Stripe.PaymentIntent,
           ctx.state.paymentDatabase
@@ -68,6 +70,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
       break;
     case "charge.dispute.created":
       try {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleDisputeCreatedEvent(
           data.object as Stripe.Dispute,
           ctx.state.paymentDatabase
