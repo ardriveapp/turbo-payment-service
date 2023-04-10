@@ -241,4 +241,15 @@ describe("Router tests", () => {
     expect(status).to.equal(400);
     expect(data).to.equal("ArweaveToFiat Oracle Error");
   });
+
+  it("GET /reserveBalance returns 200 for correct params", async () => {
+    const testAddress = "kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
+    const wrc = 1000;
+
+    const { status, statusText } = await axios.get(
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`
+    );
+    expect(statusText).to.equal("OK");
+    expect(status).to.equal(200);
+  });
 });

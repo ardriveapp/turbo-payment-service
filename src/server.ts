@@ -1,5 +1,6 @@
 import cors from "@koa/cors";
 import Koa, { DefaultState, ParameterizedContext } from "koa";
+import jwt from "koa-jwt";
 
 import { Architecture, getDefaultArch } from "./architecture";
 import { defaultPort } from "./constants";
@@ -26,12 +27,21 @@ export async function createServer(
 
   await loadSecretsToEnv();
   const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+  const sharedSecret = process.env.PRIVATE_ROUTE_SECRET;
+
+  if (!sharedSecret) {
+    throw new Error("Shared secret not set");
+  }
 
   if (!STRIPE_SECRET_KEY) {
     throw new Error("Stripe secret key or webhook secret not set");
   }
 
   app.use(cors({ allowMethods: ["GET", "POST"] }));
+  // NOTE: Middleware that use the JWT must handle ctx.state.user being undefined and throw
+  // an error if the user is not authenticated
+  app.use(jwt({ secret: sharedSecret, passthrough: true }));
+
   app.use(async (ctx: KoaContext, next) => {
     attachArchToKoaContext(ctx);
 

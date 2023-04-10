@@ -5,10 +5,10 @@ import { KoaContext } from "../server";
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase } = ctx.state;
 
-  const wrc = ctx.params.winstonCredits;
+  const winstonCredits = ctx.params.winstonCredits;
   const walletAddress = ctx.params.walletAddress;
 
-  if (!wrc || !walletAddress) {
+  if (!winstonCredits || !walletAddress) {
     ctx.response.status = 400;
     ctx.body = "Missing parameters";
     return next;
@@ -23,13 +23,13 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     return next;
   }
 
-  if (user.winstonCreditBalance < wrc) {
+  if (user.winstonCreditBalance < winstonCredits) {
     ctx.response.status = 400;
     ctx.body = "Insufficient balance";
     return next;
   } else {
     try {
-      await paymentDatabase.reserveBalance(walletAddress, wrc);
+      await paymentDatabase.reserveBalance(walletAddress, winstonCredits);
       ctx.response.status = 200;
       ctx.body = "Balance reserved";
       return next;
