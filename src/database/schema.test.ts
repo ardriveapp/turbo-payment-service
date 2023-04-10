@@ -45,6 +45,7 @@ describe("Schema class", () => {
     expect(columnInfo).to.deep.equal({
       user_address,
       user_address_type,
+      user_creation_date,
       winston_credit_balance,
       promotional_info,
     });
@@ -177,6 +178,7 @@ const {
   quote_expiration_date,
   user_address,
   user_address_type,
+  user_creation_date,
   winston_credit_amount,
   winston_credit_balance,
 } = expectedColumnInfo;

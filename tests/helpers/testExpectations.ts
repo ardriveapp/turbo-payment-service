@@ -50,6 +50,7 @@ const expectedVarCharColumn = ({
 export const expectedColumnInfo = {
   user_address: expectedVarCharColumn({}),
   user_address_type: expectedVarCharColumn({}),
+  user_creation_date: expectedDateColumn(),
   destination_address: expectedVarCharColumn({}),
   destination_address_type: expectedVarCharColumn({}),
   winston_credit_balance: expectedVarCharColumn({}),
