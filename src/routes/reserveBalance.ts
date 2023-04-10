@@ -5,8 +5,8 @@ import { KoaContext } from "../server";
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase } = ctx.state;
 
-  let wrc = ctx.params.winstonCredits;
-  let walletAddress = ctx.params.walletAddress;
+  const wrc = ctx.params.winstonCredits;
+  const walletAddress = ctx.params.walletAddress;
 
   if (!wrc || !walletAddress) {
     ctx.response.status = 400;
