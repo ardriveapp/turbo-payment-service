@@ -48,11 +48,10 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     ctx.response.status = 200;
     ctx.response.message = "Balance refunded";
     logger.info(
-      "Balance refund processed for user ",
+      "Balance refund processed", {
       walletAddressToRefund,
-      " | ",
       winstonCreditsToRefund
-    );
+    });
     return next;
   } catch (error) {
     ctx.response.status = 502;
