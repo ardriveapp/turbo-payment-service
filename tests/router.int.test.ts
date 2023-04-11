@@ -25,9 +25,9 @@ describe("Router tests", () => {
   let mock: MockAdapter;
   let secret: string;
   beforeEach(async () => {
-    server = await createServer({});
     process.env.PRIVATE_ROUTE_SECRET ??= "secret";
     secret = process.env.PRIVATE_ROUTE_SECRET;
+    server = await createServer({});
     mock = new MockAdapter(axios, { onNoMatch: "passthrough" });
   });
 
