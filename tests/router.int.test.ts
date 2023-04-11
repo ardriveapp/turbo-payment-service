@@ -248,13 +248,13 @@ describe("Router tests", () => {
 
   it("GET /reserve-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const wrc = 1000;
+    const winstonCredits = 1000;
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -267,10 +267,10 @@ describe("Router tests", () => {
 
   it("GET /reserve-balance returns 401 for missing authorization", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const wrc = 1000;
+    const winstonCredits = 1000;
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${winstonCredits}`,
       {
         validateStatus: () => true,
       }
@@ -279,15 +279,15 @@ describe("Router tests", () => {
     expect(status).to.equal(401);
   });
 
-  it("GET /reserve-balance returns 400 for insufficient balance", async () => {
+  it("GET /reserve-balance returns 403 for insufficient balance", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const wrc = 100000;
+    const winstonCredits = 100000;
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -299,16 +299,16 @@ describe("Router tests", () => {
     expect(status).to.equal(403);
   });
 
-  it("GET /reserve-balance returns 400 if user not found", async () => {
+  it("GET /reserve-balance returns 403 if user not found", async () => {
     const testAddress = "someRandomAddress";
-    const wrc = 100000;
+    const winstonCredits = 100000;
 
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -322,13 +322,13 @@ describe("Router tests", () => {
 
   it("GET /refund-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const wrc = 1000;
+    const winstonCredits = 1000;
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`,
+      `${localTestUrl}/v1/refund-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -341,10 +341,10 @@ describe("Router tests", () => {
 
   it("GET /refund-balance returns 401 for missing authorization", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const wrc = 1000;
+    const winstonCredits = 1000;
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`,
+      `${localTestUrl}/v1/refund-balance/${testAddress}/${winstonCredits}`,
       {
         validateStatus: () => true,
       }
@@ -353,15 +353,15 @@ describe("Router tests", () => {
     expect(status).to.equal(401);
   });
 
-  it("GET /refund-balance returns 400 if user not found", async () => {
+  it("GET /refund-balance returns 403 if user not found", async () => {
     const testAddress = "someRandomAddress";
-    const wrc = 100000;
+    const winstonCredits = 100000;
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`,
+      `${localTestUrl}/v1/refund-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
