@@ -12,7 +12,9 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     return next;
   }
 
-  const winstonCreditsToReserve: Winston = new Winston(ctx.params.winstonCredits);
+  const winstonCreditsToReserve: Winston = new Winston(
+    ctx.params.winstonCredits
+  );
   const walletAddressToCredit: string = ctx.params.walletAddress;
 
   let user;
@@ -30,12 +32,15 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     return next;
   } else {
     try {
-      await paymentDatabase.reserveBalance(walletAddressToCredit, winstonCreditsToReserve);
+      await paymentDatabase.reserveBalance(
+        walletAddressToCredit,
+        winstonCreditsToReserve
+      );
       ctx.response.status = 200;
       ctx.response.message = "Balance reserved";
       return next;
     } catch (error) {
-      ctx.response.status = 403;
+      ctx.response.status = 502;
       ctx.response.message = "Error reserving balance";
       return next;
     }

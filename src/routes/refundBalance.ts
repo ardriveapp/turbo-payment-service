@@ -2,41 +2,53 @@ import { Next } from "koa";
 
 import logger from "../logger";
 import { KoaContext } from "../server";
+import { Winston } from "../types/winston";
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase } = ctx.state;
 
-  const wrc = ctx.params.winstonCredits;
-  const walletAddress = ctx.params.walletAddress;
-
-  if (!wrc || !walletAddress) {
+  if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
     ctx.response.status = 400;
     ctx.body = "Missing parameters";
     return next;
   }
 
+  const walletAddressToRefund: string = ctx.params.walletAddress;
+  const winstonCreditsToRefund: Winston = new Winston(
+    ctx.params.winstonCredits
+  );
+
   try {
-    const user = await paymentDatabase.getUser(walletAddress);
-    logger.info("Refunding balance for user ", user.userAddress, " | ", wrc);
+    const user = await paymentDatabase.getUser(walletAddressToRefund);
+    logger.info(
+      "Refunding balance for user ",
+      user.userAddress,
+      " | ",
+      winstonCreditsToRefund
+    );
   } catch (error) {
-    ctx.response.status = 400;
-    ctx.body = "User not found";
+    ctx.response.status = 403;
+    ctx.response.message = "User not found";
     return next;
   }
 
   try {
-    await paymentDatabase.refundBalance(walletAddress, wrc);
+    await paymentDatabase.refundBalance(
+      walletAddressToRefund,
+      winstonCreditsToRefund
+    );
     ctx.response.status = 200;
+    ctx.response.message = "Balance refunded";
     logger.info(
       "Balance refund processed for user ",
-      walletAddress,
+      walletAddressToRefund,
       " | ",
-      wrc
+      winstonCreditsToRefund
     );
     return next;
   } catch (error) {
-    ctx.response.status = 400;
-    ctx.body = "Error refunding balance";
+    ctx.response.status = 502;
+    ctx.response.message = "Error refunding balance";
     return next;
   }
 }

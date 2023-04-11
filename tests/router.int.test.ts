@@ -242,7 +242,7 @@ describe("Router tests", () => {
     expect(data).to.equal("ArweaveToFiat Oracle Error");
   });
 
-  it("GET /reserveBalance returns 200 for correct params", async () => {
+  it("GET /reserve-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const wrc = 1000;
 
@@ -253,7 +253,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
   });
 
-  it("GET /reserveBalance returns 400 for insufficient balance", async () => {
+  it("GET /reserve-balance returns 400 for insufficient balance", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const wrc = 100000;
 
@@ -267,12 +267,37 @@ describe("Router tests", () => {
     expect(status).to.equal(403);
   });
 
-  it("GET /reserveBalance returns 400 if user not found", async () => {
+  it("GET /reserve-balance returns 400 if user not found", async () => {
     const testAddress = "someRandomAddress";
     const wrc = 100000;
 
     const { status, statusText } = await axios.get(
       `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      {
+        validateStatus: () => true,
+      }
+    );
+    expect(statusText).to.equal("User not found");
+    expect(status).to.equal(403);
+  });
+
+  it("GET /refund-balance returns 200 for correct params", async () => {
+    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
+    const wrc = 1000;
+
+    const { status, statusText } = await axios.get(
+      `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`
+    );
+    expect(statusText).to.equal("Balance refunded");
+    expect(status).to.equal(200);
+  });
+
+  it("GET /refund-balance returns 400 if user not found", async () => {
+    const testAddress = "someRandomAddress";
+    const wrc = 100000;
+
+    const { status, statusText } = await axios.get(
+      `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`,
       {
         validateStatus: () => true,
       }
