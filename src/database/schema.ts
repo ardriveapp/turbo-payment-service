@@ -54,6 +54,9 @@ export class Schema {
       t.string(userAddressType).notNullable();
       t.string(winstonCreditBalance).notNullable();
       t.jsonb(promotionalInfo).defaultTo({}).notNullable();
+      t.timestamp(userCreationDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
     });
   }
 
@@ -174,6 +177,7 @@ const {
   topUpQuoteId,
   userAddress,
   userAddressType,
+  userCreationDate,
   winstonCreditAmount,
   winstonCreditBalance,
 } = columnNames;

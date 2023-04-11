@@ -5,7 +5,6 @@ import { Stripe } from "stripe";
 import logger from "../../logger";
 import { KoaContext } from "../../server";
 import { handleDisputeCreatedEvent } from "./eventHandlers/disputeCreatedEventHandler";
-import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
 export async function stripeRoute(ctx: KoaContext, next: Next) {
@@ -28,6 +27,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     logger.info("Verifying webhook signature...");
 
     event = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     logger.info(`⚠️ Webhook signature verification failed.`);
     logger.info(err.message);
@@ -59,6 +59,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     case "payment_intent.succeeded":
       // Funds have been captured
       try {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handlePaymentSuccessEvent(
           data.object as Stripe.PaymentIntent,
           ctx.state.paymentDatabase
@@ -67,19 +68,9 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
         logger.error("Payment Success Event handler failed", error);
       }
       break;
-    case "payment_intent.payment_failed":
-    case "payment_intent.canceled":
-      try {
-        handlePaymentFailedEvent(
-          data.object as Stripe.PaymentIntent,
-          ctx.state.paymentDatabase
-        );
-      } catch (error) {
-        logger.error("Payment Failed/Cancelled Event handler failed", error);
-      }
-      break;
     case "charge.dispute.created":
       try {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleDisputeCreatedEvent(
           data.object as Stripe.Dispute,
           ctx.state.paymentDatabase

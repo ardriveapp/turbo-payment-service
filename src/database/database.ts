@@ -17,13 +17,13 @@ import {
 export interface Database {
   createTopUpQuote: (topUpQuote: CreateTopUpQuoteParams) => Promise<void>;
   getTopUpQuote: (topUpQuoteId: TopUpQuoteId) => Promise<TopUpQuote>;
-  expireTopUpQuote: (topUpQuoteId: TopUpQuoteId) => Promise<void>;
   updatePromoInfo: (
     userAddress: UserAddress,
     promoInfo: PromotionalInfo
   ) => Promise<void>;
   getPromoInfo: (userAddress: UserAddress) => Promise<PromotionalInfo>;
   getUser: (userAddress: UserAddress) => Promise<User>;
+  getBalance: (userAddress: UserAddress) => Promise<WC>;
   createPaymentReceipt: (
     paymentReceipt: CreatePaymentReceiptParams
   ) => Promise<void>;
