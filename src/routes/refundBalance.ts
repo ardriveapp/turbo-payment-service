@@ -5,7 +5,15 @@ import { KoaContext } from "../server";
 import { Winston } from "../types/winston";
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
+  logger.child({ path: ctx.path });
+
   const { paymentDatabase } = ctx.state;
+
+  if (!ctx.request.headers.authorization || !ctx.state.user) {
+    ctx.response.status = 401;
+    ctx.body = "Unauthorized";
+    return next;
+  }
 
   if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
     ctx.response.status = 400;

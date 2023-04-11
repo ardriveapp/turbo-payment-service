@@ -1,10 +1,19 @@
 import { Next } from "koa";
 
+import logger from "../logger";
 import { KoaContext } from "../server";
 import { Winston } from "../types/winston";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
+  logger.child({ path: ctx.path });
+
   const { paymentDatabase } = ctx.state;
+
+  if (!ctx.request.headers.authorization || !ctx.state.user) {
+    ctx.response.status = 401;
+    ctx.body = "Unauthorized";
+    return next;
+  }
 
   if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
     ctx.response.status = 403;
@@ -38,6 +47,13 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       );
       ctx.response.status = 200;
       ctx.response.message = "Balance reserved";
+      logger.info(
+        "Balance reserved for user ",
+        walletAddressToCredit,
+        " | ",
+        winstonCreditsToReserve
+      );
+
       return next;
     } catch (error) {
       ctx.response.status = 502;

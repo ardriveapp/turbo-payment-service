@@ -2,6 +2,7 @@ import axios from "axios";
 import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
+import { sign } from "jsonwebtoken";
 
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
@@ -22,8 +23,11 @@ describe("Router tests", () => {
   }
 
   let mock: MockAdapter;
+  let secret: string;
   beforeEach(async () => {
     server = await createServer({});
+    process.env.PRIVATE_ROUTE_SECRET ??= "secret";
+    secret = process.env.PRIVATE_ROUTE_SECRET;
     mock = new MockAdapter(axios, { onNoMatch: "passthrough" });
   });
 
@@ -245,21 +249,49 @@ describe("Router tests", () => {
   it("GET /reserve-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const wrc = 1000;
+    const token = sign({}, secret, {
+      expiresIn: "1h",
+    });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
     expect(statusText).to.equal("Balance reserved");
     expect(status).to.equal(200);
   });
 
-  it("GET /reserve-balance returns 400 for insufficient balance", async () => {
+  it("GET /reserve-balance returns 401 for missing authorization", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const wrc = 100000;
+    const wrc = 1000;
 
     const { status, statusText } = await axios.get(
       `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
       {
+        validateStatus: () => true,
+      }
+    );
+    expect(statusText).to.equal("Unauthorized");
+    expect(status).to.equal(401);
+  });
+
+  it("GET /reserve-balance returns 400 for insufficient balance", async () => {
+    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
+    const wrc = 100000;
+    const token = sign({}, secret, {
+      expiresIn: "1h",
+    });
+
+    const { status, statusText } = await axios.get(
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         validateStatus: () => true,
       }
     );
@@ -271,9 +303,16 @@ describe("Router tests", () => {
     const testAddress = "someRandomAddress";
     const wrc = 100000;
 
+    const token = sign({}, secret, {
+      expiresIn: "1h",
+    });
+
     const { status, statusText } = await axios.get(
       `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
       {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         validateStatus: () => true,
       }
     );
@@ -284,21 +323,49 @@ describe("Router tests", () => {
   it("GET /refund-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const wrc = 1000;
+    const token = sign({}, secret, {
+      expiresIn: "1h",
+    });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`
+      `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
     );
     expect(statusText).to.equal("Balance refunded");
     expect(status).to.equal(200);
   });
 
-  it("GET /refund-balance returns 400 if user not found", async () => {
-    const testAddress = "someRandomAddress";
-    const wrc = 100000;
+  it("GET /refund-balance returns 401 for missing authorization", async () => {
+    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
+    const wrc = 1000;
 
     const { status, statusText } = await axios.get(
       `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`,
       {
+        validateStatus: () => true,
+      }
+    );
+    expect(statusText).to.equal("Unauthorized");
+    expect(status).to.equal(401);
+  });
+
+  it("GET /refund-balance returns 400 if user not found", async () => {
+    const testAddress = "someRandomAddress";
+    const wrc = 100000;
+    const token = sign({}, secret, {
+      expiresIn: "1h",
+    });
+
+    const { status, statusText } = await axios.get(
+      `${localTestUrl}/v1/refund-balance/${testAddress}/${wrc}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         validateStatus: () => true,
       }
     );
