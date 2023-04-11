@@ -243,13 +243,41 @@ describe("Router tests", () => {
   });
 
   it("GET /reserveBalance returns 200 for correct params", async () => {
-    const testAddress = "kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
+    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const wrc = 1000;
 
     const { status, statusText } = await axios.get(
       `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`
     );
-    expect(statusText).to.equal("OK");
+    expect(statusText).to.equal("Balance reserved");
     expect(status).to.equal(200);
+  });
+
+  it("GET /reserveBalance returns 400 for insufficient balance", async () => {
+    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
+    const wrc = 100000;
+
+    const { status, statusText } = await axios.get(
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      {
+        validateStatus: () => true,
+      }
+    );
+    expect(statusText).to.equal("Insufficient balance");
+    expect(status).to.equal(403);
+  });
+
+  it("GET /reserveBalance returns 400 if user not found", async () => {
+    const testAddress = "someRandomAddress";
+    const wrc = 100000;
+
+    const { status, statusText } = await axios.get(
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${wrc}`,
+      {
+        validateStatus: () => true,
+      }
+    );
+    expect(statusText).to.equal("User not found");
+    expect(status).to.equal(403);
   });
 });

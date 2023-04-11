@@ -1,41 +1,42 @@
 import { Next } from "koa";
 
 import { KoaContext } from "../server";
+import { Winston } from "../types/winston";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase } = ctx.state;
 
-  const winstonCredits = ctx.params.winstonCredits;
-  const walletAddress = ctx.params.walletAddress;
-
-  if (!winstonCredits || !walletAddress) {
-    ctx.response.status = 400;
+  if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
+    ctx.response.status = 403;
     ctx.body = "Missing parameters";
     return next;
   }
 
+  const winstonCreditsToReserve: Winston = new Winston(ctx.params.winstonCredits);
+  const walletAddressToCredit: string = ctx.params.walletAddress;
+
   let user;
   try {
-    user = await paymentDatabase.getUser(walletAddress);
+    user = await paymentDatabase.getUser(walletAddressToCredit);
   } catch (error) {
-    ctx.response.status = 400;
-    ctx.body = "User not found";
+    ctx.response.status = 403;
+    ctx.response.message = "User not found";
     return next;
   }
 
-  if (user.winstonCreditBalance < winstonCredits) {
-    ctx.response.status = 400;
-    ctx.body = "Insufficient balance";
+  if (winstonCreditsToReserve.isGreaterThan(user.winstonCreditBalance)) {
+    ctx.response.status = 403;
+    ctx.response.message = "Insufficient balance";
     return next;
   } else {
     try {
-      await paymentDatabase.reserveBalance(walletAddress, winstonCredits);
+      await paymentDatabase.reserveBalance(walletAddressToCredit, winstonCreditsToReserve);
       ctx.response.status = 200;
-      ctx.body = "Balance reserved";
+      ctx.response.message = "Balance reserved";
       return next;
     } catch (error) {
-      ctx.response.status = 400;
-      ctx.body = "Error reserving balance";
+      ctx.response.status = 403;
+      ctx.response.message = "Error reserving balance";
       return next;
     }
   }
