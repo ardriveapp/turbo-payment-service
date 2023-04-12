@@ -59,6 +59,17 @@ describe("Router tests", () => {
     expect(arcPrice).to.be.a("number");
   });
 
+  it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
+    const { status, statusText } = await axios.get(
+      `${localTestUrl}/v1/price/bytes/1024000000000000000000000000000000000000000000`,
+      {
+        validateStatus: () => true,
+      }
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Byte count too large");
+  });
+
   it("GET /price/:currency/:value", async () => {
     mock
       .onGet(
