@@ -7,6 +7,8 @@ import { verifySignature } from "./middleware/verifySignature";
 import { balanceRoute } from "./routes/balance";
 import { priceQuote } from "./routes/priceQuote";
 import { priceRoutes } from "./routes/priceRoutes";
+import { refundBalance } from "./routes/refundBalance";
+import { reserveBalance } from "./routes/reserveBalance";
 import { stripeRoute } from "./routes/stripe/stripeRoute";
 import { KoaContext } from "./server";
 
@@ -31,6 +33,13 @@ router.post("/v1/refund-balance", () => logger.info("TODO"));
 router.post("/v1/stripe-webhook", stripeRoute);
 
 router.get("/v1/balance", verifySignature, balanceRoute);
+
+router.get(
+  "/v1/reserve-balance/:walletAddress/:winstonCredits",
+  reserveBalance
+);
+
+router.get("/v1/refund-balance/:walletAddress/:winstonCredits", refundBalance);
 
 // Health
 router.get("/health", async (ctx: KoaContext, next: Next) => {

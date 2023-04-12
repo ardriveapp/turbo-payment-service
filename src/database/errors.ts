@@ -6,3 +6,10 @@ export class UserNotFoundWarning extends Error {
     this.name = "UserNotFoundWarning";
   }
 }
+
+export class InsufficientBalance extends Error {
+  constructor(userAddress: UserAddress) {
+    super(`Insufficient balance for '${userAddress}'`);
+    this.name = "InsufficientBalance";
+  }
+}

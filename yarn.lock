@@ -4310,6 +4310,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"koa-jwt@npm:^4.0.4":
+  version: 4.0.4
+  resolution: "koa-jwt@npm:4.0.4"
+  dependencies:
+    jsonwebtoken: ^9.0.0
+    koa-unless: ^1.0.7
+    p-any: ^2.1.0
+  checksum: 7edcc063d80d4fdf78ac5315c5046e3f34c76c81df35dae6970197bfd4e08f7130104691d62e19f250a22880e46bc7cba8dd33eae39426e23f6baecef00bbb7e
+  languageName: node
+  linkType: hard
+
 "koa-router@npm:11.0.1":
   version: 11.0.1
   resolution: "koa-router@npm:11.0.1"
@@ -4319,6 +4330,13 @@ __metadata:
     methods: ^1.1.2
     path-to-regexp: ^6.2.1
   checksum: 5101bc023f8f4d8a69d637c4f804161befeecf539f785ff961a22ce6701bd49f6f4db506c62eda8f3fed5ea74a930ab55a79771ff4655a0235a8b03472809084
+  languageName: node
+  linkType: hard
+
+"koa-unless@npm:^1.0.7":
+  version: 1.0.7
+  resolution: "koa-unless@npm:1.0.7"
+  checksum: 01d35d6084837a9749bb4d4c2ff91dd10ee227fd13d5826c01494131c0d60b6c4e892a4d64c83bd4ce22f1cb23d967c6de9b00df77f52e8c615f58e49f45bf5a
   languageName: node
   linkType: hard
 
@@ -5073,6 +5091,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"p-any@npm:^2.1.0":
+  version: 2.1.0
+  resolution: "p-any@npm:2.1.0"
+  dependencies:
+    p-cancelable: ^2.0.0
+    p-some: ^4.0.0
+    type-fest: ^0.3.0
+  checksum: c65924474214b5cb66b4ad8a2860f4d57f1cde81c0e0f505c013ee7bc9bde1ea68d0a6a82732f16643f8e14d473887da5d617397ccda4bf25a218492d70a1d86
+  languageName: node
+  linkType: hard
+
+"p-cancelable@npm:^2.0.0":
+  version: 2.1.1
+  resolution: "p-cancelable@npm:2.1.1"
+  checksum: 3dba12b4fb4a1e3e34524535c7858fc82381bbbd0f247cc32dedc4018592a3950ce66b106d0880b4ec4c2d8d6576f98ca885dc1d7d0f274d1370be20e9523ddf
+  languageName: node
+  linkType: hard
+
 "p-limit@npm:^2.2.0":
   version: 2.3.0
   resolution: "p-limit@npm:2.3.0"
@@ -5124,6 +5160,16 @@ __metadata:
   dependencies:
     aggregate-error: ^3.0.0
   checksum: cb0ab21ec0f32ddffd31dfc250e3afa61e103ef43d957cc45497afe37513634589316de4eb88abdfd969fe6410c22c0b93ab24328833b8eb1ccc087fc0442a1c
+  languageName: node
+  linkType: hard
+
+"p-some@npm:^4.0.0":
+  version: 4.1.0
+  resolution: "p-some@npm:4.1.0"
+  dependencies:
+    aggregate-error: ^3.0.0
+    p-cancelable: ^2.0.0
+  checksum: 7ef6a808c53ac2d96954dd26c1406ebbc14c89a092f46f65b0902601ed9db3b2fb7855d18624645157d56de9a51c59ce98378a68b797617204028addfbada10a
   languageName: node
   linkType: hard
 
@@ -5261,6 +5307,7 @@ __metadata:
     jsonwebtoken: ^9.0.0
     knex: 2.4.0
     koa: 2.13.4
+    koa-jwt: ^4.0.4
     koa-router: 11.0.1
     lint-staged: ^12.5.0
     mocha: ^10.0.0
@@ -6347,6 +6394,13 @@ __metadata:
   version: 0.21.3
   resolution: "type-fest@npm:0.21.3"
   checksum: e6b32a3b3877f04339bae01c193b273c62ba7bfc9e325b8703c4ee1b32dc8fe4ef5dfa54bf78265e069f7667d058e360ae0f37be5af9f153b22382cd55a9afe0
+  languageName: node
+  linkType: hard
+
+"type-fest@npm:^0.3.0":
+  version: 0.3.1
+  resolution: "type-fest@npm:0.3.1"
+  checksum: 347ff46c2285616635cb59f722e7f396bee81b8988b6fc1f1536b725077f2abf6ccfa22ab7a78e9b6ce7debea0e6614bbf5946cbec6674ec1bde12113af3a65c
   languageName: node
   linkType: hard
 

@@ -615,9 +615,9 @@ describe("PostgresDatabase class", () => {
     it("throws an error as expected when winston balance is not available", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.reserveBalance(poorAddress, new Winston(200)),
-        errorMessage: "User does not have enough balance!",
+        errorType: "InsufficientBalance",
+        errorMessage: `Insufficient balance for '${poorAddress}'`,
       });
-
       const poorUser = await db.getUser(poorAddress);
 
       expect(+poorUser.winstonCreditBalance).to.equal(10);
