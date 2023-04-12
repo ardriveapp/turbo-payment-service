@@ -20,10 +20,8 @@ export class Schema {
 
     await this.createUserTable();
     await this.createTopUpQuoteTable();
-    await this.createFulfilledTopUpQuoteTable();
     await this.createFailedTopUpQuoteTable();
     await this.createPaymentReceiptTable();
-    await this.createRescindedPaymentReceiptTable();
     await this.createChargebackReceiptTable();
 
     logger.info("Finished initial migration!", {
@@ -37,10 +35,8 @@ export class Schema {
 
     await this.pg.schema.dropTable(user);
     await this.pg.schema.dropTable(topUpQuote);
-    await this.pg.schema.dropTable(fulfilledTopUpQuote);
     await this.pg.schema.dropTable(failedTopUpQuote);
     await this.pg.schema.dropTable(paymentReceipt);
-    await this.pg.schema.dropTable(rescindedPaymentReceipt);
     await this.pg.schema.dropTable(chargebackReceipt);
 
     logger.info("Schema dropped. Initial migration rollback successful!", {
@@ -65,7 +61,7 @@ export class Schema {
       t.string(topUpQuoteId).primary().notNullable();
       t.string(destinationAddress).notNullable().index();
       t.string(destinationAddressType).notNullable();
-      t.string(amount).notNullable();
+      t.string(paymentAmount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(paymentProvider).notNullable();
@@ -76,20 +72,19 @@ export class Schema {
     });
   }
 
-  private async createFulfilledTopUpQuoteTable(): Promise<void> {
-    return this.pg.schema.createTableLike(
-      fulfilledTopUpQuote,
-      topUpQuote,
-      (t) => {
-        t.timestamp(quoteFulfilledDate)
-          .notNullable()
-          .defaultTo(this.defaultTimestamp());
-      }
-    );
-  }
-
   private async createFailedTopUpQuoteTable(): Promise<void> {
-    return this.pg.schema.createTableLike(failedTopUpQuote, topUpQuote, (t) => {
+    return this.pg.schema.createTable(failedTopUpQuote, (t) => {
+      t.string(topUpQuoteId).primary().notNullable();
+      t.string(destinationAddress).notNullable().index();
+      t.string(destinationAddressType).notNullable();
+      t.string(paymentAmount).notNullable();
+      t.string(currencyType).notNullable();
+      t.string(winstonCreditAmount).notNullable();
+      t.string(paymentProvider).notNullable();
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate).notNullable();
+
+      t.string(failedReason).index().notNullable();
       t.timestamp(quoteFailedDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
@@ -98,44 +93,40 @@ export class Schema {
 
   private async createPaymentReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(paymentReceipt, (t) => {
-      t.string(paymentReceiptId).notNullable().primary();
+      t.string(topUpQuoteId).index().notNullable();
       t.string(destinationAddress).notNullable().index();
       t.string(destinationAddressType).notNullable();
-      t.string(amount).notNullable();
+      t.string(paymentAmount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
-      t.string(topUpQuoteId).notNullable().index();
       t.string(paymentProvider).notNullable();
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate).notNullable();
+
+      t.string(paymentReceiptId).notNullable().primary();
       t.timestamp(paymentReceiptDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
   }
 
-  private async createRescindedPaymentReceiptTable(): Promise<void> {
-    return this.pg.schema.createTableLike(
-      rescindedPaymentReceipt,
-      paymentReceipt,
-      (t) => {
-        t.timestamp(paymentReceiptRescindedDate)
-          .notNullable()
-          .defaultTo(this.defaultTimestamp());
-      }
-    );
-  }
-
   private async createChargebackReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(chargebackReceipt, (t) => {
-      t.string(chargebackReceiptId).notNullable().primary();
+      t.string(topUpQuoteId).index().notNullable();
       t.string(destinationAddress).notNullable().index();
       t.string(destinationAddressType).notNullable();
-      t.string(amount).notNullable();
+      t.string(paymentAmount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
-      t.string(paymentReceiptId).notNullable();
-      t.string(topUpQuoteId).notNullable().index();
       t.string(paymentProvider).notNullable();
-      t.string(chargebackReason).notNullable();
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate).notNullable();
+
+      t.string(paymentReceiptId).notNullable();
+      t.timestamp(paymentReceiptDate).notNullable();
+
+      t.string(chargebackReceiptId).notNullable().primary();
+      t.string(chargebackReason).index().notNullable();
       t.timestamp(chargebackReceiptDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
@@ -150,30 +141,27 @@ export class Schema {
 const {
   chargebackReceipt,
   failedTopUpQuote,
-  fulfilledTopUpQuote,
-  rescindedPaymentReceipt,
   paymentReceipt,
   topUpQuote,
   user,
 } = tableNames;
 
 const {
-  amount,
+  paymentAmount,
   chargebackReason,
   chargebackReceiptDate,
   chargebackReceiptId,
   currencyType,
   destinationAddress,
   destinationAddressType,
+  failedReason,
   paymentProvider,
   paymentReceiptDate,
   paymentReceiptId,
-  paymentReceiptRescindedDate,
   promotionalInfo,
   quoteCreationDate,
   quoteExpirationDate,
   quoteFailedDate,
-  quoteFulfilledDate,
   topUpQuoteId,
   userAddress,
   userAddressType,
