@@ -17,11 +17,9 @@ import {
   CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
-  FulfilledTopUpQuoteDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
   PromotionalInfo,
-  RescindedPaymentReceiptDBResult,
   TopUpQuote,
   TopUpQuoteDBResult,
   User,
@@ -47,7 +45,7 @@ export class PostgresDatabase implements Database {
     });
 
     const {
-      amount,
+      paymentAmount,
       currencyType,
       destinationAddress,
       destinationAddressType,
@@ -58,7 +56,7 @@ export class PostgresDatabase implements Database {
     } = topUpQuote;
 
     await this.knex<TopUpQuoteDBResult>(tableNames.topUpQuote).insert({
-      amount: amount.toString(),
+      payment_amount: paymentAmount.toString(),
       currency_type: currencyType,
       destination_address: destinationAddress,
       destination_address_type: destinationAddressType,
@@ -133,7 +131,7 @@ export class PostgresDatabase implements Database {
       paymentReceipt,
     });
 
-    const { topUpQuoteId, paymentReceiptId, amount, currencyType } =
+    const { topUpQuoteId, paymentReceiptId, paymentAmount, currencyType } =
       paymentReceipt;
 
     await this.knex.transaction(async (knexTransaction) => {
@@ -149,11 +147,10 @@ export class PostgresDatabase implements Database {
       }
 
       const {
-        amount: topUpAmount,
+        payment_amount,
         currency_type,
         destination_address,
         destination_address_type,
-        payment_provider,
         winston_credit_amount,
         quote_expiration_date,
       } = topUpQuoteDbResults[0];
@@ -164,14 +161,14 @@ export class PostgresDatabase implements Database {
         );
       }
 
-      if (+topUpAmount !== amount || currencyType !== currency_type) {
+      if (+payment_amount !== paymentAmount || currencyType !== currency_type) {
         // TODO: Whats the business logic to handle the below error cases. Refund the amount? Or credit the amount paid
         throw Error(
-          `Amount from top up quote (${topUpAmount} ${currency_type}) does not match the amount paid on the payment receipt (${amount} ${currencyType})!`
+          `Amount from top up quote (${payment_amount} ${currency_type}) does not match the amount paid on the payment receipt (${paymentAmount} ${currencyType})!`
         );
       }
 
-      // Expire the existing top up quote
+      // Delete top up quote
       const topUpQuote = await knexTransaction<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       )
@@ -181,9 +178,10 @@ export class PostgresDatabase implements Database {
         .del()
         .returning("*");
 
-      await knexTransaction<FulfilledTopUpQuoteDBResult>(
-        tableNames.fulfilledTopUpQuote
-      ).insert(topUpQuote);
+      // Re-insert as payment receipt
+      await knexTransaction<PaymentReceiptDBResult>(
+        tableNames.paymentReceipt
+      ).insert({ ...topUpQuote[0], payment_receipt_id: paymentReceiptId });
 
       const destinationUser = (
         await knexTransaction<UserDBResult>(tableNames.user).where({
@@ -211,20 +209,6 @@ export class PostgresDatabase implements Database {
           })
           .update({ winston_credit_balance: newBalance.toString() });
       }
-
-      // Create Payment Receipt
-      await knexTransaction<PaymentReceiptDBResult>(
-        tableNames.paymentReceipt
-      ).insert({
-        amount: amount.toString(),
-        currency_type: currencyType,
-        destination_address,
-        destination_address_type,
-        payment_provider,
-        top_up_quote_id: topUpQuoteId,
-        payment_receipt_id: paymentReceiptId,
-        winston_credit_amount,
-      });
     });
   }
 
@@ -279,19 +263,11 @@ export class PostgresDatabase implements Database {
 
     await this.knex.transaction(async (knexTransaction) => {
       // This will throw if payment receipt does not exist
-      const {
-        amount,
-        currencyType,
-        destinationAddress,
-        destinationAddressType,
-        paymentProvider,
-        paymentReceiptId,
-        paymentReceiptDate,
-        winstonCreditAmount,
-      } = await this.getPaymentReceiptByTopUpQuoteId(
-        topUpQuoteId,
-        knexTransaction
-      );
+      const { destinationAddress, paymentReceiptId, winstonCreditAmount } =
+        await this.getPaymentReceiptByTopUpQuoteId(
+          topUpQuoteId,
+          knexTransaction
+        );
 
       const user = await this.getUser(destinationAddress, knexTransaction);
 
@@ -316,39 +292,19 @@ export class PostgresDatabase implements Database {
         .update({ winston_credit_balance: newBalance.toString() });
 
       // Remove from payment receipt table,
-      await knexTransaction<PaymentReceiptDBResult>(tableNames.paymentReceipt)
-        .where({ payment_receipt_id: paymentReceiptId })
-        .del();
-
-      // Insert into rescinded payment receipts table
-      await knexTransaction<RescindedPaymentReceiptDBResult>(
-        tableNames.rescindedPaymentReceipt
-      ).insert({
-        amount: amount.toString(),
-        currency_type: currencyType,
-        destination_address: destinationAddress,
-        destination_address_type: destinationAddressType,
-        payment_provider: paymentProvider,
-        payment_receipt_date: paymentReceiptDate,
-        payment_receipt_id: paymentReceiptId,
-        top_up_quote_id: topUpQuoteId,
-        winston_credit_amount: winstonCreditAmount.toString(),
-      });
+      const paymentReceiptDbResult =
+        await knexTransaction<PaymentReceiptDBResult>(tableNames.paymentReceipt)
+          .where({ payment_receipt_id: paymentReceiptId })
+          .del()
+          .returning("*");
 
       // Create Chargeback Receipt
       await knexTransaction<ChargebackReceiptDBResult>(
         tableNames.chargebackReceipt
       ).insert({
-        amount: amount.toString(),
-        currency_type: currencyType,
-        destination_address: destinationAddress,
-        destination_address_type: destinationAddressType,
-        payment_provider: paymentProvider,
-        payment_receipt_id: paymentReceiptId,
-        top_up_quote_id: topUpQuoteId,
+        ...paymentReceiptDbResult[0],
         chargeback_reason: chargebackReason,
         chargeback_receipt_id: chargebackReceiptId,
-        winston_credit_amount: winstonCreditAmount.toString(),
       });
     });
   }

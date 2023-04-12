@@ -43,7 +43,7 @@ describe("handleDisputeCreatedEvent", () => {
     expect(chargebackReceipt.length).to.equal(1);
 
     const {
-      amount,
+      payment_amount,
       currency_type,
       destination_address,
       destination_address_type,
@@ -55,7 +55,7 @@ describe("handleDisputeCreatedEvent", () => {
       chargeback_reason,
     } = chargebackReceipt[0];
 
-    expect(amount).to.equal("100");
+    expect(payment_amount).to.equal("100");
     expect(currency_type).to.equal("usd");
     expect(destination_address).to.equal(disputeEventUserAddress);
     expect(destination_address_type).to.equal("arweave");

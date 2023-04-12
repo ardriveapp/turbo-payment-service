@@ -7,7 +7,6 @@ import { tableNames } from "./dbConstants";
 import {
   ChargebackReceiptDBResult,
   PaymentReceiptDBResult,
-  RescindedPaymentReceiptDBResult,
   TopUpQuoteDBResult,
   UserDBResult,
 } from "./dbTypes";
@@ -28,7 +27,7 @@ describe("PostgresDatabase class", () => {
       // -  validate payment provider is expected
       // -  validate currency type is supported
       await db.createTopUpQuote({
-        amount: 100,
+        paymentAmount: 100,
         currencyType: "usd",
         destinationAddress: "XYZ",
         destinationAddressType: "arweave",
@@ -46,7 +45,7 @@ describe("PostgresDatabase class", () => {
       expect(topUpQuote.length).to.equal(1);
 
       const {
-        amount,
+        payment_amount,
         currency_type,
         destination_address,
         destination_address_type,
@@ -57,7 +56,7 @@ describe("PostgresDatabase class", () => {
         winston_credit_amount,
       } = topUpQuote[0];
 
-      expect(amount).to.equal("100");
+      expect(payment_amount).to.equal("100");
       expect(currency_type).to.equal("usd");
       expect(destination_address).to.equal("XYZ");
       expect(destination_address_type).to.equal("arweave");
@@ -110,7 +109,7 @@ describe("PostgresDatabase class", () => {
     before(async () => {
       // Create Payment Receipt for New User
       await dbTestHelper.insertStubTopUpQuote({
-        amount: "10101",
+        payment_amount: "10101",
         currency_type: "can",
         destination_address: newUserAddress,
         destination_address_type: "arweave",
@@ -119,7 +118,7 @@ describe("PostgresDatabase class", () => {
       });
       await db.createPaymentReceipt({
         currencyType: "can",
-        amount: 10101,
+        paymentAmount: 10101,
         topUpQuoteId: newUserTopUpId,
         paymentReceiptId: "Unique Identifier",
       });
@@ -132,14 +131,14 @@ describe("PostgresDatabase class", () => {
       // Create Payment Receipt for Existing User
       await dbTestHelper.insertStubTopUpQuote({
         top_up_quote_id: oldUserTopUpId,
-        amount: "1337",
+        payment_amount: "1337",
         currency_type: "fra",
         destination_address: oldUserAddress,
         destination_address_type: "arweave",
         winston_credit_amount: oldUserPaymentAmount.toString(),
       });
       await db.createPaymentReceipt({
-        amount: 1337,
+        paymentAmount: 1337,
         currencyType: "fra",
         topUpQuoteId: oldUserTopUpId,
         paymentReceiptId: "An Existing User's Unique Identifier",
@@ -153,7 +152,7 @@ describe("PostgresDatabase class", () => {
       expect(paymentReceipt.length).to.equal(1);
 
       const {
-        amount,
+        payment_amount,
         currency_type,
         destination_address,
         destination_address_type,
@@ -164,7 +163,7 @@ describe("PostgresDatabase class", () => {
         winston_credit_amount,
       } = paymentReceipt[0];
 
-      expect(amount).to.equal("10101");
+      expect(payment_amount).to.equal("10101");
       expect(currency_type).to.equal("can");
       expect(destination_address).to.equal(newUserAddress);
       expect(destination_address_type).to.equal("arweave");
@@ -205,7 +204,7 @@ describe("PostgresDatabase class", () => {
       );
     });
 
-    it("deletes the top_up_quote and inserts a new fulfilled_top_up_quote as expected", async () => {
+    it("deletes the top_up_quotes as expected", async () => {
       const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       );
@@ -213,29 +212,19 @@ describe("PostgresDatabase class", () => {
 
       expect(topUpIds).to.not.include(newUserTopUpId);
       expect(topUpIds).to.not.include(oldUserTopUpId);
-
-      const fulfilledTopUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
-        tableNames.fulfilledTopUpQuote
-      );
-      const fulfilledTopUpIds = fulfilledTopUpQuoteDbResults.map(
-        (r) => r.top_up_quote_id
-      );
-
-      expect(fulfilledTopUpIds).to.include(newUserTopUpId);
-      expect(fulfilledTopUpIds).to.include(oldUserTopUpId);
     });
 
     it("errors as expected when top up quote amount is mismatched", async () => {
       await dbTestHelper.insertStubTopUpQuote({
         top_up_quote_id:
           "A Top Up Quote ID That will be mismatched by currency amount",
-        amount: "500",
+        payment_amount: "500",
         currency_type: "any",
       });
 
       await expectAsyncErrorThrow({
         promiseToError: db.createPaymentReceipt({
-          amount: 200,
+          paymentAmount: 200,
           currencyType: "any",
           topUpQuoteId:
             "A Top Up Quote ID That will be mismatched by currency amount",
@@ -262,13 +251,13 @@ describe("PostgresDatabase class", () => {
       await dbTestHelper.insertStubTopUpQuote({
         quote_expiration_date: quoteExpirationDateInThePast,
         top_up_quote_id: "Expired Quote",
-        amount: "1",
+        payment_amount: "1",
         currency_type: "marsToken",
       });
 
       await expectAsyncErrorThrow({
         promiseToError: db.createPaymentReceipt({
-          amount: 1,
+          paymentAmount: 1,
           currencyType: "marsToken",
           topUpQuoteId: "Expired Quote",
           paymentReceiptId: "This is a string",
@@ -289,7 +278,7 @@ describe("PostgresDatabase class", () => {
     it("errors as expected when no top up quote can be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.createPaymentReceipt({
-          amount: 1,
+          paymentAmount: 1,
           currencyType: "usd",
           topUpQuoteId: "A Top Up Quote ID That will be NOT FOUND",
           paymentReceiptId: "This is fine",
@@ -370,7 +359,7 @@ describe("PostgresDatabase class", () => {
       expect(chargebackReceipt.length).to.equal(1);
 
       const {
-        amount,
+        payment_amount,
         currency_type,
         destination_address,
         destination_address_type,
@@ -382,7 +371,7 @@ describe("PostgresDatabase class", () => {
         chargeback_reason,
       } = chargebackReceipt[0];
 
-      expect(amount).to.equal("100");
+      expect(payment_amount).to.equal("100");
       expect(currency_type).to.equal("usd");
       expect(destination_address).to.equal(naughtyUserAddress);
       expect(destination_address_type).to.equal("arweave");
@@ -394,20 +383,11 @@ describe("PostgresDatabase class", () => {
       expect(chargeback_reason).to.equal("Evil");
     });
 
-    it("deletes the payment_receipt entity and inserts a rescinded_payment_receipt", async () => {
+    it("deletes the payment_receipt entity", async () => {
       const paymentReceiptDbResults = await db["knex"]<PaymentReceiptDBResult>(
         tableNames.paymentReceipt
       ).where({ payment_receipt_id: naughtyPaymentId });
       expect(paymentReceiptDbResults.length).to.equal(0);
-
-      const rescindedPaymentReceiptDbResults = await db[
-        "knex"
-      ]<RescindedPaymentReceiptDBResult>(
-        tableNames.rescindedPaymentReceipt
-      ).where({
-        payment_receipt_id: naughtyPaymentId,
-      });
-      expect(rescindedPaymentReceiptDbResults.length).to.equal(1);
     });
 
     it("decrements user's balance as expected", async () => {
