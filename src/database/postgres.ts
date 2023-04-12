@@ -27,7 +27,7 @@ import {
   User,
   UserDBResult,
 } from "./dbTypes";
-import { UserNotFoundWarning } from "./errors";
+import { InsufficientBalance, UserNotFoundWarning } from "./errors";
 import * as knexConfig from "./knexfile";
 
 /** Knex instance connected to a PostgreSQL database */
@@ -384,7 +384,7 @@ export class PostgresDatabase implements Database {
       try {
         newBalance = currentWinstonBalance.minus(winstonCreditAmount);
       } catch {
-        throw Error("User does not have enough balance!");
+        throw new InsufficientBalance(userAddress);
       }
 
       await knexTransaction<UserDBResult>(tableNames.user)
