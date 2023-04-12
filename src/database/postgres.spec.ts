@@ -6,8 +6,8 @@ import { Winston } from "../types/winston";
 import { tableNames } from "./dbConstants";
 import {
   ChargebackReceiptDBResult,
-  FailedTopUpQuoteDBResult,
   PaymentReceiptDBResult,
+  RescindedPaymentReceiptDBResult,
   TopUpQuoteDBResult,
   UserDBResult,
 } from "./dbTypes";
@@ -94,56 +94,6 @@ describe("PostgresDatabase class", () => {
         errorMessage:
           "No top up quote found in database with ID 'Non Existent ID'",
       });
-    });
-  });
-
-  describe("expireTopUpQuote method", () => {
-    const sunnyId = "Sunny 🌞";
-
-    before(async () => {
-      await dbTestHelper.insertStubTopUpQuote({ top_up_quote_id: sunnyId });
-    });
-
-    it("deletes the top_up_quote entity and inserts a failed_top_up_quote", async () => {
-      await db.expireTopUpQuote(sunnyId);
-
-      const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
-        tableNames.topUpQuote
-      ).where({ top_up_quote_id: sunnyId });
-      expect(topUpQuoteDbResults.length).to.equal(0);
-
-      const failedTopUpQuoteDbResults = await db[
-        "knex"
-      ]<FailedTopUpQuoteDBResult>(tableNames.failedTopUpQuote).where({
-        top_up_quote_id: sunnyId,
-      });
-      expect(failedTopUpQuoteDbResults.length).to.equal(1);
-
-      const {
-        amount,
-        currency_type,
-        destination_address,
-        destination_address_type,
-        payment_provider,
-        quote_creation_date,
-        quote_expiration_date,
-        quote_failed_date,
-        top_up_quote_id,
-        winston_credit_amount,
-      } = failedTopUpQuoteDbResults[0];
-
-      expect(amount).to.equal("100");
-      expect(currency_type).to.equal("usd");
-      expect(destination_address).to.equal(
-        "1234567890123456789012345678901231234567890"
-      );
-      expect(destination_address_type).to.equal("arweave");
-      expect(payment_provider).to.equal("stripe");
-      expect(quote_creation_date).to.exist;
-      expect(quote_failed_date).to.exist;
-      expect(quote_expiration_date).to.exist;
-      expect(top_up_quote_id).to.equal(sunnyId);
-      expect(winston_credit_amount).to.equal("1337");
     });
   });
 
@@ -304,6 +254,38 @@ describe("PostgresDatabase class", () => {
       ).to.equal(0);
     });
 
+    it("errors as expected when top_up_quote is beyond expiration date", async () => {
+      const quoteExpirationDateInThePast = new Date(
+        Date.now() - 1000
+      ).toISOString();
+
+      await dbTestHelper.insertStubTopUpQuote({
+        quote_expiration_date: quoteExpirationDateInThePast,
+        top_up_quote_id: "Expired Quote",
+        amount: "1",
+        currency_type: "marsToken",
+      });
+
+      await expectAsyncErrorThrow({
+        promiseToError: db.createPaymentReceipt({
+          amount: 1,
+          currencyType: "marsToken",
+          topUpQuoteId: "Expired Quote",
+          paymentReceiptId: "This is a string",
+        }),
+        errorMessage:
+          "Top up quote with id 'Expired Quote' has already been expired!",
+      });
+
+      expect(
+        (
+          await db["knex"](tableNames.paymentReceipt).where({
+            payment_receipt_id: "This is a string",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
     it("errors as expected when no top up quote can be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.createPaymentReceipt({
@@ -420,7 +402,9 @@ describe("PostgresDatabase class", () => {
 
       const rescindedPaymentReceiptDbResults = await db[
         "knex"
-      ]<PaymentReceiptDBResult>(tableNames.rescindedPaymentReceipt).where({
+      ]<RescindedPaymentReceiptDBResult>(
+        tableNames.rescindedPaymentReceipt
+      ).where({
         payment_receipt_id: naughtyPaymentId,
       });
       expect(rescindedPaymentReceiptDbResults.length).to.equal(1);
@@ -534,9 +518,35 @@ describe("PostgresDatabase class", () => {
       expect(shortsQuote.userAddress).to.equal(evilAddress);
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.getUser("Non Existent Address"),
+        errorType: "UserNotFoundWarning",
+        errorMessage:
+          "No user found in database with address 'Non Existent Address'",
+      });
+    });
+  });
+
+  describe("getBalance method", () => {
+    const userWithBalanceAddress = "userWithBalanceAddress";
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: userWithBalanceAddress,
+        winston_credit_balance: "500",
+      });
+    });
+
+    it("gets the expected user's balance", async () => {
+      const userBalance = await db.getBalance(userWithBalanceAddress);
+      expect(userBalance.toString()).to.equal("500");
+    });
+
+    it("throws a warning as expected when user cannot be found", async () => {
+      await expectAsyncErrorThrow({
+        promiseToError: db.getUser("Non Existent Address"),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
@@ -556,9 +566,10 @@ describe("PostgresDatabase class", () => {
       expect(promoInfo).to.deep.equal({});
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.getPromoInfo("Non Existent Address"),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
@@ -586,11 +597,12 @@ describe("PostgresDatabase class", () => {
       });
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.updatePromoInfo("Non Existent Address", {
           newPromo: true,
         }),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
@@ -631,12 +643,13 @@ describe("PostgresDatabase class", () => {
       expect(+poorUser.winstonCreditBalance).to.equal(10);
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.reserveBalance(
           "Non Existent Address",
           new Winston(1337)
         ),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });
@@ -661,12 +674,13 @@ describe("PostgresDatabase class", () => {
       expect(+happyUser.winstonCreditBalance).to.equal(102_000);
     });
 
-    it("errors as expected when user cannot be found", async () => {
+    it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
         promiseToError: db.refundBalance(
           "Non Existent Address",
           new Winston(1337)
         ),
+        errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });

@@ -1,3 +1,4 @@
+import Arweave from "arweave/node/common";
 import axios from "axios";
 import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
@@ -135,22 +136,53 @@ describe("Router tests", () => {
     expect(balance).to.equal(5000);
   });
 
+  it("GET /balance returns 404 for no user found", async function () {
+    this.timeout(5_000);
+    const jwk = await Arweave.crypto.generateJWK();
+
+    const nonce = "123";
+    const publicKey = toB64Url(Buffer.from(jwkToPem(jwk, true)));
+    const signature = await signData(jwkToPem(jwk), nonce);
+
+    const { status, statusText, data } = await axios.get(
+      `${localTestUrl}/v1/balance`,
+      {
+        headers: {
+          "x-public-key": publicKey,
+          "x-nonce": nonce,
+          "x-signature": toB64Url(Buffer.from(signature)),
+        },
+        validateStatus: () => true,
+      }
+    );
+
+    expect(status).to.equal(404);
+    expect(statusText).to.equal("Not Found");
+
+    expect(data).to.equal("User Not Found");
+  });
+
   it("GET /balance returns 403 for bad signature", async () => {
     const nonce = "123";
     const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
     const signature = await signData(jwkToPem(testWallet), "another nonce");
 
-    const { status, data } = await axios.get(`${localTestUrl}/v1/balance`, {
-      headers: {
-        "x-public-key": publicKey,
-        "x-nonce": nonce,
-        "x-signature": toB64Url(Buffer.from(signature)),
-      },
-      validateStatus: () => true,
-    });
+    const { status, data, statusText } = await axios.get(
+      `${localTestUrl}/v1/balance`,
+      {
+        headers: {
+          "x-public-key": publicKey,
+          "x-nonce": nonce,
+          "x-signature": toB64Url(Buffer.from(signature)),
+        },
+        validateStatus: () => true,
+      }
+    );
+
+    expect(status).to.equal(403);
+    expect(statusText).to.equal("Forbidden");
 
     expect(data).to.equal("Invalid signature or missing required headers");
-    expect(status).to.equal(403);
   });
 
   it("GET /price-quote returns 200 and correct response for correct signature", async () => {

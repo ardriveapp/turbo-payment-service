@@ -2,7 +2,7 @@ import knex, { Knex } from "knex";
 import winston from "winston";
 
 import logger from "../logger";
-import { Winston } from "../types/types";
+import { WC, Winston } from "../types/types";
 import { Database } from "./database";
 import { columnNames, tableNames } from "./dbConstants";
 import {
@@ -27,6 +27,7 @@ import {
   User,
   UserDBResult,
 } from "./dbTypes";
+import { UserNotFoundWarning } from "./errors";
 import * as knexConfig from "./knexfile";
 
 /** Knex instance connected to a PostgreSQL database */
@@ -83,23 +84,6 @@ export class PostgresDatabase implements Database {
     return topUpQuoteDbResult.map(topUpQuoteDBMap)[0];
   }
 
-  public async expireTopUpQuote(topUpQuoteId: string): Promise<void> {
-    await this.knex.transaction(async (knexTransaction) => {
-      const topUpQuoteResult = await knexTransaction<TopUpQuoteDBResult>(
-        tableNames.topUpQuote
-      )
-        .where({
-          [columnNames.topUpQuoteId]: topUpQuoteId,
-        })
-        .del()
-        .returning("*");
-
-      await knexTransaction<TopUpQuoteDBResult>(
-        tableNames.failedTopUpQuote
-      ).insert(topUpQuoteResult);
-    });
-  }
-
   public async updatePromoInfo(
     userAddress: string,
     promoInfo: PromotionalInfo
@@ -130,11 +114,16 @@ export class PostgresDatabase implements Database {
     ).where({
       user_address: userAddress,
     });
+
     if (userDbResult.length === 0) {
-      throw Error(`No user found in database with address '${userAddress}'`);
+      throw new UserNotFoundWarning(userAddress);
     }
 
     return userDbResult.map(userDBMap)[0];
+  }
+
+  public async getBalance(userAddress: string): Promise<WC> {
+    return (await this.getUser(userAddress)).winstonCreditBalance;
   }
 
   public async createPaymentReceipt(
@@ -166,10 +155,17 @@ export class PostgresDatabase implements Database {
         destination_address_type,
         payment_provider,
         winston_credit_amount,
+        quote_expiration_date,
       } = topUpQuoteDbResults[0];
 
+      if (new Date(quote_expiration_date).getTime() < new Date().getTime()) {
+        throw Error(
+          `Top up quote with id '${topUpQuoteId}' has already been expired!`
+        );
+      }
+
       if (+topUpAmount !== amount || currencyType !== currency_type) {
-        // TODO: Whats the business logic to handle this. Refund the amount? Or credit the amount paid
+        // TODO: Whats the business logic to handle the below error cases. Refund the amount? Or credit the amount paid
         throw Error(
           `Amount from top up quote (${topUpAmount} ${currency_type}) does not match the amount paid on the payment receipt (${amount} ${currencyType})!`
         );
