@@ -39,7 +39,7 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
   const priceQuote = {
     topUpQuoteId: randomUUID(),
     destinationAddressType: "arweave",
-    amount: fiatValue,
+    paymentAmount: fiatValue,
     winstonCreditAmount: quote,
     destinationAddress: walletAddress,
     currencyType: fiatCurrency,

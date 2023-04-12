@@ -21,7 +21,7 @@ export async function handlePaymentSuccessEvent(
 
   await paymentDatabase.createPaymentReceipt({
     paymentReceiptId,
-    amount: pi.amount,
+    paymentAmount: pi.amount,
     currencyType: pi.currency,
     topUpQuoteId,
   });

@@ -25,7 +25,7 @@ describe("handlePaymentSuccessEvent", () => {
     await dbTestHelper.insertStubTopUpQuote({
       top_up_quote_id: paymentSuccessTopUpQuoteId,
       winston_credit_amount: "500",
-      amount: "100",
+      payment_amount: "100",
     });
 
     // Trigger success event happy path
@@ -41,7 +41,7 @@ describe("handlePaymentSuccessEvent", () => {
     expect(paymentReceiptDbResults).to.have.length(1);
 
     const {
-      amount,
+      payment_amount,
       currency_type,
       destination_address,
       destination_address_type,
@@ -52,7 +52,7 @@ describe("handlePaymentSuccessEvent", () => {
       winston_credit_amount,
     } = paymentReceiptDbResults[0];
 
-    expect(amount).to.equal("100");
+    expect(payment_amount).to.equal("100");
     expect(currency_type).to.equal("usd");
     expect(destination_address).to.equal(
       "1234567890123456789012345678901231234567890"
