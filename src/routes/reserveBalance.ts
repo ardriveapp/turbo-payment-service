@@ -16,17 +16,23 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     return next;
   }
 
+  let winstonCreditsToReserve: Winston;
+  let walletAddressToCredit: string;
+
   if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
     ctx.response.status = 403;
     ctx.body = "Missing parameters";
     return next;
+  } else {
+    try {
+      winstonCreditsToReserve = new Winston(ctx.params.winstonCredits);
+      walletAddressToCredit = ctx.params.walletAddress;
+    } catch (error) {
+      ctx.response.status = 403;
+      ctx.body = "Invalid parameters";
+      return next;
+    }
   }
-
-  const winstonCreditsToReserve: Winston = new Winston(
-    ctx.params.winstonCredits
-  );
-
-  const walletAddressToCredit: string = ctx.params.walletAddress;
 
   try {
     await paymentDatabase.reserveBalance(

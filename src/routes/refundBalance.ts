@@ -16,16 +16,23 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     return next;
   }
 
+  let winstonCreditsToRefund: Winston;
+  let walletAddressToRefund: string;
+
   if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
-    ctx.response.status = 400;
+    ctx.response.status = 403;
     ctx.body = "Missing parameters";
     return next;
+  } else {
+    try {
+      winstonCreditsToRefund = new Winston(ctx.params.winstonCredits);
+      walletAddressToRefund = ctx.params.walletAddress;
+    } catch (error) {
+      ctx.response.status = 403;
+      ctx.body = "Invalid parameters";
+      return next;
+    }
   }
-
-  const walletAddressToRefund: string = ctx.params.walletAddress;
-  const winstonCreditsToRefund: Winston = new Winston(
-    ctx.params.winstonCredits
-  );
 
   logger.info("Refunding balance for user ", {
     walletAddressToRefund,
