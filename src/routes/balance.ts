@@ -1,5 +1,6 @@
 import { Next } from "koa";
 
+import { UserNotFoundWarning } from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
 
@@ -15,17 +16,21 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
     return next;
   }
 
-  logger.info(" balance requested for ", { walletAddress });
+  logger.info("Balance requested", { walletAddress });
 
   try {
-    const balance = await paymentDatabase.getUserBalance(walletAddress);
+    const balance = await paymentDatabase.getBalance(walletAddress);
     ctx.body = balance.toString();
   } catch (error) {
-    // TODO: Check for user not found error (warning) from DB and add that status and test
-
-    logger.error(error);
-    ctx.response.status = 503;
-    ctx.body = "Cloud Database Unavailable";
+    if (error instanceof UserNotFoundWarning) {
+      logger.info(error.message);
+      ctx.response.status = 404;
+      ctx.body = "User Not Found";
+    } else {
+      logger.error(error);
+      ctx.response.status = 503;
+      ctx.body = "Cloud Database Unavailable";
+    }
   }
 
   return next;

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { Stripe } from "stripe";
 
 import { Database } from "../../../database/database";
@@ -8,34 +9,17 @@ export async function handleDisputeCreatedEvent(
   pi: Stripe.Dispute,
   paymentDatabase: Database
 ) {
-  const walletAddress = pi.metadata["address"];
-  logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${pi.status}!`
-  );
-  logger.info(`💸 Dispute Created. ${pi.amount}`);
+  // TODO: Can we depend on this to be here on every chargeback?
+  const topUpQuoteId = pi.metadata["top_up_quote_id"];
+  logger.info(`🔔  Webhook Dispute Created Event!`, { topUpQuoteId, pi });
+  const chargebackReceiptId = randomUUID();
 
-  const priceQuote = await paymentDatabase.expirePriceQuote(walletAddress);
-  const oldPaymentReceipt = await paymentDatabase.getPaymentReceipt(
-    walletAddress
-  );
-  if (priceQuote) {
-    logger.info(`Payment Quote found for ${walletAddress}`);
-    const oldBalance = await paymentDatabase.getUserBalance(walletAddress);
-    //TODO: Use BigNumber or Winston types for balance
-    const balance = await paymentDatabase.updateUserBalance(
-      walletAddress,
-      oldBalance.balance - oldPaymentReceipt.balance
-    );
-    logger.info("Balance updated: ", balance);
-  } else {
-    logger.info(
-      `No payment quote found for ${walletAddress}. Creating refund anyway.`
-    );
-  }
-  const receipt = await paymentDatabase.createRefundReceipt(walletAddress);
-  logger.info(
-    `Refund Receipt created for ${walletAddress} ${JSON.stringify(receipt)}`
-  );
-
+  await paymentDatabase.createChargebackReceipt({
+    chargebackReason: pi.reason,
+    chargebackReceiptId,
+    topUpQuoteId,
+  });
   MetricRegistry.paymentFailedCounter.inc();
+
+  logger.info("Chargeback receipt created!", { chargebackReceiptId });
 }

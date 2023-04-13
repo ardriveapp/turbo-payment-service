@@ -5,8 +5,10 @@
   "editor.formatOnSaveMode": "file",
   "typescript.preferences.importModuleSpecifier": "relative",
   "cSpell.words": [
+    "ario",
     "bignumber",
     "chargeback",
+    "Hodler",
     "knexfile",
     "nvmrc",
     "Readables",

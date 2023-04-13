@@ -9,6 +9,11 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
   const { pricingService } = ctx.state;
 
   const bytesValue = ctx.params.amount;
+  if (Number(bytesValue) > Number.MAX_SAFE_INTEGER) {
+    ctx.response.status = 400;
+    ctx.message = "Byte count too large";
+    return next;
+  }
   let bytes: ByteCount;
   try {
     bytes = ByteCount(Number(bytesValue));

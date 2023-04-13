@@ -20,6 +20,7 @@ export class Schema {
 
     await this.createUserTable();
     await this.createTopUpQuoteTable();
+    await this.createFailedTopUpQuoteTable();
     await this.createPaymentReceiptTable();
     await this.createChargebackReceiptTable();
 
@@ -34,6 +35,7 @@ export class Schema {
 
     await this.pg.schema.dropTable(user);
     await this.pg.schema.dropTable(topUpQuote);
+    await this.pg.schema.dropTable(failedTopUpQuote);
     await this.pg.schema.dropTable(paymentReceipt);
     await this.pg.schema.dropTable(chargebackReceipt);
 
@@ -47,8 +49,10 @@ export class Schema {
       t.string(userAddress).primary().notNullable();
       t.string(userAddressType).notNullable();
       t.string(winstonCreditBalance).notNullable();
-      // TODO: Will jsonb work for this promo info or should we use a string and JSON stringify/parse?
       t.jsonb(promotionalInfo).defaultTo({}).notNullable();
+      t.timestamp(userCreationDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
     });
   }
 
@@ -57,12 +61,31 @@ export class Schema {
       t.string(topUpQuoteId).primary().notNullable();
       t.string(destinationAddress).notNullable().index();
       t.string(destinationAddressType).notNullable();
-      t.string(amount).notNullable();
+      t.string(paymentAmount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
       t.string(paymentProvider).notNullable();
-      t.timestamp(quoteExpirationDate, this.noTimeZone).notNullable();
-      t.timestamp(quoteCreationDate, this.noTimeZone)
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
+    });
+  }
+
+  private async createFailedTopUpQuoteTable(): Promise<void> {
+    return this.pg.schema.createTable(failedTopUpQuote, (t) => {
+      t.string(topUpQuoteId).primary().notNullable();
+      t.string(destinationAddress).notNullable().index();
+      t.string(destinationAddressType).notNullable();
+      t.string(paymentAmount).notNullable();
+      t.string(currencyType).notNullable();
+      t.string(winstonCreditAmount).notNullable();
+      t.string(paymentProvider).notNullable();
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate).notNullable();
+
+      t.string(failedReason).index().notNullable();
+      t.timestamp(quoteFailedDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
@@ -70,15 +93,18 @@ export class Schema {
 
   private async createPaymentReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(paymentReceipt, (t) => {
-      t.string(paymentReceiptId).notNullable().primary();
+      t.string(topUpQuoteId).index().notNullable();
       t.string(destinationAddress).notNullable().index();
       t.string(destinationAddressType).notNullable();
-      t.string(amount).notNullable();
+      t.string(paymentAmount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
-      t.string(topUpQuoteId).notNullable();
       t.string(paymentProvider).notNullable();
-      t.timestamp(paymentReceiptDate, this.noTimeZone)
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate).notNullable();
+
+      t.string(paymentReceiptId).notNullable().primary();
+      t.timestamp(paymentReceiptDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
@@ -86,16 +112,22 @@ export class Schema {
 
   private async createChargebackReceiptTable(): Promise<void> {
     return this.pg.schema.createTable(chargebackReceipt, (t) => {
-      t.string(chargebackReceiptId).notNullable().primary();
+      t.string(topUpQuoteId).index().notNullable();
       t.string(destinationAddress).notNullable().index();
       t.string(destinationAddressType).notNullable();
-      t.string(amount).notNullable();
+      t.string(paymentAmount).notNullable();
       t.string(currencyType).notNullable();
       t.string(winstonCreditAmount).notNullable();
-      t.string(paymentReceiptId).notNullable();
       t.string(paymentProvider).notNullable();
-      t.string(chargebackReason).notNullable();
-      t.timestamp(chargebackReceiptDate, this.noTimeZone)
+      t.timestamp(quoteExpirationDate).notNullable();
+      t.timestamp(quoteCreationDate).notNullable();
+
+      t.string(paymentReceiptId).notNullable();
+      t.timestamp(paymentReceiptDate).notNullable();
+
+      t.string(chargebackReceiptId).notNullable().primary();
+      t.string(chargebackReason).index().notNullable();
+      t.timestamp(chargebackReceiptDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
     });
@@ -104,29 +136,36 @@ export class Schema {
   private defaultTimestamp() {
     return this.pg.fn.now();
   }
-
-  private noTimeZone = { useTz: false };
 }
 
-const { chargebackReceipt, paymentReceipt, topUpQuote, user } = tableNames;
+const {
+  chargebackReceipt,
+  failedTopUpQuote,
+  paymentReceipt,
+  topUpQuote,
+  user,
+} = tableNames;
 
 const {
-  amount,
+  paymentAmount,
   chargebackReason,
   chargebackReceiptDate,
   chargebackReceiptId,
   currencyType,
   destinationAddress,
   destinationAddressType,
+  failedReason,
   paymentProvider,
   paymentReceiptDate,
   paymentReceiptId,
   promotionalInfo,
   quoteCreationDate,
   quoteExpirationDate,
+  quoteFailedDate,
   topUpQuoteId,
   userAddress,
   userAddressType,
+  userCreationDate,
   winstonCreditAmount,
   winstonCreditBalance,
 } = columnNames;

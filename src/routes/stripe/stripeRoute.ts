@@ -5,28 +5,16 @@ import { Stripe } from "stripe";
 import logger from "../../logger";
 import { KoaContext } from "../../server";
 import { handleDisputeCreatedEvent } from "./eventHandlers/disputeCreatedEventHandler";
-import { handlePaymentFailedEvent } from "./eventHandlers/paymentFailedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
-let stripe: Stripe;
-
 export async function stripeRoute(ctx: KoaContext, next: Next) {
-  const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
   const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 
-  if (!STRIPE_SECRET_KEY || !WEBHOOK_SECRET) {
-    throw new Error("Stripe secret key or webhook secret not set");
+  if (!WEBHOOK_SECRET) {
+    throw new Error("Stripe webhook secret not set");
   }
 
-  stripe ??= new Stripe(STRIPE_SECRET_KEY, {
-    apiVersion: "2022-11-15",
-    appInfo: {
-      // For sample support and debugging, not required for production:
-      name: "ardrive-turbo",
-      version: "0.0.0",
-    },
-    typescript: true,
-  });
+  const stripe = ctx.state.stripe;
 
   logger.child({ path: ctx.path });
   //get the webhook signature for verification
@@ -39,6 +27,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     logger.info("Verifying webhook signature...");
 
     event = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (err: any) {
     logger.info(`⚠️ Webhook signature verification failed.`);
     logger.info(err.message);
@@ -70,6 +59,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     case "payment_intent.succeeded":
       // Funds have been captured
       try {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handlePaymentSuccessEvent(
           data.object as Stripe.PaymentIntent,
           ctx.state.paymentDatabase
@@ -78,16 +68,9 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
         logger.error("Payment Success Event handler failed", error);
       }
       break;
-    case "payment_intent.payment_failed":
-    case "payment_intent.canceled":
-      try {
-        handlePaymentFailedEvent(data.object as Stripe.PaymentIntent, ctx);
-      } catch (error) {
-        logger.error("Payment Failed/Cancelled Event handler failed", error);
-      }
-      break;
     case "charge.dispute.created":
       try {
+        // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleDisputeCreatedEvent(
           data.object as Stripe.Dispute,
           ctx.state.paymentDatabase
