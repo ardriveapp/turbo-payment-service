@@ -12,7 +12,9 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
 
   const { pricingService, paymentDatabase, stripe } = ctx.state;
 
-  const fiatValue = ctx.params.amount;
+  // TODO: Sanitize payment amount input value. TODO: Add proper types for fiat. Stripe takes amount in smallest unit of currency. So we handle it the same. Here we are assuming this API accepts a dollar integer instead of smallest form (cents). TODO: Should we change that to use smallest form of currency when going into the API?
+  const fiatValue = Math.round(ctx.params.amount * 100);
+  // TODO: Sanitize currency type input value (must be currency type that both FiatOracle (CoinGecko) and PaymentProvider (Stripe) can handle)
   const fiatCurrency = ctx.params.currency;
 
   const walletAddress = ctx.state.walletAddress;
@@ -73,19 +75,37 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
   }
 
   try {
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(fiatValue * 100), // TODO: Add proper types for fiat. Stripe takes amount in smallest unit of currency
+    const checkoutSession = await stripe.checkout.sessions.create({
+      // TODO: Success and Cancel URLS (Do we need app origin? e.g: ArDrive Widget, Top Up Page, ario-turbo-cli)
+      success_url: "https://app.ardrive.io",
+      cancel_url: "https://app.ardrive.io",
       currency: fiatCurrency,
-      metadata: {
-        topUpQuoteId: priceQuote.topUpQuoteId,
+      payment_method_types: ["card"],
+      line_items: [
+        {
+          price_data: {
+            product_data: { name: "ARC" },
+            currency: fiatCurrency,
+            unit_amount: fiatValue,
+          },
+          quantity: 1,
+        },
+      ],
+      payment_intent_data: {
+        metadata: {
+          topUpQuoteId: priceQuote.topUpQuoteId,
+          destinationAddress: walletAddress,
+        },
       },
+      mode: "payment",
     });
+
     ctx.response.status = 200;
 
     ctx.body = {
       balance: existingBalance,
       priceQuote,
-      paymentIntent,
+      checkoutSession,
     };
   } catch (error) {
     logger.error(error);

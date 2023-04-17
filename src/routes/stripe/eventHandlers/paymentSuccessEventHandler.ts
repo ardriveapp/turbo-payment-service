@@ -9,11 +9,14 @@ export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
   paymentDatabase: Database
 ) {
-  const topUpQuoteId = pi.metadata["top_up_quote_id"];
+  const topUpQuoteId = pi.metadata["topUpQuoteId"];
+  const destinationAddress = pi.metadata["destinationAddress"];
 
   logger.info(`💰 Payment Success Event Triggered!`, {
     topUpQuoteId,
-    amount: pi.amount,
+    destinationAddress,
+    paymentAmount: pi.amount,
+    currencyType: pi.currency,
   });
 
   const topUpQuote = await paymentDatabase.getTopUpQuote(topUpQuoteId);
