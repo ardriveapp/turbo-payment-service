@@ -17,7 +17,7 @@ describe("handlePaymentSuccessEvent", () => {
   const paymentSuccessTopUpQuoteId = "Payment Success Top Up Quote ID 🧾";
 
   const paymentIntent = paymentIntentStub({
-    top_up_quote_id: paymentSuccessTopUpQuoteId,
+    topUpQuoteId: paymentSuccessTopUpQuoteId,
   });
 
   before(async () => {
