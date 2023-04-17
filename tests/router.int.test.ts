@@ -224,7 +224,7 @@ describe("Router tests", () => {
 
     expect(data).to.have.property("balance");
     expect(data).to.have.property("priceQuote");
-    expect(data).to.have.property("paymentIntent");
+    expect(data).to.have.property("checkoutSession");
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
   });

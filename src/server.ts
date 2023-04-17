@@ -27,7 +27,7 @@ export async function createServer(
 
   await loadSecretsToEnv();
   const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-  const sharedSecret = process.env.PRIVATE_ROUTE_SECRET;
+  const sharedSecret = process.env.PRIVATE_ROUTE_SECRET ?? "local";
 
   if (!sharedSecret) {
     throw new Error("Shared secret not set");
