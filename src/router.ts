@@ -2,7 +2,6 @@ import { Next } from "koa";
 import Router from "koa-router";
 import * as promClient from "prom-client";
 
-import logger from "./logger";
 import { verifySignature } from "./middleware/verifySignature";
 import { balanceRoute } from "./routes/balance";
 import { priceQuote } from "./routes/priceQuote";
@@ -23,21 +22,11 @@ router.get("/v1/price/:currency/:amount", priceRoutes);
 
 router.get("/v1/price-quote/:currency/:amount", verifySignature, priceQuote);
 
-router.post("/v1/balance/address", () => logger.info("TODO"));
-
-router.post("/v1/webhook/stripe", () => logger.info("TODO"));
-
-router.post("/v1/reserve-balance", () => logger.info("TODO"));
-router.post("/v1/refund-balance", () => logger.info("TODO"));
-
 router.post("/v1/stripe-webhook", stripeRoute);
 
 router.get("/v1/balance", verifySignature, balanceRoute);
 
-router.get(
-  "/v1/reserve-balance/:walletAddress/:winstonCredits",
-  reserveBalance
-);
+router.get("/v1/reserve-balance/:walletAddress/:byteCount", reserveBalance);
 
 router.get("/v1/refund-balance/:walletAddress/:winstonCredits", refundBalance);
 
