@@ -1,0 +1,1 @@
+export const supportedPaymentProviders = ["stripe"];
