@@ -3,7 +3,6 @@ import { expect } from "chai";
 import {
   InvalidPaymentAmount,
   UnsupportedCurrencyType,
-  UnsupportedPaymentProvider,
 } from "../database/errors";
 import { Payment } from "./payment";
 import { supportedPaymentCurrencyTypes } from "./supportedCurrencies";
@@ -73,20 +72,6 @@ describe("Payment class", () => {
       expect(() => new Payment({ amount: NaN, type: "krw" })).to.throw(
         InvalidPaymentAmount,
         "The provided payment amount (NaN) is invalid; it must be a positive non-decimal integer!"
-      );
-    });
-
-    it("throws an error when provided an un-supported payment provider", () => {
-      expect(
-        () =>
-          new Payment({
-            amount: 5000,
-            type: "usd",
-            provider: "apple-pay",
-          })
-      ).to.throw(
-        UnsupportedPaymentProvider,
-        "The provided payment provider (apple-pay) is currently not supported by this API!"
       );
     });
   });

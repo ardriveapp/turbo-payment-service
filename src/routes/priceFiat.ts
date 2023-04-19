@@ -14,8 +14,6 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
     payment = new Payment({
       amount: ctx.params.amount,
       type: ctx.params.currency,
-      provider:
-        /* TODO: (ctx.request.header["x-payment-provider"] as string) ?? */ "stripe",
     });
   } catch (error) {
     ctx.response.status = 400;

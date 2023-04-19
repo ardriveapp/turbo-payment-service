@@ -29,8 +29,6 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
     payment = new Payment({
       amount: ctx.params.amount,
       type: ctx.params.currency,
-      provider:
-        /* TODO: (ctx.request.header["x-payment-provider"] as string) ?? */ "stripe",
     });
   } catch (error) {
     ctx.response.status = 400;
@@ -60,7 +58,7 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
     destinationAddress: walletAddress,
     currencyType: payment.type,
     quoteExpirationDate: thirtyMinutesFromNow,
-    paymentProvider: payment.provider,
+    paymentProvider: "stripe",
   };
 
   let existingBalance: WC = new Winston("0");

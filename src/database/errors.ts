@@ -1,9 +1,4 @@
-import {
-  CurrencyType,
-  PaymentAmount,
-  PaymentProvider,
-  UserAddress,
-} from "./dbTypes";
+import { CurrencyType, PaymentAmount, UserAddress } from "./dbTypes";
 
 export class UserNotFoundWarning extends Error {
   constructor(userAddress: UserAddress) {
@@ -37,16 +32,6 @@ export class InvalidPaymentAmount extends Error {
   }
 }
 
-export class UnsupportedPaymentProvider extends Error {
-  constructor(paymentProvider: PaymentProvider) {
-    super(
-      `The provided payment provider (${paymentProvider}) is currently not supported by this API!`
-    );
-    this.name = "UnsupportedPaymentProvider";
-  }
-}
-
 export type PaymentValidationErrors =
   | UnsupportedCurrencyType
-  | InvalidPaymentAmount
-  | UnsupportedPaymentProvider;
+  | InvalidPaymentAmount;

@@ -1,35 +1,27 @@
 import BigNumber from "bignumber.js";
 
-import {
-  CurrencyType,
-  PaymentAmount,
-  PaymentProvider,
-} from "../database/dbTypes";
+import { CurrencyType, PaymentAmount } from "../database/dbTypes";
 import {
   InvalidPaymentAmount,
   UnsupportedCurrencyType,
-  UnsupportedPaymentProvider,
 } from "../database/errors";
 import { WC } from "./arc";
 import {
   supportedPaymentCurrencyTypes,
   zeroDecimalCurrencyTypes,
 } from "./supportedCurrencies";
-import { supportedPaymentProviders } from "./supportedPaymentProviders";
 import { Winston } from "./winston";
 
 interface PaymentConstructorParams {
   amount: PaymentAmount;
   type: CurrencyType;
-  provider?: PaymentProvider;
 }
 
 export class Payment {
   public readonly amount: PaymentAmount;
   public readonly type: CurrencyType;
-  public readonly provider;
 
-  constructor({ amount, type, provider = "stripe" }: PaymentConstructorParams) {
+  constructor({ amount, type }: PaymentConstructorParams) {
     amount = Number(amount);
     type = type.toLowerCase();
 
@@ -45,13 +37,8 @@ export class Payment {
       throw new InvalidPaymentAmount(amount);
     }
 
-    if (!supportedPaymentProviders.includes(provider)) {
-      throw new UnsupportedPaymentProvider(provider);
-    }
-
     this.amount = amount;
     this.type = type;
-    this.provider = provider;
   }
 
   public winstonCreditAmountForARPrice(priceForOneAR: number): WC {
