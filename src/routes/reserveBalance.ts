@@ -25,7 +25,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     return next;
   } else {
     try {
-      byteCount = ByteCount(ctx.params.byteCount);
+      byteCount = ByteCount(+ctx.params.byteCount);
       walletAddressToCredit = ctx.params.walletAddress;
     } catch (error) {
       ctx.response.status = 403;

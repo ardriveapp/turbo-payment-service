@@ -119,7 +119,7 @@ describe("Router tests", () => {
   before(async () => {
     await new DbTestHelper(new PostgresDatabase()).insertStubUser({
       user_address: "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830",
-      winston_credit_balance: "5000",
+      winston_credit_balance: "5000000",
     });
   });
 
@@ -144,7 +144,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(balance).to.equal(5000);
+    expect(balance).to.equal(5000000);
   });
 
   it("GET /balance returns 404 for no user found", async function () {
@@ -291,10 +291,13 @@ describe("Router tests", () => {
 
   it("GET /reserve-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const byteCount = 1000;
+    const byteCount = 1;
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
+
+    const priceUrl = new RegExp("arweave.net/price/.*");
+    mock.onGet(priceUrl).reply(200, 100);
 
     const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
@@ -306,7 +309,7 @@ describe("Router tests", () => {
     );
     expect(statusText).to.equal("Balance reserved");
     expect(status).to.equal(200);
-    expect(data).to.be.a("number");
+    expect(data).to.equal("100");
   });
 
   it("GET /reserve-balance returns 401 for missing authorization", async () => {
