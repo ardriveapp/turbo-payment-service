@@ -5,6 +5,7 @@ import { expect } from "chai";
 import { Server } from "http";
 import { sign } from "jsonwebtoken";
 
+import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
 import { createServer } from "../src/server";
@@ -26,8 +27,7 @@ describe("Router tests", () => {
   let mock: MockAdapter;
   let secret: string;
   beforeEach(async () => {
-    process.env.PRIVATE_ROUTE_SECRET ??= "secret";
-    secret = process.env.PRIVATE_ROUTE_SECRET;
+    secret = TEST_PRIVATE_ROUTE_SECRET;
     server = await createServer({});
     mock = new MockAdapter(axios, { onNoMatch: "passthrough" });
   });
@@ -119,7 +119,7 @@ describe("Router tests", () => {
   before(async () => {
     await new DbTestHelper(new PostgresDatabase()).insertStubUser({
       user_address: "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830",
-      winston_credit_balance: "5000",
+      winston_credit_balance: "5000000",
     });
   });
 
@@ -144,7 +144,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(balance).to.equal(5000);
+    expect(balance).to.equal(5000000);
   });
 
   it("GET /balance returns 404 for no user found", async function () {
@@ -291,13 +291,16 @@ describe("Router tests", () => {
 
   it("GET /reserve-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const winstonCredits = 1000;
+    const byteCount = 1;
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
 
-    const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${winstonCredits}`,
+    const priceUrl = new RegExp("arweave.net/price/.*");
+    mock.onGet(priceUrl).reply(200, 100);
+
+    const { status, statusText, data } = await axios.get(
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -306,14 +309,15 @@ describe("Router tests", () => {
     );
     expect(statusText).to.equal("Balance reserved");
     expect(status).to.equal(200);
+    expect(data).to.equal("100");
   });
 
   it("GET /reserve-balance returns 401 for missing authorization", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const winstonCredits = 1000;
+    const byteCount = 1000;
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${winstonCredits}`,
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
       {
         validateStatus: () => true,
       }
@@ -324,13 +328,13 @@ describe("Router tests", () => {
 
   it("GET /reserve-balance returns 403 for insufficient balance", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
-    const winstonCredits = 100000;
+    const byteCount = 100000;
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${winstonCredits}`,
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -344,14 +348,14 @@ describe("Router tests", () => {
 
   it("GET /reserve-balance returns 403 if user not found", async () => {
     const testAddress = "someRandomAddress";
-    const winstonCredits = 100000;
+    const byteCount = 100000;
 
     const token = sign({}, secret, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${winstonCredits}`,
+      `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

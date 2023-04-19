@@ -3,7 +3,7 @@ import Koa, { DefaultState, ParameterizedContext } from "koa";
 import jwt from "koa-jwt";
 
 import { Architecture, getDefaultArch } from "./architecture";
-import { defaultPort } from "./constants";
+import { TEST_PRIVATE_ROUTE_SECRET, defaultPort } from "./constants";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
 import router from "./router";
@@ -27,7 +27,8 @@ export async function createServer(
 
   await loadSecretsToEnv();
   const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
-  const sharedSecret = process.env.PRIVATE_ROUTE_SECRET ?? "local";
+  const sharedSecret =
+    process.env.PRIVATE_ROUTE_SECRET ?? TEST_PRIVATE_ROUTE_SECRET;
 
   if (!sharedSecret) {
     throw new Error("Shared secret not set");
