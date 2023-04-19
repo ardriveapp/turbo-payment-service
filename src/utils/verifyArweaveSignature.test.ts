@@ -9,7 +9,7 @@ import { jwkToPem } from "./pem";
 import { verifyArweaveSignature } from "./verifyArweaveSignature";
 
 describe("verifyArweaveSignature", () => {
-  let wallet: JWKInterface = testWallet;
+  const wallet: JWKInterface = testWallet;
 
   it("should pass for a valid signature without query parameters", async () => {
     const nonce =
