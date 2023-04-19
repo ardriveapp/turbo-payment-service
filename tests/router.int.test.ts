@@ -106,14 +106,18 @@ describe("Router tests", () => {
       )
       .reply(200, { arweave: {} });
 
-    const { status } = await axios.get(
+    const { data, status, statusText } = await axios.get(
       `${localTestUrl}/v1/price/RandomCurrency/100`,
       {
         // stop axios from throwing an error for 502
         validateStatus: () => true,
       }
     );
-    expect(status).to.equal(502);
+    expect(data).to.equal(
+      "The currency type 'randomcurrency' is currently not supported by this API!"
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
   });
 
   before(async () => {
@@ -274,7 +278,7 @@ describe("Router tests", () => {
         },
       });
 
-    const { status, data } = await axios.get(
+    const { status, data, statusText } = await axios.get(
       `${localTestUrl}/v1/price-quote/currencyThatDoesNotExist/100`,
       {
         headers: {
@@ -285,8 +289,12 @@ describe("Router tests", () => {
         validateStatus: () => true,
       }
     );
+
+    expect(data).to.equal(
+      "The currency type 'currencythatdoesnotexist' is currently not supported by this API!"
+    );
     expect(status).to.equal(400);
-    expect(data).to.equal("ArweaveToFiat Oracle Error");
+    expect(statusText).to.equal("Bad Request");
   });
 
   it("GET /reserve-balance returns 200 for correct params", async () => {
