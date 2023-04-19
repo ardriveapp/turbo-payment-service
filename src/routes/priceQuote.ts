@@ -1,21 +1,20 @@
 import { randomUUID } from "crypto";
 import { Next } from "koa";
 
-import { UserNotFoundWarning } from "../database/errors";
+import {
+  PaymentValidationErrors,
+  UserNotFoundWarning,
+} from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
+import { Payment } from "../types/payment";
 import { Winston } from "../types/winston";
 
 export async function priceQuote(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
 
   const { pricingService, paymentDatabase, stripe } = ctx.state;
-
-  // TODO: Sanitize payment amount input value. TODO: Add proper types for fiat. Stripe takes amount in smallest unit of currency. So we handle it the same. Here we are assuming this API accepts a dollar integer instead of smallest form (cents). TODO: Should we change that to use smallest form of currency when going into the API?
-  const fiatValue = Math.round(ctx.params.amount * 100);
-  // TODO: Sanitize currency type input value (must be currency type that both FiatOracle (CoinGecko) and PaymentProvider (Stripe) can handle)
-  const fiatCurrency = ctx.params.currency;
 
   const walletAddress = ctx.state.walletAddress;
 
@@ -24,9 +23,24 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
     ctx.body = "Wallet address not provided";
     return next;
   }
-  let quote: WC;
+
+  let payment: Payment;
   try {
-    quote = await pricingService.getWCForFiat(fiatCurrency, fiatValue);
+    payment = new Payment({
+      amount: ctx.params.amount,
+      type: ctx.params.currency,
+      provider:
+        /* TODO: (ctx.request.header["x-payment-provider"] as string) ?? */ "stripe",
+    });
+  } catch (error) {
+    ctx.response.status = 400;
+    ctx.body = (error as PaymentValidationErrors).message;
+    return next;
+  }
+
+  let winstonCreditAmount: WC;
+  try {
+    winstonCreditAmount = await pricingService.getWCForPayment(payment);
   } catch (error) {
     logger.error(error);
     ctx.response.status = 400;
@@ -41,12 +55,12 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
   const priceQuote = {
     topUpQuoteId: randomUUID(),
     destinationAddressType: "arweave",
-    paymentAmount: fiatValue,
-    winstonCreditAmount: quote,
+    paymentAmount: payment.amount,
+    winstonCreditAmount,
     destinationAddress: walletAddress,
-    currencyType: fiatCurrency,
+    currencyType: payment.type,
     quoteExpirationDate: thirtyMinutesFromNow,
-    paymentProvider: "stripe",
+    paymentProvider: payment.provider,
   };
 
   let existingBalance: WC = new Winston("0");
@@ -79,14 +93,14 @@ export async function priceQuote(ctx: KoaContext, next: Next) {
       // TODO: Success and Cancel URLS (Do we need app origin? e.g: ArDrive Widget, Top Up Page, ario-turbo-cli)
       success_url: "https://app.ardrive.io",
       cancel_url: "https://app.ardrive.io",
-      currency: fiatCurrency,
+      currency: payment.type,
       payment_method_types: ["card"],
       line_items: [
         {
           price_data: {
             product_data: { name: "ARC" },
-            currency: fiatCurrency,
-            unit_amount: fiatValue,
+            currency: payment.type,
+            unit_amount: payment.amount,
           },
           quantity: 1,
         },

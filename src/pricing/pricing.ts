@@ -1,12 +1,11 @@
-import BigNumber from "bignumber.js";
-
-import { AR, ByteCount, WC, Winston } from "../types/types";
+import { Payment } from "../types/payment";
+import { ByteCount, WC, Winston } from "../types/types";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
 export interface PricingService {
-  getWCForFiat: (fiat: string, fiatQuantity: number) => Promise<WC>;
+  getWCForPayment: (payment: Payment) => Promise<WC>;
   getWCForBytes: (bytes: ByteCount) => Promise<WC>;
 }
 
@@ -27,16 +26,16 @@ export class TurboPricingService implements PricingService {
       arweaveToFiatOracle ?? new ReadThroughArweaveToFiatOracle({});
   }
 
-  async getWCForFiat(fiat: string, fiatQuantity: number): Promise<Winston> {
+  async getWCForPayment(payment: Payment): Promise<Winston> {
     const fiatPriceOfOneAR =
-      await this.arweaveToFiatOracle.getFiatPriceForOneAR(fiat);
-    const amountOfARForFiatQuantity = fiatQuantity / fiatPriceOfOneAR;
-    // AR only accepts 12 decimal places, but we have more from the above calculation.
-    // We need to round to 12 decimal places to avoid errors.
-    // toPrecision rounds up by default so this is a workaround to round down to ensure we don't overpay.
-    const ar =
-      Math.floor(amountOfARForFiatQuantity * 1000000000000) / 1000000000000;
-    return AR.from(BigNumber(ar)).toWinston();
+      await this.arweaveToFiatOracle.getFiatPriceForOneAR(payment.type);
+
+    // TODO: INCORPORATE FEES BEFORE PROD (stripe, infra costs, community tip)
+
+    const baseWinstonCreditsFromPayment =
+      payment.winstonCreditAmountForARPrice(fiatPriceOfOneAR);
+
+    return baseWinstonCreditsFromPayment;
   }
 
   async getWCForBytes(bytes: ByteCount): Promise<Winston> {
