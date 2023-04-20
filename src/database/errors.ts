@@ -1,4 +1,4 @@
-import { UserAddress } from "./dbTypes";
+import { CurrencyType, PaymentAmount, UserAddress } from "./dbTypes";
 
 export class UserNotFoundWarning extends Error {
   constructor(userAddress: UserAddress) {
@@ -13,3 +13,25 @@ export class InsufficientBalance extends Error {
     this.name = "InsufficientBalance";
   }
 }
+
+export class UnsupportedCurrencyType extends Error {
+  constructor(currencyType: CurrencyType) {
+    super(
+      `The currency type '${currencyType}' is currently not supported by this API!`
+    );
+    this.name = "UnsupportedCurrencyType";
+  }
+}
+
+export class InvalidPaymentAmount extends Error {
+  constructor(paymentAmount: PaymentAmount) {
+    super(
+      `The provided payment amount (${paymentAmount}) is invalid; it must be a positive non-decimal integer!`
+    );
+    this.name = "InvalidPaymentAmount";
+  }
+}
+
+export type PaymentValidationErrors =
+  | UnsupportedCurrencyType
+  | InvalidPaymentAmount;
