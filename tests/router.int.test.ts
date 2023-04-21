@@ -200,7 +200,7 @@ describe("Router tests", () => {
     expect(data).to.equal("Invalid signature or missing required headers");
   });
 
-  it("GET /price-quote returns 200 and correct response for correct signature", async () => {
+  it("GET /top-up/checkout-session returns 200 and correct response for correct signature", async () => {
     const nonce = "123";
     const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
     const signature = await signData(jwkToPem(testWallet), nonce);
@@ -216,7 +216,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/price-quote/usd/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/usd/100`,
       {
         headers: {
           "x-public-key": publicKey,
@@ -227,13 +227,72 @@ describe("Router tests", () => {
     );
 
     expect(data).to.have.property("balance");
-    expect(data).to.have.property("priceQuote");
-    expect(data).to.have.property("checkoutSession");
+    expect(data).to.have.property("topUpQuote");
+    expect(data).to.have.property("paymentSession");
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
+
+    const { object, payment_method_types, amount_total, url } =
+      data.paymentSession;
+
+    expect(object).to.equal("checkout.session");
+    expect(payment_method_types).to.deep.equal(["card"]);
+    expect(amount_total).to.equal(100);
+    expect(url).to.be.a.string;
   });
 
-  it("GET /price-quote returns 403 for bad signature", async () => {
+  it("GET /top-up/payment-intent returns 200 and correct response for correct signature", async () => {
+    const nonce = "123";
+    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
+    const signature = await signData(jwkToPem(testWallet), nonce);
+
+    mock
+      .onGet(
+        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
+      )
+      .reply(200, {
+        arweave: {
+          usd: 10,
+        },
+      });
+
+    const { status, statusText, data } = await axios.get(
+      `${localTestUrl}/v1/top-up/payment-intent/usd/100`,
+      {
+        headers: {
+          "x-public-key": publicKey,
+          "x-nonce": nonce,
+          "x-signature": toB64Url(Buffer.from(signature)),
+        },
+      }
+    );
+
+    expect(data).to.have.property("balance");
+    expect(data).to.have.property("topUpQuote");
+    expect(data).to.have.property("paymentSession");
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    const {
+      object,
+      payment_method_types,
+      amount,
+      currency,
+      client_secret,
+      metadata,
+      status: paymentStatus,
+    } = data.paymentSession;
+
+    expect(object).to.equal("payment_intent");
+    expect(payment_method_types).to.deep.equal(["card"]);
+    expect(amount).to.equal(100);
+    expect(currency).to.equal("usd");
+    expect(client_secret).to.be.a.string;
+    expect(metadata.topUpQuoteId).to.be.a.string;
+    expect(paymentStatus).to.equal("requires_payment_method");
+  });
+
+  it("GET /top-up/checkout-session returns 403 for bad signature", async () => {
     const nonce = "123";
     const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
     const signature = await signData(jwkToPem(testWallet), "somethingElse");
@@ -249,7 +308,7 @@ describe("Router tests", () => {
       });
 
     const { status, data } = await axios.get(
-      `${localTestUrl}/v1/price-quote/usd/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/usd/100`,
       {
         headers: {
           "x-public-key": publicKey,
@@ -263,7 +322,7 @@ describe("Router tests", () => {
     expect(data).to.equal("Wallet address not provided");
   });
 
-  it("GET /price-quote returns 400 for correct signature but invalid currency", async () => {
+  it("GET /top-up/checkout-session returns 400 for correct signature but invalid currency", async () => {
     const nonce = "123";
     const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
     const signature = await signData(jwkToPem(testWallet), nonce);
@@ -279,7 +338,7 @@ describe("Router tests", () => {
       });
 
     const { status, data, statusText } = await axios.get(
-      `${localTestUrl}/v1/price-quote/currencyThatDoesNotExist/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/currencyThatDoesNotExist/100`,
       {
         headers: {
           "x-public-key": publicKey,
