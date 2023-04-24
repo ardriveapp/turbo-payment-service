@@ -3,24 +3,28 @@ import { ParsedUrlQuery } from "querystring";
 
 import { signData } from "../../tests/helpers/signData";
 import { testWallet } from "../../tests/helpers/testHelpers";
-import { JWKInterface } from "../types/jwkTypes";
+import {
+  JWKInterface,
+  jwkInterfaceToPrivateKey,
+  jwkInterfaceToPublicKey,
+} from "../types/jwkTypes";
 import { fromB64UrlToBuffer } from "./base64";
-import { jwkToPem } from "./pem";
 import { verifyArweaveSignature } from "./verifyArweaveSignature";
 
 describe("verifyArweaveSignature", () => {
-  let wallet: JWKInterface = testWallet;
+  const wallet: JWKInterface = testWallet;
 
   it("should pass for a valid signature without query parameters", async () => {
     const nonce =
       "should pass for a valid signature without query parameters nonce";
     const dataToSign = nonce;
-    const signature = await signData(jwkToPem(wallet), dataToSign);
+    const privateKey = jwkInterfaceToPrivateKey(wallet);
+    const publicKey = jwkInterfaceToPublicKey(wallet);
 
-    const publicPem = jwkToPem(wallet, true);
+    const signature = await signData(privateKey, dataToSign);
 
     const isVerified = await verifyArweaveSignature({
-      publicPem,
+      publicKey,
       signature,
       nonce,
     });
@@ -37,11 +41,13 @@ describe("verifyArweaveSignature", () => {
       corgi: "wow",
     };
     const additionalData = JSON.stringify(query);
-    const signature = await signData(jwkToPem(wallet), additionalData + nonce);
+    const privateKey = jwkInterfaceToPrivateKey(wallet);
+    const publicKey = jwkInterfaceToPublicKey(wallet);
 
-    const publicPem = jwkToPem(wallet, true);
+    const signature = await signData(privateKey, additionalData + nonce);
+
     const isVerified = await verifyArweaveSignature({
-      publicPem,
+      publicKey,
       signature,
       additionalData,
       nonce,
@@ -53,10 +59,11 @@ describe("verifyArweaveSignature", () => {
   it("should fail for an invalid signature", async () => {
     const nonce = "should fail for an invalid signature nonce";
     const invalidSignature = "invalid_signature";
-    const publicPem = jwkToPem(wallet, true);
+
+    const publicKey = jwkInterfaceToPublicKey(wallet);
 
     const isVerified = await verifyArweaveSignature({
-      publicPem,
+      publicKey,
       signature: fromB64UrlToBuffer(invalidSignature),
       nonce,
     });

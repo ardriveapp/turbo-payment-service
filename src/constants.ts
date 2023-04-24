@@ -13,3 +13,5 @@ export const topUpMethods = [
   paymentIntentTopUpMethod,
   checkoutSessionTopUpMethod,
 ] as const;
+
+export const TEST_PRIVATE_ROUTE_SECRET = "test-secret";
