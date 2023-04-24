@@ -1,7 +1,7 @@
-import crypto from "crypto";
+import crypto, { KeyLike } from "crypto";
 
 export async function signData(
-  privateKey: string,
+  privateKey: KeyLike,
   dataToSign: string
 ): Promise<Uint8Array> {
   const sign = crypto.createSign("SHA256");

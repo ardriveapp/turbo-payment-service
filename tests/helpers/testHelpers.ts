@@ -1,7 +1,9 @@
 import { expect } from "chai";
+import { KeyObject } from "crypto";
 import { Knex } from "knex";
 
 import { JWKInterface } from "../../src/types/jwkTypes";
+import { toB64Url } from "../../src/utils/base64";
 
 export const localTestUrl = "http://localhost:1235";
 
@@ -72,3 +74,9 @@ export const testWallet: JWKInterface = {
   dq: "EESORt_-Nty1howIEXpbSuvTWXMGSnkXuwAMh4zDR6jhRUB5Gyfgz_3JQW1Xd93Vr3mqg_ul2uehb5sd_VTnGFCCco1MlcV13NL7AJntwRc-furD3LdXr9Vu6mhlO25uPPrBI58tT4iC_QZD7891NMgRT4uUWqbK0w4xd4CvGAYpWPd77TOuShFYCRWuFSCM8VQe_Vi8aYBtIlQezDl36mYlyvAWpMTftqsGk9VKzZG4wwLoy24gx6Ou94_3Rlvd2OctlMCAtLfFokwupoCeKDeqZywBIuJleUavFZeQLF7GQZB7MznO5DT6XQTq26u1p9hCnqiQT0maTvXaLFycwQ",
   qi: "Fthoo6f2f_oaLSu3jtqXqpQpc2H1w1Ns0XxtyD6fi_wW2r3toXaD6Mz0B3eoz-pH6yCmqbquGO3Vt46U6QHAz44oAXKadpV11QfZdjxrc6jqQ-4wUlqvkaOZrCidKL3t7iYqS6x3Ob1vk4MeaOX62r0FgGJ7TLAJeH1csmH9tFbgMt0Q3hgNf6vMZZ0R1nuRS-vjEqW-SbjH2GDfBTiRjP-LjnA-AvZA-aAJvl8odD0RuY8c66krzd1gS8svN4Nhxrgcdc-LB2bVCP0TiuJtP56XaqHZgxk7pmQivCk7SFjOaiISmAksXqk82GNZKoQQnKHyXU9b-YbZKRYD1SUaCw",
 };
+
+export function publicKeyToHeader(publicKey: KeyObject) {
+  return toB64Url(
+    Buffer.from(JSON.stringify(publicKey.export({ format: "jwk" })))
+  );
+}

@@ -9,12 +9,19 @@ import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
 import { createServer } from "../src/server";
+import {
+  jwkInterfaceToPrivateKey,
+  jwkInterfaceToPublicKey,
+} from "../src/types/jwkTypes";
 import { toB64Url } from "../src/utils/base64";
-import { jwkToPem } from "../src/utils/pem";
 import { DbTestHelper } from "./dbTestHelper";
 import { signData } from "./helpers/signData";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
-import { localTestUrl, testWallet } from "./helpers/testHelpers";
+import {
+  localTestUrl,
+  publicKeyToHeader,
+  testWallet,
+} from "./helpers/testHelpers";
 
 describe("Router tests", () => {
   let server: Server;
@@ -129,14 +136,15 @@ describe("Router tests", () => {
 
   it("GET /balance returns 200 for correct signature", async () => {
     const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), nonce);
+    const publicKey = jwkInterfaceToPublicKey(testWallet);
+    const privateKey = jwkInterfaceToPrivateKey(testWallet);
+    const signature = await signData(privateKey, nonce);
 
     const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/balance`,
       {
         headers: {
-          "x-public-key": publicKey,
+          "x-public-key": publicKeyToHeader(publicKey),
           "x-nonce": nonce,
           "x-signature": toB64Url(Buffer.from(signature)),
         },
@@ -156,14 +164,15 @@ describe("Router tests", () => {
     const jwk = await Arweave.crypto.generateJWK();
 
     const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(jwk, true)));
-    const signature = await signData(jwkToPem(jwk), nonce);
+    const publicKey = jwkInterfaceToPublicKey(jwk);
+    const privateKey = jwkInterfaceToPrivateKey(jwk);
+    const signature = await signData(privateKey, nonce);
 
     const { status, statusText, data } = await axios.get(
       `${localTestUrl}/v1/balance`,
       {
         headers: {
-          "x-public-key": publicKey,
+          "x-public-key": publicKeyToHeader(publicKey),
           "x-nonce": nonce,
           "x-signature": toB64Url(Buffer.from(signature)),
         },
@@ -179,14 +188,16 @@ describe("Router tests", () => {
 
   it("GET /balance returns 403 for bad signature", async () => {
     const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), "another nonce");
+    const publicKey = jwkInterfaceToPublicKey(testWallet);
+    const privateKey = jwkInterfaceToPrivateKey(testWallet);
+
+    const signature = await signData(privateKey, "another nonce");
 
     const { status, data, statusText } = await axios.get(
       `${localTestUrl}/v1/balance`,
       {
         headers: {
-          "x-public-key": publicKey,
+          "x-public-key": publicKeyToHeader(publicKey),
           "x-nonce": nonce,
           "x-signature": toB64Url(Buffer.from(signature)),
         },
@@ -202,8 +213,9 @@ describe("Router tests", () => {
 
   it("GET /price-quote returns 200 and correct response for correct signature", async () => {
     const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), nonce);
+    const publicKey = jwkInterfaceToPublicKey(testWallet);
+    const privateKey = jwkInterfaceToPrivateKey(testWallet);
+    const signature = await signData(privateKey, nonce);
 
     mock
       .onGet(
@@ -219,7 +231,7 @@ describe("Router tests", () => {
       `${localTestUrl}/v1/price-quote/usd/100`,
       {
         headers: {
-          "x-public-key": publicKey,
+          "x-public-key": publicKeyToHeader(publicKey),
           "x-nonce": nonce,
           "x-signature": toB64Url(Buffer.from(signature)),
         },
@@ -235,8 +247,9 @@ describe("Router tests", () => {
 
   it("GET /price-quote returns 403 for bad signature", async () => {
     const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), "somethingElse");
+    const publicKey = jwkInterfaceToPublicKey(testWallet);
+    const privateKey = jwkInterfaceToPrivateKey(testWallet);
+    const signature = await signData(privateKey, "some other nonce");
 
     mock
       .onGet(
@@ -252,7 +265,7 @@ describe("Router tests", () => {
       `${localTestUrl}/v1/price-quote/usd/100`,
       {
         headers: {
-          "x-public-key": publicKey,
+          "x-public-key": publicKeyToHeader(publicKey),
           "x-nonce": nonce,
           "x-signature": toB64Url(Buffer.from(signature)),
         },
@@ -265,8 +278,9 @@ describe("Router tests", () => {
 
   it("GET /price-quote returns 400 for correct signature but invalid currency", async () => {
     const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), nonce);
+    const publicKey = jwkInterfaceToPublicKey(testWallet);
+    const privateKey = jwkInterfaceToPrivateKey(testWallet);
+    const signature = await signData(privateKey, nonce);
 
     mock
       .onGet(
@@ -282,7 +296,7 @@ describe("Router tests", () => {
       `${localTestUrl}/v1/price-quote/currencyThatDoesNotExist/100`,
       {
         headers: {
-          "x-public-key": publicKey,
+          "x-public-key": publicKeyToHeader(publicKey),
           "x-nonce": nonce,
           "x-signature": toB64Url(Buffer.from(signature)),
         },
