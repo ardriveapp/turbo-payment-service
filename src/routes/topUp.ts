@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { Next } from "koa";
 import Stripe from "stripe";
 
+import { paymentIntentTopUpMethod, topUpMethods } from "../constants";
 import {
   PaymentValidationErrors,
   UserNotFoundWarning,
@@ -17,9 +18,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
   const { pricingService, paymentDatabase, stripe } = ctx.state;
   const { amount, currency, method } = ctx.params;
-  if (!["checkout-session", "payment-intent"].includes(method)) {
+  if (!topUpMethods.includes(method)) {
     ctx.response.status = 400;
-    ctx.body = "Payment method must be 'checkout-session' or 'payment-intent'!";
+    ctx.body = `Payment method must include one of: ${topUpMethods.toString()}!`;
     return next;
   }
 
@@ -72,7 +73,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     | Stripe.Response<Stripe.PaymentIntent>
     | Stripe.Response<Stripe.Checkout.Session>;
   try {
-    if (method === "payment-intent") {
+    if (method === paymentIntentTopUpMethod) {
       intentOrCheckout = await stripe.paymentIntents.create({
         amount: payment.amount,
         currency: payment.type,
