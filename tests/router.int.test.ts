@@ -201,10 +201,6 @@ describe("Router tests", () => {
   });
 
   it("GET /top-up/checkout-session returns 200 and correct response for correct signature", async () => {
-    const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), nonce);
-
     mock
       .onGet(
         "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
@@ -216,14 +212,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`,
-      {
-        headers: {
-          "x-public-key": publicKey,
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
-      }
+      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
     );
 
     expect(data).to.have.property("balance");
@@ -242,10 +231,6 @@ describe("Router tests", () => {
   });
 
   it("GET /top-up/payment-intent returns 200 and correct response for correct signature", async () => {
-    const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), nonce);
-
     mock
       .onGet(
         "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
@@ -257,14 +242,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/payment-intent/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`,
-      {
-        headers: {
-          "x-public-key": publicKey,
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
-      }
+      `${localTestUrl}/v1/top-up/payment-intent/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
     );
 
     expect(data).to.have.property("balance");
@@ -293,10 +271,6 @@ describe("Router tests", () => {
   });
 
   it("GET /top-up/checkout-session returns 403 for bad arweave address", async () => {
-    const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), "somethingElse");
-
     mock
       .onGet(
         "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
@@ -310,11 +284,6 @@ describe("Router tests", () => {
     const { status, data } = await axios.get(
       `${localTestUrl}/v1/top-up/checkout-session/BAD_ADDRESS_OF_DOOM/usd/100`,
       {
-        headers: {
-          "x-public-key": publicKey,
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
         validateStatus: () => true,
       }
     );
@@ -325,10 +294,6 @@ describe("Router tests", () => {
   });
 
   it("GET /top-up/checkout-session returns 400 for correct signature but invalid currency", async () => {
-    const nonce = "123";
-    const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
-    const signature = await signData(jwkToPem(testWallet), nonce);
-
     mock
       .onGet(
         "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
@@ -342,11 +307,6 @@ describe("Router tests", () => {
     const { status, data, statusText } = await axios.get(
       `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/currencyThatDoesNotExist/100`,
       {
-        headers: {
-          "x-public-key": publicKey,
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
         validateStatus: () => true,
       }
     );
