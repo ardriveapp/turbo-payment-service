@@ -216,7 +216,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/checkout-session/usd/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`,
       {
         headers: {
           "x-public-key": publicKey,
@@ -257,7 +257,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/payment-intent/usd/100`,
+      `${localTestUrl}/v1/top-up/payment-intent/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`,
       {
         headers: {
           "x-public-key": publicKey,
@@ -308,7 +308,7 @@ describe("Router tests", () => {
       });
 
     const { status, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/checkout-session/usd/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`,
       {
         headers: {
           "x-public-key": publicKey,
@@ -338,7 +338,7 @@ describe("Router tests", () => {
       });
 
     const { status, data, statusText } = await axios.get(
-      `${localTestUrl}/v1/top-up/checkout-session/currencyThatDoesNotExist/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/currencyThatDoesNotExist/100`,
       {
         headers: {
           "x-public-key": publicKey,

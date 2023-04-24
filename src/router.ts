@@ -21,7 +21,11 @@ router.get("/v1/price/:amount", priceRoutes);
 router.get("/v1/price/bytes/:amount", priceRoutes);
 router.get("/v1/price/:currency/:amount", priceRoutes);
 
-router.get("/v1/top-up/:method/:currency/:amount", verifySignature, topUp);
+router.get(
+  "/v1/top-up/:method/:address/:currency/:amount",
+  verifySignature,
+  topUp
+);
 
 router.post("/v1/balance/address", () => logger.info("TODO"));
 
