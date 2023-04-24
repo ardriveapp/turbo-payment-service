@@ -12,23 +12,22 @@ import { KoaContext } from "../server";
 import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
 import { Winston } from "../types/winston";
+import { isValidArweaveBase64URL } from "../utils/base64";
 
 export async function topUp(ctx: KoaContext, next: Next) {
   logger.child({ path: ctx.path });
 
   const { pricingService, paymentDatabase, stripe } = ctx.state;
-  const { amount, currency, method } = ctx.params;
+  const { amount, currency, method, address: destinationAddress } = ctx.params;
   if (!topUpMethods.includes(method)) {
     ctx.response.status = 400;
     ctx.body = `Payment method must include one of: ${topUpMethods.toString()}!`;
     return next;
   }
 
-  const walletAddress = ctx.state.walletAddress;
-
-  if (!walletAddress) {
+  if (!isValidArweaveBase64URL(destinationAddress)) {
     ctx.response.status = 403;
-    ctx.body = "Wallet address not provided";
+    ctx.body = "Destination address is not a valid Arweave native address!";
     return next;
   }
 
@@ -63,7 +62,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     destinationAddressType: "arweave",
     paymentAmount: payment.amount,
     winstonCreditAmount,
-    destinationAddress: walletAddress,
+    destinationAddress,
     currencyType: payment.type,
     quoteExpirationDate: fiveMinutesFromNow,
     paymentProvider: "stripe",
@@ -101,7 +100,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
         payment_intent_data: {
           metadata: {
             topUpQuoteId: topUpQuote.topUpQuoteId,
-            destinationAddress: walletAddress,
+            destinationAddress,
           },
         },
         mode: "payment",
@@ -130,7 +129,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
   let existingBalance: WC = new Winston("0");
   try {
-    existingBalance = await paymentDatabase.getBalance(walletAddress);
+    existingBalance = await paymentDatabase.getBalance(destinationAddress);
   } catch (error) {
     if (error instanceof UserNotFoundWarning) {
       logger.info(

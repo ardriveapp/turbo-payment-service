@@ -292,7 +292,7 @@ describe("Router tests", () => {
     expect(paymentStatus).to.equal("requires_payment_method");
   });
 
-  it("GET /top-up/checkout-session returns 403 for bad signature", async () => {
+  it("GET /top-up/checkout-session returns 403 for bad arweave address", async () => {
     const nonce = "123";
     const publicKey = toB64Url(Buffer.from(jwkToPem(testWallet, true)));
     const signature = await signData(jwkToPem(testWallet), "somethingElse");
@@ -308,7 +308,7 @@ describe("Router tests", () => {
       });
 
     const { status, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/BAD_ADDRESS_OF_DOOM/usd/100`,
       {
         headers: {
           "x-public-key": publicKey,
@@ -319,7 +319,9 @@ describe("Router tests", () => {
       }
     );
     expect(status).to.equal(403);
-    expect(data).to.equal("Wallet address not provided");
+    expect(data).to.equal(
+      "Destination address is not a valid Arweave native address!"
+    );
   });
 
   it("GET /top-up/checkout-session returns 400 for correct signature but invalid currency", async () => {
