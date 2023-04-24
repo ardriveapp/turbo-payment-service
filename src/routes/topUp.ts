@@ -53,10 +53,10 @@ export async function topUp(ctx: KoaContext, next: Next) {
     ctx.body = "ArweaveToFiat Oracle Error";
     return next;
   }
-
-  const thirtyMinutesFromNow = new Date(
-    Date.now() + 1000 * 60 * 30
-  ).toISOString();
+  const oneSecondMs = 1000;
+  const oneMinuteMs = oneSecondMs * 60;
+  const fiveMinutesMs = oneMinuteMs * 5;
+  const fiveMinutesFromNow = new Date(Date.now() + fiveMinutesMs).toISOString();
 
   const topUpQuote = {
     topUpQuoteId: randomUUID(),
@@ -65,7 +65,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     winstonCreditAmount,
     destinationAddress: walletAddress,
     currencyType: payment.type,
-    quoteExpirationDate: thirtyMinutesFromNow,
+    quoteExpirationDate: fiveMinutesFromNow,
     paymentProvider: "stripe",
   };
 
