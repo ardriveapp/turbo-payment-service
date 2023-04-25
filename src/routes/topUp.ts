@@ -63,6 +63,13 @@ export async function topUp(ctx: KoaContext, next: Next) {
     quoteExpirationDate: fiveMinutesFromNow,
     paymentProvider: "stripe",
   };
+  // Take all of topUpQuote to stripeMetadata except paymentProvider
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { paymentProvider, ...stripeMetadataRaw } = topUpQuote;
+  const stripeMetadata = {
+    ...stripeMetadataRaw,
+    winstonCreditAmount: winstonCreditAmount.toString(),
+  };
 
   let intentOrCheckout:
     | Stripe.Response<Stripe.PaymentIntent>
@@ -72,9 +79,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
       intentOrCheckout = await stripe.paymentIntents.create({
         amount: payment.amount,
         currency: payment.type,
-        metadata: {
-          topUpQuoteId: topUpQuote.topUpQuoteId,
-        },
+        metadata: stripeMetadata,
       });
     } else {
       intentOrCheckout = await stripe.checkout.sessions.create({
@@ -94,10 +99,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
           },
         ],
         payment_intent_data: {
-          metadata: {
-            topUpQuoteId: topUpQuote.topUpQuoteId,
-            destinationAddress,
-          },
+          metadata: stripeMetadata,
         },
         mode: "payment",
       });
