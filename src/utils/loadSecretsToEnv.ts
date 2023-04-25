@@ -8,6 +8,7 @@ import logger from "../logger";
 const stripeWebhookSecretName = "stripe-webhook-secret";
 const stripeSecretKeyName = "stripe-secret-key";
 const privateRouteSecretName = "private-route-secret";
+const jwtSecretName = "jwt-secret";
 
 export async function loadSecretsToEnv() {
   try {
@@ -37,9 +38,11 @@ export async function loadSecretsToEnv() {
   const getWebhookSecretCommand = new GetSecretValueCommand({
     SecretId: stripeWebhookSecretName,
   });
-
   const getPrivateRouteSecretCommand = new GetSecretValueCommand({
     SecretId: privateRouteSecretName,
+  });
+  const getJwtSecretCommand = new GetSecretValueCommand({
+    SecretId: jwtSecretName,
   });
 
   process.env.STRIPE_SECRET_KEY ??= (
@@ -50,5 +53,8 @@ export async function loadSecretsToEnv() {
   ).SecretString;
   process.env.PRIVATE_ROUTE_SECRET ??= (
     await client.send(getPrivateRouteSecretCommand)
+  ).SecretString;
+  process.env.JWT_SECRET ??= (
+    await client.send(getJwtSecretCommand)
   ).SecretString;
 }
