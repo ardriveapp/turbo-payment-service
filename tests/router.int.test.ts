@@ -226,7 +226,6 @@ describe("Router tests", () => {
       `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
     );
 
-    expect(data).to.have.property("balance");
     expect(data).to.have.property("topUpQuote");
     expect(data).to.have.property("paymentSession");
     expect(status).to.equal(200);
@@ -256,7 +255,6 @@ describe("Router tests", () => {
       `${localTestUrl}/v1/top-up/payment-intent/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
     );
 
-    expect(data).to.have.property("balance");
     expect(data).to.have.property("topUpQuote");
     expect(data).to.have.property("paymentSession");
     expect(status).to.equal(200);

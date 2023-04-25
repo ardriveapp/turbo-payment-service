@@ -3,15 +3,11 @@ import { Next } from "koa";
 import Stripe from "stripe";
 
 import { paymentIntentTopUpMethod, topUpMethods } from "../constants";
-import {
-  PaymentValidationErrors,
-  UserNotFoundWarning,
-} from "../database/errors";
+import { PaymentValidationErrors } from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
-import { Winston } from "../types/winston";
 import { isValidArweaveBase64URL } from "../utils/base64";
 
 export async function topUp(ctx: KoaContext, next: Next) {
@@ -127,22 +123,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     return next;
   }
 
-  let existingBalance: WC = new Winston("0");
-  try {
-    existingBalance = await paymentDatabase.getBalance(destinationAddress);
-  } catch (error) {
-    if (error instanceof UserNotFoundWarning) {
-      logger.info(
-        "User not found, new user will be created on payment success"
-      );
-    } else {
-      logger.error(error);
-      // Log the error, but continue the route and return the existing balance as 0
-    }
-  }
-
   ctx.body = {
-    balance: existingBalance,
     topUpQuote,
     paymentSession: intentOrCheckout,
   };
