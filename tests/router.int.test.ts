@@ -211,12 +211,7 @@ describe("Router tests", () => {
     expect(data).to.equal("Invalid signature or missing required headers");
   });
 
-  it("GET /price-quote returns 200 and correct response for correct signature", async () => {
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(testWallet);
-    const privateKey = jwkInterfaceToPrivateKey(testWallet);
-    const signature = await signData(privateKey, nonce);
-
+  it("GET /top-up/checkout-session returns 200 and correct response for correct signature", async () => {
     mock
       .onGet(
         "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
@@ -228,29 +223,63 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/price-quote/usd/100`,
-      {
-        headers: {
-          "x-public-key": publicKeyToHeader(publicKey),
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
-      }
+      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
     );
 
-    expect(data).to.have.property("balance");
-    expect(data).to.have.property("priceQuote");
-    expect(data).to.have.property("checkoutSession");
+    expect(data).to.have.property("topUpQuote");
+    expect(data).to.have.property("paymentSession");
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
+
+    const { object, payment_method_types, amount_total, url } =
+      data.paymentSession;
+
+    expect(object).to.equal("checkout.session");
+    expect(payment_method_types).to.deep.equal(["card"]);
+    expect(amount_total).to.equal(100);
+    expect(url).to.be.a.string;
   });
 
-  it("GET /price-quote returns 403 for bad signature", async () => {
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(testWallet);
-    const privateKey = jwkInterfaceToPrivateKey(testWallet);
-    const signature = await signData(privateKey, "some other nonce");
+  it("GET /top-up/payment-intent returns 200 and correct response for correct signature", async () => {
+    mock
+      .onGet(
+        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
+      )
+      .reply(200, {
+        arweave: {
+          usd: 10,
+        },
+      });
 
+    const { status, statusText, data } = await axios.get(
+      `${localTestUrl}/v1/top-up/payment-intent/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
+    );
+
+    expect(data).to.have.property("topUpQuote");
+    expect(data).to.have.property("paymentSession");
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    const {
+      object,
+      payment_method_types,
+      amount,
+      currency,
+      client_secret,
+      metadata,
+      status: paymentStatus,
+    } = data.paymentSession;
+
+    expect(object).to.equal("payment_intent");
+    expect(payment_method_types).to.deep.equal(["card"]);
+    expect(amount).to.equal(100);
+    expect(currency).to.equal("usd");
+    expect(client_secret).to.be.a.string;
+    expect(metadata.topUpQuoteId).to.be.a.string;
+    expect(paymentStatus).to.equal("requires_payment_method");
+  });
+
+  it("GET /top-up/checkout-session returns 403 for bad arweave address", async () => {
     mock
       .onGet(
         "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
@@ -262,26 +291,18 @@ describe("Router tests", () => {
       });
 
     const { status, data } = await axios.get(
-      `${localTestUrl}/v1/price-quote/usd/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/BAD_ADDRESS_OF_DOOM/usd/100`,
       {
-        headers: {
-          "x-public-key": publicKeyToHeader(publicKey),
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
         validateStatus: () => true,
       }
     );
     expect(status).to.equal(403);
-    expect(data).to.equal("Wallet address not provided");
+    expect(data).to.equal(
+      "Destination address is not a valid Arweave native address!"
+    );
   });
 
-  it("GET /price-quote returns 400 for correct signature but invalid currency", async () => {
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(testWallet);
-    const privateKey = jwkInterfaceToPrivateKey(testWallet);
-    const signature = await signData(privateKey, nonce);
-
+  it("GET /top-up/checkout-session returns 400 for correct signature but invalid currency", async () => {
     mock
       .onGet(
         "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
@@ -293,13 +314,8 @@ describe("Router tests", () => {
       });
 
     const { status, data, statusText } = await axios.get(
-      `${localTestUrl}/v1/price-quote/currencyThatDoesNotExist/100`,
+      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/currencyThatDoesNotExist/100`,
       {
-        headers: {
-          "x-public-key": publicKeyToHeader(publicKey),
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
         validateStatus: () => true,
       }
     );

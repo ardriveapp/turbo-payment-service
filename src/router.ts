@@ -4,11 +4,11 @@ import * as promClient from "prom-client";
 
 import { verifySignature } from "./middleware/verifySignature";
 import { balanceRoute } from "./routes/balance";
-import { priceQuote } from "./routes/priceQuote";
 import { priceRoutes } from "./routes/priceRoutes";
 import { refundBalance } from "./routes/refundBalance";
 import { reserveBalance } from "./routes/reserveBalance";
 import { stripeRoute } from "./routes/stripe/stripeRoute";
+import { topUp } from "./routes/topUp";
 import { KoaContext } from "./server";
 
 const metricsRegistry = promClient.register;
@@ -20,7 +20,11 @@ router.get("/v1/price/:amount", priceRoutes);
 router.get("/v1/price/bytes/:amount", priceRoutes);
 router.get("/v1/price/:currency/:amount", priceRoutes);
 
-router.get("/v1/price-quote/:currency/:amount", verifySignature, priceQuote);
+router.get(
+  "/v1/top-up/:method/:address/:currency/:amount",
+  verifySignature,
+  topUp
+);
 
 router.post("/v1/stripe-webhook", stripeRoute);
 
