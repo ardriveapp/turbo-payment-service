@@ -107,7 +107,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
       });
     }
   } catch (error) {
-    if ((error as any).raw.code === "amount_too_small") {
+    if ((error as { raw: { code: string } }).raw.code === "amount_too_small") {
       ctx.response.status = 400;
       ctx.body = "That payment amount is too small to accept!";
     } else {
