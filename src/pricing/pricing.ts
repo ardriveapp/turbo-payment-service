@@ -1,3 +1,4 @@
+import { turboFeePercentageAsADecimal } from "../constants";
 import { Payment } from "../types/payment";
 import { ByteCount, WC, Winston } from "../types/types";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
@@ -30,10 +31,10 @@ export class TurboPricingService implements PricingService {
     const fiatPriceOfOneAR =
       await this.arweaveToFiatOracle.getFiatPriceForOneAR(payment.type);
 
-    // TODO: INCORPORATE FEES BEFORE PROD (stripe, infra costs, community tip)
-
-    const baseWinstonCreditsFromPayment =
-      payment.winstonCreditAmountForARPrice(fiatPriceOfOneAR);
+    const baseWinstonCreditsFromPayment = payment.winstonCreditAmountForARPrice(
+      fiatPriceOfOneAR,
+      turboFeePercentageAsADecimal
+    );
 
     return baseWinstonCreditsFromPayment;
   }
