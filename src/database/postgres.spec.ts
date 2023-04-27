@@ -284,7 +284,7 @@ describe("PostgresDatabase class", () => {
           paymentReceiptId: "This is fine",
         }),
         errorMessage:
-          "No top up quote found in database for payment receipt id 'This is fine'",
+          "No top up quote found in database with id 'A Top Up Quote ID That will be NOT FOUND'",
       });
 
       expect(

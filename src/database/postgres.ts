@@ -142,7 +142,7 @@ export class PostgresDatabase implements Database {
       });
       if (topUpQuoteDbResults.length === 0) {
         throw Error(
-          `No top up quote found in database for payment receipt id '${paymentReceiptId}'`
+          `No top up quote found in database with id '${topUpQuoteId}'`
         );
       }
 
