@@ -84,8 +84,19 @@ describe("Payment class", () => {
       const pricePerAr = 8.31;
 
       expect(
-        payment.winstonCreditAmountForARPrice(pricePerAr).toString()
+        payment.winstonCreditAmountForARPrice(pricePerAr, 0).toString()
       ).to.equal("1000000000000");
+    });
+
+    it("returns the expected amount for a two decimal currency when reduced by a fee", () => {
+      const payment = new Payment({ amount: 5000, type: "usd" });
+
+      // Retrieved from `curl https://api.coingecko.com/api/v3/simple/price\?ids\=arweave\&vs_currencies\=usd` on 04-19-2023
+      const pricePerAr = 10;
+
+      expect(
+        payment.winstonCreditAmountForARPrice(pricePerAr, 0.2).toString()
+      ).to.equal("4000000000000");
     });
 
     it("returns the expected amount for a zero decimal currency", () => {
@@ -95,7 +106,7 @@ describe("Payment class", () => {
       const pricePerAr = 1119.26;
 
       expect(
-        payment.winstonCreditAmountForARPrice(pricePerAr).toString()
+        payment.winstonCreditAmountForARPrice(pricePerAr, 0).toString()
       ).to.equal("999767703661");
     });
   });

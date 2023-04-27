@@ -41,12 +41,18 @@ export class Payment {
     this.type = type;
   }
 
-  public winstonCreditAmountForARPrice(priceForOneAR: number): WC {
+  public winstonCreditAmountForARPrice(
+    priceForOneAR: number,
+    turboFeePercentageAsADecimal: number
+  ): WC {
     const zeroDecimalAmount = zeroDecimalCurrencyTypes.includes(this.type)
       ? this.amount
       : this.amount / 100;
 
-    const arcForPaymentAmount = zeroDecimalAmount / priceForOneAR;
+    const paymentAmountAfterFees =
+      zeroDecimalAmount - zeroDecimalAmount * turboFeePercentageAsADecimal;
+
+    const arcForPaymentAmount = paymentAmountAfterFees / priceForOneAR;
 
     return new Winston(
       BigNumber(arcForPaymentAmount).times(1_000_000_000_000).toFixed(0)

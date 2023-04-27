@@ -15,3 +15,5 @@ export const topUpMethods = [
 ] as const;
 
 export const TEST_PRIVATE_ROUTE_SECRET = "test-secret";
+
+export const turboFeePercentageAsADecimal = 0.2;
