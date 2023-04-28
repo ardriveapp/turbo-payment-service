@@ -1,4 +1,5 @@
 import { expect } from "chai";
+import Stripe from "stripe";
 
 import { DbTestHelper } from "../../../../tests/dbTestHelper";
 import {
@@ -13,6 +14,9 @@ import { handlePaymentSuccessEvent } from "./paymentSuccessEventHandler";
 describe("handlePaymentSuccessEvent", () => {
   const db = new PostgresDatabase();
   const dbTestHelper = new DbTestHelper(db);
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    apiVersion: "2022-11-15",
+  });
 
   const paymentSuccessTopUpQuoteId = "Payment Success Top Up Quote ID 🧾";
 
@@ -29,7 +33,7 @@ describe("handlePaymentSuccessEvent", () => {
     });
 
     // Trigger success event happy path
-    await handlePaymentSuccessEvent(paymentIntent, db);
+    await handlePaymentSuccessEvent(paymentIntent, db, stripe);
   });
 
   it("should process payment and create receipt if top up quote exists", async () => {
@@ -69,7 +73,7 @@ describe("handlePaymentSuccessEvent", () => {
     const paymentIntent = paymentIntentSucceededStub;
 
     try {
-      await handlePaymentSuccessEvent(paymentIntent, db);
+      await handlePaymentSuccessEvent(paymentIntent, db, stripe);
       expect.fail("No payment quote found for 0x1234567890");
     } catch (error) {
       expect(error).to.exist;

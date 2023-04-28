@@ -25,8 +25,7 @@ export async function handleDisputeCreatedEvent(
     topUpQuoteId,
   });
 
-  // TODO: Increment a chargebackReceiptCounter instead of paymentFailedCounter?
-  MetricRegistry.paymentFailedCounter.inc();
+  MetricRegistry.paymentChargebackCounter.inc();
 
   logger.info("Chargeback receipt created!", { chargebackReceiptId });
 }
