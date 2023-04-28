@@ -76,7 +76,6 @@ export const testWallet: JWKInterface = {
 };
 
 export function publicKeyToHeader(publicKey: KeyObject) {
-  return toB64Url(
-    Buffer.from(JSON.stringify(publicKey.export({ format: "jwk" })))
-  );
+  const publicKeyString = JSON.stringify(publicKey.export({ format: "jwk" }));
+  return toB64Url(Buffer.from(publicKeyString));
 }
