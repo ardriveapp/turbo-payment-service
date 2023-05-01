@@ -4,17 +4,21 @@ interface StubPaymentIntentParams {
   id?: string;
   status?: Stripe.PaymentIntent.Status;
   topUpQuoteId?: string;
+  currency?: string;
+  amount?: number;
 }
 export const paymentIntentStub = ({
   id = "pi_123",
   status = "succeeded",
   topUpQuoteId = "0x1234567890",
+  currency = "usd",
+  amount = 100,
 }: StubPaymentIntentParams): Stripe.PaymentIntent => {
   return {
     id,
     status,
-    amount: 100,
-    currency: "usd",
+    amount,
+    currency,
     metadata: { topUpQuoteId },
     object: "payment_intent",
     amount_capturable: 0,

@@ -10,7 +10,6 @@ export interface Architecture {
   stripe: Stripe;
 }
 export function getDefaultArch(): Architecture {
-  console.log(process.env.STRIPE_SECRET_KEY!.split("_")[0]);
   return {
     paymentDatabase: new PostgresDatabase(),
     pricingService: new TurboPricingService({}),
