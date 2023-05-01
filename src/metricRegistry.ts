@@ -3,9 +3,14 @@ import * as promClient from "prom-client";
 export class MetricRegistry {
   private static instance: MetricRegistry;
   private registry: promClient.Registry;
-  public static paymentFailedCounter = new promClient.Counter({
-    name: "payment_intent_failed",
-    help: "payment_intent_failed",
+  public static paymentChargebackCounter = new promClient.Counter({
+    name: "payment_intent_chargeback",
+    help: "Count of successful payments fulfilled that were then disputed and/or charged back",
+  });
+
+  public static paymentRefundedCounter = new promClient.Counter({
+    name: "payment_intent_refunded",
+    help: "Count of payment success events received that were immediately rejected at a database level and refunded",
   });
 
   public static topUpsCounter = new promClient.Counter({
@@ -25,7 +30,9 @@ export class MetricRegistry {
 
   private constructor() {
     this.registry = new promClient.Registry();
-    this.registry.registerMetric(MetricRegistry.paymentFailedCounter);
+
+    this.registry.registerMetric(MetricRegistry.paymentChargebackCounter);
+    this.registry.registerMetric(MetricRegistry.paymentRefundedCounter);
     this.registry.registerMetric(MetricRegistry.paymentSuccessCounter);
     this.registry.registerMetric(MetricRegistry.topUpsCounter);
     this.registry.registerMetric(MetricRegistry.uncaughtExceptionCounter);

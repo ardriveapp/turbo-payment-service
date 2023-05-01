@@ -7,27 +7,63 @@ import { MetricRegistry } from "../../../metricRegistry";
 
 export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
-  paymentDatabase: Database
+  paymentDatabase: Database,
+  stripe: Stripe
 ) {
-  const topUpQuoteId = pi.metadata["top_up_quote_id"];
+  logger.info("💰 Payment Success Event Triggered", pi.metadata);
 
-  logger.info(`💰 Payment Success Event Triggered!`, {
-    topUpQuoteId,
-    amount: pi.amount,
-  });
-
-  const topUpQuote = await paymentDatabase.getTopUpQuote(topUpQuoteId);
+  const { topUpQuoteId, winstonCreditAmount } = pi.metadata;
   const paymentReceiptId = randomUUID();
 
-  await paymentDatabase.createPaymentReceipt({
+  const loggerObject = {
     paymentReceiptId,
-    paymentAmount: pi.amount,
-    currencyType: pi.currency,
-    topUpQuoteId,
-  });
+    ...pi.metadata,
+  };
+  try {
+    if (!topUpQuoteId) {
+      throw Error(
+        'Payment intent metadata object must include key "topUpQuoteId" as a string value!'
+      );
+    }
 
-  logger.info(`Payment Receipt created!`, { paymentReceiptId, topUpQuote });
+    logger.info("Creating payment receipt...", loggerObject);
 
-  MetricRegistry.paymentSuccessCounter.inc();
-  MetricRegistry.topUpsCounter.inc(Number(topUpQuote.winstonCreditAmount));
+    // TODO: Return new balance and winston credited here for logging and metrics in PE-3562
+    await paymentDatabase.createPaymentReceipt({
+      paymentReceiptId,
+      paymentAmount: pi.amount,
+      currencyType: pi.currency,
+      topUpQuoteId,
+    });
+
+    logger.info(`💸 Payment Receipt created!`, loggerObject);
+
+    MetricRegistry.paymentSuccessCounter.inc();
+    MetricRegistry.topUpsCounter.inc(Number(winstonCreditAmount));
+  } catch (error) {
+    logger.error("❌ Payment receipt creation has failed!", loggerObject);
+    logger.error(error);
+
+    await refundPayment(stripe, pi.id, loggerObject);
+  }
+}
+
+async function refundPayment(
+  stripe: Stripe,
+  paymentIntentId: string,
+  loggerObject: Record<string, unknown>
+) {
+  try {
+    logger.info("Creating a Stripe refund for payment intent...", loggerObject);
+    await stripe.refunds.create({ payment_intent: paymentIntentId });
+
+    logger.info(
+      "♻️ Payment successfully refunded through Stripe refund",
+      loggerObject
+    );
+    MetricRegistry.paymentRefundedCounter.inc();
+  } catch (error) {
+    logger.error("⛔️ Payment refund has failed!", loggerObject);
+    logger.error(error);
+  }
 }

@@ -1634,6 +1634,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/jwk-to-pem@npm:^2.0.1":
+  version: 2.0.1
+  resolution: "@types/jwk-to-pem@npm:2.0.1"
+  checksum: 4fb0e1918c55bd2b794b2a497c14fd898028ae0b9f21f73b4400167358f4767df898d032875ca3655ea4e49234480cf9d21524374913664007e4e9011b2f28e8
+  languageName: node
+  linkType: hard
+
 "@types/keygrip@npm:*":
   version: 1.0.2
   resolution: "@types/keygrip@npm:1.0.2"
@@ -1707,10 +1714,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/node@npm:*, @types/node@npm:>=8.1.0, @types/node@npm:^18.13.0":
+"@types/node@npm:*, @types/node@npm:>=8.1.0":
   version: 18.15.11
   resolution: "@types/node@npm:18.15.11"
   checksum: 977b4ad04708897ff0eb049ecf82246d210939c82461922d20f7d2dcfd81bbc661582ba3af28869210f7e8b1934529dcd46bff7d448551400f9d48b9d3bddec3
+  languageName: node
+  linkType: hard
+
+"@types/node@npm:^18.16.1":
+  version: 18.16.1
+  resolution: "@types/node@npm:18.16.1"
+  checksum: 799026b949a48993cba7c9b81b2eabfdfb34c880744cb44c1c990fbedc9e315f3634d126eb2cf9a6e0795577c01016e2326d98565bef695ada9d363fadeb6946
   languageName: node
   linkType: hard
 
@@ -5285,12 +5299,13 @@ __metadata:
     "@types/bn.js": ^5.1.0
     "@types/chai": ^4.3.1
     "@types/jsonwebtoken": ^9.0.1
+    "@types/jwk-to-pem": ^2.0.1
     "@types/knex": ^0.16.1
     "@types/koa": ^2.13.4
     "@types/koa-router": ^7.4.4
     "@types/koa__cors": ^3.3.0
     "@types/mocha": ^9.1.1
-    "@types/node": ^18.13.0
+    "@types/node": ^18.16.1
     "@types/sinon": ^10.0.11
     "@types/sinon-chai": ^3.2.9
     "@typescript-eslint/eslint-plugin": ^5.25.0

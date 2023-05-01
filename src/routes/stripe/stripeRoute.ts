@@ -62,7 +62,8 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handlePaymentSuccessEvent(
           data.object as Stripe.PaymentIntent,
-          ctx.state.paymentDatabase
+          ctx.state.paymentDatabase,
+          stripe
         );
       } catch (error) {
         logger.error("Payment Success Event handler failed", error);

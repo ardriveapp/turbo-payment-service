@@ -3,19 +3,19 @@ import Stripe from "stripe";
 interface StubPaymentIntentParams {
   id?: string;
   status?: Stripe.PaymentIntent.Status;
-  top_up_quote_id?: string;
+  topUpQuoteId?: string;
 }
 export const paymentIntentStub = ({
   id = "pi_123",
   status = "succeeded",
-  top_up_quote_id = "0x1234567890",
+  topUpQuoteId = "0x1234567890",
 }: StubPaymentIntentParams): Stripe.PaymentIntent => {
   return {
     id,
     status,
     amount: 100,
     currency: "usd",
-    metadata: { top_up_quote_id },
+    metadata: { topUpQuoteId },
     object: "payment_intent",
     amount_capturable: 0,
     amount_received: 0,
@@ -103,7 +103,7 @@ export const chargeDisputeStub: Stripe.Dispute = {
   is_charge_refundable: true,
   livemode: false,
   metadata: {
-    top_up_quote_id: "0x1234567890",
+    topUpQuoteId: "0x1234567890",
   },
   payment_intent: null,
   reason: "fraudulent",
