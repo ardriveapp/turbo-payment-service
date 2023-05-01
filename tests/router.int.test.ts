@@ -538,4 +538,19 @@ describe("with a stubbed stripe instance", () => {
       webhookStub.restore();
     }
   });
+
+  // We expect to return 200 OK on all stripe webhook events we handle regardless of how we handle the event
+  it("POST /stripe-webhook returns 400 for invalid stripe requests", async () => {
+    stub(stripe.webhooks, "constructEvent").throws(Error("bad"));
+
+    const { status, statusText, data } = await axios.post(
+      `${localTestUrl}/v1/stripe-webhook`,
+      {},
+      { validateStatus: () => true }
+    );
+
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal("Webhook Error: bad");
+  });
 });
