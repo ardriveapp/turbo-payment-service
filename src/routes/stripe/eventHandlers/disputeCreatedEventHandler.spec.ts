@@ -17,7 +17,7 @@ describe("handleDisputeCreatedEvent", () => {
   const disputeEventPaymentReceiptId = "A Payment Receipt Id to Dispute 👊🏻";
   const disputeEventUserAddress = "User Address to Dispute 🤺";
 
-  const dispute = chargeDisputeStub;
+  const dispute = chargeDisputeStub({});
 
   before(async () => {
     // Insert payment receipt and user that dispute event depends on

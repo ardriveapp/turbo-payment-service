@@ -4,6 +4,8 @@ import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
 import { sign } from "jsonwebtoken";
+import { stub } from "sinon";
+import Stripe from "stripe";
 
 import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
@@ -16,6 +18,7 @@ import {
 import { toB64Url } from "../src/utils/base64";
 import { DbTestHelper } from "./dbTestHelper";
 import { signData } from "./helpers/signData";
+import { chargeDisputeStub, paymentIntentStub } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import {
   localTestUrl,
@@ -454,7 +457,85 @@ describe("Router tests", () => {
         validateStatus: () => true,
       }
     );
+
     expect(statusText).to.equal("User not found");
     expect(status).to.equal(403);
+  });
+});
+
+describe("with a stubbed stripe instance", () => {
+  const stripe = new Stripe("stub", { apiVersion: "2022-11-15" });
+
+  let server: Server;
+
+  function closeServer() {
+    server.close();
+    logger.info("Server closed!");
+  }
+  beforeEach(async () => {
+    server = await createServer({ stripe });
+  });
+
+  afterEach(() => {
+    closeServer();
+  });
+
+  // We expect to return 200 OK on all stripe webhook events we handle regardless of how we handle the event
+  it("POST /stripe-webhook returns 200 for valid stripe events", async () => {
+    const dbTestHelper = new DbTestHelper(new PostgresDatabase());
+
+    await dbTestHelper.insertStubTopUpQuote({
+      top_up_quote_id: "webhook intent Succeeded",
+      payment_amount: "500",
+      currency_type: "usd",
+    });
+
+    const successStub = paymentIntentStub({
+      id: "webhook intent Succeeded",
+      topUpQuoteId: "webhook intent Succeeded",
+      amount: 500,
+      currency: "usd",
+    });
+
+    await dbTestHelper.insertStubPaymentReceipt({
+      top_up_quote_id: "webhook dispute created",
+      payment_receipt_id: "webhook dispute created",
+      payment_amount: "1000",
+      currency_type: "gbp",
+    });
+
+    const disputeStub = chargeDisputeStub({
+      id: "webhook dispute created",
+      topUpQuoteId: "webhook dispute created",
+      amount: 1000,
+      currency: "gbp",
+    });
+
+    const webhookEvents = [
+      ["payment_intent.succeeded", successStub],
+      ["charge.dispute.created", disputeStub],
+    ];
+
+    for (const [eventType, eventStub] of webhookEvents) {
+      const webhookStub = stub(stripe.webhooks, "constructEvent").returns({
+        type: eventType,
+        data: {
+          object: eventStub,
+        },
+      } as unknown as Stripe.Event);
+
+      const { status, statusText, data } = await axios.post(
+        `${localTestUrl}/v1/stripe-webhook`,
+        {
+          validateStatus: () => true,
+        }
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("OK");
+      expect(data).to.equal("OK");
+
+      webhookStub.restore();
+    }
   });
 });
