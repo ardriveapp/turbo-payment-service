@@ -19,13 +19,25 @@ export async function handleDisputeCreatedEvent(
   });
 
   const chargebackReceiptId = randomUUID();
-  await paymentDatabase.createChargebackReceipt({
-    chargebackReason: pi.reason,
-    chargebackReceiptId,
-    topUpQuoteId,
-  });
 
-  MetricRegistry.paymentChargebackCounter.inc();
+  try {
+    await paymentDatabase.createChargebackReceipt({
+      chargebackReason: pi.reason,
+      chargebackReceiptId,
+      topUpQuoteId,
+    });
 
-  logger.info("Chargeback receipt created!", { chargebackReceiptId });
+    MetricRegistry.paymentChargebackCounter.inc();
+
+    logger.info("Chargeback receipt created!", {
+      chargebackReceiptId,
+      topUpQuoteId,
+    });
+  } catch (error) {
+    logger.error("Chargeback receipt failed!", {
+      chargebackReceiptId,
+      topUpQuoteId,
+    });
+    logger.error(error);
+  }
 }
