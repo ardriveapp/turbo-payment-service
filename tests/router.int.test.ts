@@ -539,7 +539,6 @@ describe("with a stubbed stripe instance", () => {
     }
   });
 
-  // We expect to return 200 OK on all stripe webhook events we handle regardless of how we handle the event
   it("POST /stripe-webhook returns 400 for invalid stripe requests", async () => {
     stub(stripe.webhooks, "constructEvent").throws(Error("bad"));
 
