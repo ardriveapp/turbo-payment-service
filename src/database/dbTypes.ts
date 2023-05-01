@@ -26,7 +26,6 @@ export type ChargebackReceiptId = IdType;
 
 export type PaymentAmount = number;
 
-// TODO: Should we define these types here? e.g: `'usd' | 'etc'`
 export type CurrencyType = string;
 
 export type PaymentProvider = string | "stripe"; // TODO: "apple-pay"
