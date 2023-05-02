@@ -10,6 +10,7 @@ import Stripe from "stripe";
 import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
+import { TurboPricingService } from "../src/pricing/pricing";
 import { createServer } from "../src/server";
 import {
   jwkInterfaceToPrivateKey,
@@ -33,12 +34,10 @@ describe("Router tests", () => {
     server.close();
     logger.info("Server closed!");
   }
-
+  const pricingService = new TurboPricingService({});
   let mock: MockAdapter;
-  let secret: string;
   before(async () => {
-    secret = TEST_PRIVATE_ROUTE_SECRET;
-    server = await createServer({});
+    server = await createServer({ pricingService });
   });
 
   beforeEach(() => {
@@ -339,7 +338,7 @@ describe("Router tests", () => {
   it("GET /reserve-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const byteCount = 1;
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
@@ -356,7 +355,7 @@ describe("Router tests", () => {
     );
     expect(statusText).to.equal("Balance reserved");
     expect(status).to.equal(200);
-    expect(data).to.equal("100");
+    expect(data).to.equal("193602278");
   });
 
   it("GET /reserve-balance returns 401 for missing authorization", async () => {
@@ -376,7 +375,7 @@ describe("Router tests", () => {
   it("GET /reserve-balance returns 403 for insufficient balance", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const byteCount = 100000;
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
@@ -397,7 +396,7 @@ describe("Router tests", () => {
     const testAddress = "someRandomAddress";
     const byteCount = 100000;
 
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
@@ -417,7 +416,7 @@ describe("Router tests", () => {
   it("GET /refund-balance returns 200 for correct params", async () => {
     const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const winstonCredits = 1000;
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
@@ -450,7 +449,7 @@ describe("Router tests", () => {
   it("GET /refund-balance returns 403 if user not found", async () => {
     const testAddress = "someRandomAddress";
     const winstonCredits = 100000;
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
