@@ -12,21 +12,12 @@ import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
 import { TurboPricingService } from "../src/pricing/pricing";
 import { createServer } from "../src/server";
-import {
-  jwkInterfaceToPrivateKey,
-  jwkInterfaceToPublicKey,
-} from "../src/types/jwkTypes";
 import { Winston } from "../src/types/winston";
-import { toB64Url } from "../src/utils/base64";
+import { signedRequestHeadersFromJwk } from "../src/utils/jwkUtils";
 import { DbTestHelper } from "./dbTestHelper";
-import { signData } from "./helpers/signData";
 import { chargeDisputeStub, paymentIntentStub } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
-import {
-  localTestUrl,
-  publicKeyToHeader,
-  testWallet,
-} from "./helpers/testHelpers";
+import { localTestUrl, testWallet } from "./helpers/testHelpers";
 
 const dbTestHelper = new DbTestHelper(new PostgresDatabase());
 const pricingService = new TurboPricingService({});
@@ -150,17 +141,8 @@ describe("Router tests", () => {
   });
 
   it("GET /balance returns 200 for correct signature", async () => {
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(testWallet);
-    const privateKey = jwkInterfaceToPrivateKey(testWallet);
-    const signature = await signData(privateKey, nonce);
-
     const { status, statusText, data } = await axios.get(`/v1/balance`, {
-      headers: {
-        "x-public-key": publicKeyToHeader(publicKey),
-        "x-nonce": nonce,
-        "x-signature": toB64Url(Buffer.from(signature)),
-      },
+      headers: await signedRequestHeadersFromJwk(testWallet, "123"),
     });
 
     const balance = Number(data);
@@ -175,17 +157,8 @@ describe("Router tests", () => {
     this.timeout(5_000);
     const jwk = await Arweave.crypto.generateJWK();
 
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(jwk);
-    const privateKey = jwkInterfaceToPrivateKey(jwk);
-    const signature = await signData(privateKey, nonce);
-
     const { status, statusText, data } = await axios.get(`/v1/balance`, {
-      headers: {
-        "x-public-key": publicKeyToHeader(publicKey),
-        "x-nonce": nonce,
-        "x-signature": toB64Url(Buffer.from(signature)),
-      },
+      headers: await signedRequestHeadersFromJwk(jwk, "123"),
     });
 
     expect(status).to.equal(404);
@@ -195,18 +168,8 @@ describe("Router tests", () => {
   });
 
   it("GET /balance returns 403 for bad signature", async () => {
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(testWallet);
-    const privateKey = jwkInterfaceToPrivateKey(testWallet);
-
-    const signature = await signData(privateKey, "another nonce");
-
     const { status, data, statusText } = await axios.get(`/v1/balance`, {
-      headers: {
-        "x-public-key": publicKeyToHeader(publicKey),
-        "x-nonce": nonce,
-        "x-signature": toB64Url(Buffer.from(signature)),
-      },
+      headers: await signedRequestHeadersFromJwk(testWallet, "123"),
     });
 
     expect(status).to.equal(403);
