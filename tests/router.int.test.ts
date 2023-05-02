@@ -89,6 +89,19 @@ describe("Router tests", () => {
     expect(statusText).to.equal("Byte count too large");
   });
 
+  it("GET /price/bytes returns 502 if bytes pricing oracle fails to get a price", async () => {
+    stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
+    const { status, statusText, data } = await axios.get(
+      `/v1/price/bytes/1321321`,
+      {
+        validateStatus: () => true,
+      }
+    );
+    expect(status).to.equal(502);
+    expect(data).to.equal("Pricing Oracle Unavailable");
+    expect(statusText).to.equal("Bad Gateway");
+  });
+
   it("GET /price/:currency/:value", async () => {
     mock
       .onGet(
