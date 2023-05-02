@@ -22,10 +22,6 @@ describe("PostgresDatabase class", () => {
     ).toISOString();
 
     before(async () => {
-      // TODO: Before sending to DB and creating top up quote we should use safer types:
-      // -  validate this address is a public arweave address (and address type is arweave)
-      // -  validate payment provider is expected
-      // -  validate currency type is supported
       await db.createTopUpQuote({
         paymentAmount: 100,
         currencyType: "usd",
