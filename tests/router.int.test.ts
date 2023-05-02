@@ -76,11 +76,21 @@ describe("Router tests", () => {
   });
 
   it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
-    const { status, statusText } = await axios.get(
+    const { status, statusText, data } = await axios.get(
       `/v1/price/bytes/1024000000000000000000000000000000000000000000`
     );
     expect(status).to.equal(400);
     expect(statusText).to.equal("Byte count too large");
+    expect(data).to.equal("Byte count too large");
+  });
+
+  it("GET /price/bytes returns 400 for invalid byte count", async () => {
+    const { status, statusText, data } = await axios.get(
+      `/v1/price/bytes/-54.2`
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal("Invalid byte count");
   });
 
   it("GET /price/bytes returns 502 if bytes pricing oracle fails to get a price", async () => {
@@ -169,7 +179,10 @@ describe("Router tests", () => {
 
   it("GET /balance returns 403 for bad signature", async () => {
     const { status, data, statusText } = await axios.get(`/v1/balance`, {
-      headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+      headers: {
+        ...(await signedRequestHeadersFromJwk(testWallet, "123")),
+        "x-nonce": "a fake different nonce that will not match",
+      },
     });
 
     expect(status).to.equal(403);
