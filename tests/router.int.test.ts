@@ -36,15 +36,21 @@ describe("Router tests", () => {
 
   let mock: MockAdapter;
   let secret: string;
-  beforeEach(async () => {
+  before(async () => {
     secret = TEST_PRIVATE_ROUTE_SECRET;
     server = await createServer({});
+  });
+
+  beforeEach(() => {
     mock = new MockAdapter(axios, { onNoMatch: "passthrough" });
+  });
+
+  after(() => {
+    closeServer();
   });
 
   afterEach(() => {
     mock.restore();
-    closeServer();
   });
 
   it("GET /health returns 'OK' in the body, a 200 status, and the correct content-length", async () => {
@@ -472,11 +478,11 @@ describe("with a stubbed stripe instance", () => {
     server.close();
     logger.info("Server closed!");
   }
-  beforeEach(async () => {
+  before(async () => {
     server = await createServer({ stripe });
   });
 
-  afterEach(() => {
+  after(() => {
     closeServer();
   });
 
