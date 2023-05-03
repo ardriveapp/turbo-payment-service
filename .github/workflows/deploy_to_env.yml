@@ -52,10 +52,15 @@ jobs:
 
       - name: Set AppSpec Hooks from template
         id: generate-appspec
+        # TODO: use the payment service blackbox test lambda when its created
+        # run: |
+        #   CONTAINER=${{ inputs.CONTAINER_NAME }}
+        #   AFTER_ALLOW_TEST_TRAFFIC_HOOK=$(aws lambda get-function --function-name PAYMENT-SERVICE-LAMBDA | jq '. | .Configuration.FunctionArn' | tr -d '"')
+        #   jq --arg AFTER_ALLOW_TEST_TRAFFIC_HOOK $AFTER_ALLOW_TEST_TRAFFIC_HOOK --arg CONTAINER $CONTAINER '.Resources[0].TargetService.Properties.LoadBalancerInfo.ContainerName = $CONTAINER | .Hooks[0].AfterAllowTestTraffic = $AFTER_ALLOW_TEST_TRAFFIC_HOOK' appspec.json | jq . > appspec_deploy.json
+
         run: |
           CONTAINER=${{ inputs.CONTAINER_NAME }}
-          AFTER_ALLOW_TEST_TRAFFIC_HOOK=$(aws lambda get-function --function-name bundler-tests-lambda | jq '. | .Configuration.FunctionArn' | tr -d '"')
-          jq --arg AFTER_ALLOW_TEST_TRAFFIC_HOOK $AFTER_ALLOW_TEST_TRAFFIC_HOOK --arg CONTAINER $CONTAINER '.Resources[0].TargetService.Properties.LoadBalancerInfo.ContainerName = $CONTAINER | .Hooks[0].AfterAllowTestTraffic = $AFTER_ALLOW_TEST_TRAFFIC_HOOK' appspec.json | jq . > appspec_deploy.json
+          jq --arg CONTAINER $CONTAINER '.Resources[0].TargetService.Properties.LoadBalancerInfo.ContainerName = $CONTAINER | .Hooks = []' appspec.json | jq . > appspec_deploy.json
 
       - name: Download task definitions
         run: |
