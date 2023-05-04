@@ -14,6 +14,7 @@ import { TurboPricingService } from "../src/pricing/pricing";
 import { createServer } from "../src/server";
 import { Winston } from "../src/types/winston";
 import { signedRequestHeadersFromJwk } from "../src/utils/jwkUtils";
+import { loadSecretsToEnv } from "../src/utils/loadSecretsToEnv";
 import { DbTestHelper } from "./dbTestHelper";
 import { chargeDisputeStub, paymentIntentStub } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
@@ -26,6 +27,8 @@ const axios = axiosPackage.create({
   baseURL: localTestUrl,
   validateStatus: () => true,
 });
+// cspell:disable
+const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:enable
 
 describe("Router tests", () => {
   let server: Server;
@@ -35,9 +38,15 @@ describe("Router tests", () => {
     logger.info("Server closed!");
   }
 
+  let stripe: Stripe;
+
   let mock: MockAdapter;
   before(async () => {
-    server = await createServer({ pricingService, paymentDatabase });
+    await loadSecretsToEnv();
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: "2022-11-15",
+    });
+    server = await createServer({ pricingService, paymentDatabase, stripe });
   });
 
   beforeEach(() => {
@@ -157,7 +166,7 @@ describe("Router tests", () => {
 
   before(async () => {
     await dbTestHelper.insertStubUser({
-      user_address: "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830",
+      user_address: testAddress,
       winston_credit_balance: "5000000",
     });
   });
@@ -226,7 +235,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
+      `/v1/top-up/checkout-session/${testAddress}/usd/100`
     );
 
     expect(data).to.have.property("topUpQuote");
@@ -255,7 +264,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `/v1/top-up/payment-intent/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
+      `/v1/top-up/payment-intent/${testAddress}/usd/100`
     );
 
     expect(data).to.have.property("topUpQuote");
@@ -282,46 +291,95 @@ describe("Router tests", () => {
     expect(paymentStatus).to.equal("requires_payment_method");
   });
 
-  it("GET /top-up/checkout-session returns 403 for bad arweave address", async () => {
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
-      )
-      .reply(200, {
-        arweave: {
-          usd: 10,
-        },
-      });
-
-    const { status, data } = await axios.get(
+  it("GET /top-up returns 403 for bad arweave address", async () => {
+    const { status, statusText, data } = await axios.get(
       `/v1/top-up/checkout-session/BAD_ADDRESS_OF_DOOM/usd/100`
     );
     expect(status).to.equal(403);
     expect(data).to.equal(
       "Destination address is not a valid Arweave native address!"
     );
+    expect(statusText).to.equal("Forbidden");
   });
 
-  it("GET /top-up/checkout-session returns 400 for correct signature but invalid currency", async () => {
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
-      )
-      .reply(200, {
-        arweave: {
-          usd: 10,
-        },
-      });
-
+  it("GET /top-up returns 400 for invalid payment method", async () => {
     const { status, data, statusText } = await axios.get(
-      `/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/currencyThatDoesNotExist/100`
+      `/v1/top-up/some-method/${testAddress}/usd/101`
     );
 
     expect(data).to.equal(
-      "The currency type 'currencythatdoesnotexist' is currently not supported by this API!"
+      "Payment method must include one of: payment-intent,checkout-session!"
     );
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /top-up returns 400 for invalid currency", async () => {
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/payment-intent/${testAddress}/currencyThatDoesNotExist/100`
+    );
+
+    expect(data).to.equal(
+      // cspell:disable
+      "The currency type 'currencythatdoesnotexist' is currently not supported by this API!" // cspell:enable
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /top-up returns 400 for invalid payment amount", async () => {
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/checkout-session/${testAddress}/usd/-984`
+    );
+
+    expect(data).to.equal(
+      "The provided payment amount (-984) is invalid; it must be a positive non-decimal integer!"
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /top-up returns 502 when fiat pricing oracle is unreachable", async () => {
+    stub(pricingService, "getWCForPayment").throws(Error("Oh no!"));
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/checkout-session/${testAddress}/usd/1337`
+    );
+
+    expect(data).to.equal("ArweaveToFiat Oracle Error");
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+  });
+
+  it("GET /top-up returns 400 when payment amount is too small", async () => {
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/payment-intent/${testAddress}/usd/10`
+    );
+
+    expect(data).to.equal("That payment amount is too small to accept!");
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /top-up returns 502 when stripe fails to create payment session", async () => {
+    stub(stripe.checkout.sessions, "create").throws(Error("Oh no!"));
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/checkout-session/${testAddress}/usd/1337`
+    );
+
+    expect(data).to.equal("Error creating checkout-session!");
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+  });
+
+  it("GET /top-up returns 503 when database is unreachable", async () => {
+    stub(paymentDatabase, "createTopUpQuote").throws(Error("Bad news"));
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/checkout-session/${testAddress}/usd/1337`
+    );
+
+    expect(data).to.equal("Cloud Database Unavailable");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
   });
 
   it("GET /reserve-balance returns 200 for correct params", async () => {
@@ -352,7 +410,6 @@ describe("Router tests", () => {
   });
 
   it("GET /reserve-balance returns 401 for missing authorization", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const byteCount = 1000;
 
     const { status, statusText } = await axios.get(
@@ -363,7 +420,6 @@ describe("Router tests", () => {
   });
 
   it("GET /reserve-balance returns 403 for insufficient balance", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const byteCount = 100000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
@@ -402,7 +458,6 @@ describe("Router tests", () => {
   });
 
   it("GET /refund-balance returns 200 for correct params", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const winstonCredits = 1000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
@@ -421,7 +476,6 @@ describe("Router tests", () => {
   });
 
   it("GET /refund-balance returns 401 for missing authorization", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const winstonCredits = 1000;
 
     const { status, statusText } = await axios.get(
