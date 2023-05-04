@@ -70,6 +70,11 @@ jobs:
     needs: vars
     steps:
       - uses: actions/checkout@v2
+
+      - name: Read .nvmrc
+        id: node_version
+        run: echo ::set-output name=NODE_VERSION::$(cat .nvmrc | tr -cd '[:digit:]'.)
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -77,20 +82,22 @@ jobs:
           aws-secret-access-key: ${{ secrets.CI_SECRET_ACCESS_KEY }}
           role-skip-session-tagging: true
           role-to-assume: arn:aws:iam::${{ needs.vars.outputs.ACCOUNT_ID }}:role/DeploymentRole
-          role-external-id: arn:aws:iam::316715143444:role/DeploymentRole
           role-duration-seconds: 1800
           aws-region: ${{ needs.vars.outputs.AWS_REGION }}
 
-      - name: Docker build
-        run: |
-          docker build --build-arg "NODE_VERSION=$(cat .nvmrc | tr -cd '[:digit:]'.)" -t "${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:$GITHUB_SHA" .
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Docker login, tag and push image
+      - name: Docker build
         id: build-image
-        run: |
-          aws ecr get-login-password | docker login --username AWS --password-stdin ${{ needs.vars.outputs.ECR_REGISTRY }}
-          docker push "${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:$GITHUB_SHA"
-          echo "::set-output name=image::"${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:$GITHUB_SHA""
+        uses: docker/build-push-action@v4
+        with:
+          push: true
+          build-args: |
+            NODE_VERSION=${{ steps.node_version.outputs.NODE_VERSION }}
+          tags: |
+            ${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:latest
+            ${{ needs.vars.outputs.ECR_REGISTRY }}/${{ needs.vars.outputs.ECR_IMAGE_NAME }}:${{ github.sha }}
 
       - name: Scan Image for Vulnerabilities
         id: scan-image
@@ -112,8 +119,8 @@ jobs:
               attempts=$((attempts+1))
               echo "Scanning is ${status}... Attempt ${attempts}"
           done
-          critical=$(echo $findings | jq '.imageScanFindings.findingSeverityCounts.CRITICAL // 0') 
-          high=$(echo $findings | jq '.imageScanFindings.findingSeverityCounts.HIGH // 0') 
+          critical=$(echo $findings | jq '.imageScanFindings.findingSeverityCounts.CRITICAL // 0')
+          high=$(echo $findings | jq '.imageScanFindings.findingSeverityCounts.HIGH // 0')
           if  [ $critical -gt 0 ] || [ $high -gt 0 ]; then
             echo "Critical or high vulnerabilities found in image that MUST be resolved before being deployed!"
             echo $findings
