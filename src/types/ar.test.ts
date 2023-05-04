@@ -72,4 +72,6 @@ describe("AR class", () => {
       ).to.equal("18014398509481982123456789012");
     });
   });
+
+  // TODO: toJSON coverage
 });

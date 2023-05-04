@@ -1,11 +1,9 @@
 import { expect } from "chai";
+import { stub } from "sinon";
 import Stripe from "stripe";
 
 import { DbTestHelper } from "../../../../tests/dbTestHelper";
-import {
-  paymentIntentStub,
-  paymentIntentSucceededStub,
-} from "../../../../tests/helpers/stubs";
+import { paymentIntentStub } from "../../../../tests/helpers/stubs";
 import { tableNames } from "../../../database/dbConstants";
 import { PaymentReceiptDBResult } from "../../../database/dbTypes";
 import { PostgresDatabase } from "../../../database/postgres";
@@ -69,14 +67,77 @@ describe("handlePaymentSuccessEvent", () => {
     expect(winston_credit_amount).to.equal("500");
   });
 
-  it("should throw an error if no top up quote is found", async () => {
-    const paymentIntent = paymentIntentSucceededStub;
+  it("should attempt to refund the payment with Stripe if no top up quote is found", async () => {
+    const stripeRefundSpy = stub(stripe.refunds, "create").resolves();
+    const paymentIntent = paymentIntentStub({ topUpQuoteId: "nope!" });
 
-    try {
-      await handlePaymentSuccessEvent(paymentIntent, db, stripe);
-      expect.fail("No payment quote found for 0x1234567890");
-    } catch (error) {
-      expect(error).to.exist;
-    }
+    await handlePaymentSuccessEvent(paymentIntent, db, stripe);
+
+    expect(stripeRefundSpy.calledOnce).to.be.true;
+  });
+
+  it("should attempt to refund the payment with Stripe if top up quote ID does not exist", async () => {
+    const stripeRefundSpy = stub(stripe.refunds, "create").resolves();
+    const paymentIntent = paymentIntentStub({});
+    delete paymentIntent.metadata.topUpQuoteId;
+
+    await handlePaymentSuccessEvent(paymentIntent, db, stripe);
+
+    expect(stripeRefundSpy.calledOnce).to.be.true;
+  });
+
+  it("should attempt to refund the payment with Stripe if top up quote has been expired", async () => {
+    const sixMinutesAgo = new Date(Date.now() - 1000 * 60 * 6).toISOString();
+    await dbTestHelper.insertStubTopUpQuote({
+      top_up_quote_id: "this is expired",
+      quote_expiration_date: sixMinutesAgo,
+    });
+
+    const stripeRefundSpy = stub(stripe.refunds, "create").resolves();
+    const paymentIntent = paymentIntentStub({
+      topUpQuoteId: "this is expired",
+    });
+
+    await handlePaymentSuccessEvent(paymentIntent, db, stripe);
+
+    expect(stripeRefundSpy.calledOnce).to.be.true;
+  });
+
+  it("should attempt to refund the payment with Stripe if currency type is mismatched", async () => {
+    await dbTestHelper.insertStubTopUpQuote({
+      top_up_quote_id: "this is wrong currency type",
+      currency_type: "jpy",
+      payment_amount: "500",
+    });
+
+    const stripeRefundSpy = stub(stripe.refunds, "create").resolves();
+    const paymentIntent = paymentIntentStub({
+      topUpQuoteId: "this is wrong currency type",
+      currency: "gbp",
+      amount: 500,
+    });
+
+    await handlePaymentSuccessEvent(paymentIntent, db, stripe);
+
+    expect(stripeRefundSpy.calledOnce).to.be.true;
+  });
+
+  it("should attempt to refund the payment with Stripe if payment amount is mismatched", async () => {
+    await dbTestHelper.insertStubTopUpQuote({
+      top_up_quote_id: "this is wrong payment amount",
+      currency_type: "usd",
+      payment_amount: "10101",
+    });
+
+    const stripeRefundSpy = stub(stripe.refunds, "create").resolves();
+    const paymentIntent = paymentIntentStub({
+      topUpQuoteId: "this is wrong payment amount",
+      currency: "usd",
+      amount: 10100,
+    });
+
+    await handlePaymentSuccessEvent(paymentIntent, db, stripe);
+
+    expect(stripeRefundSpy.calledOnce).to.be.true;
   });
 });

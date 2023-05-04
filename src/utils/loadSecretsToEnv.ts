@@ -20,41 +20,29 @@ export async function loadSecretsToEnv() {
   }
 
   if (process.env.NODE_ENV === "test") {
-    // TODO - Just return for now until we handle more secrets
+    // Do not get AWS secrets in the test env
     return;
-  }
-
-  if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET) {
-    return; // Already loaded
   }
 
   const client = new SecretsManagerClient({
     region: process.env.AWS_REGION ?? "us-east-1",
   });
 
-  const getStripeSecretKeyCommand = new GetSecretValueCommand({
-    SecretId: stripeSecretKeyName,
-  });
-  const getWebhookSecretCommand = new GetSecretValueCommand({
-    SecretId: stripeWebhookSecretName,
-  });
-  const getPrivateRouteSecretCommand = new GetSecretValueCommand({
-    SecretId: privateRouteSecretName,
-  });
-  const getJwtSecretCommand = new GetSecretValueCommand({
-    SecretId: jwtSecretName,
-  });
+  const getSecretValueCommand = (SecretId: string) =>
+    new GetSecretValueCommand({
+      SecretId,
+    });
 
   process.env.STRIPE_SECRET_KEY ??= (
-    await client.send(getStripeSecretKeyCommand)
+    await client.send(getSecretValueCommand(stripeSecretKeyName))
   ).SecretString;
   process.env.STRIPE_WEBHOOK_SECRET ??= (
-    await client.send(getWebhookSecretCommand)
+    await client.send(getSecretValueCommand(stripeWebhookSecretName))
   ).SecretString;
   process.env.PRIVATE_ROUTE_SECRET ??= (
-    await client.send(getPrivateRouteSecretCommand)
+    await client.send(getSecretValueCommand(privateRouteSecretName))
   ).SecretString;
   process.env.JWT_SECRET ??= (
-    await client.send(getJwtSecretCommand)
+    await client.send(getSecretValueCommand(jwtSecretName))
   ).SecretString;
 }

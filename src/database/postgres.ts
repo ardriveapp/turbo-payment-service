@@ -162,7 +162,6 @@ export class PostgresDatabase implements Database {
       }
 
       if (+payment_amount !== paymentAmount || currencyType !== currency_type) {
-        // TODO: Whats the business logic to handle the below error cases. Refund the amount? Or credit the amount paid
         throw Error(
           `Amount from top up quote (${payment_amount} ${currency_type}) does not match the amount paid on the payment receipt (${paymentAmount} ${currencyType})!`
         );
