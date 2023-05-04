@@ -124,23 +124,34 @@ describe("Router tests", () => {
     expect(arcAmount).to.be.a("number");
   });
 
-  it("GET /price/:currency/:value returns 502 for invalid currency", async () => {
-    //Coingecko returns 200 and empty arweave object for invalid currency
-
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=RandomCurrency"
-      )
-      .reply(200, { arweave: {} });
-
+  it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
     const { data, status, statusText } = await axios.get(
       `/v1/price/RandomCurrency/100`
     );
     expect(data).to.equal(
-      "The currency type 'randomcurrency' is currently not supported by this API!"
+      // cspell:disable
+      "The currency type 'randomcurrency' is currently not supported by this API!" // cspell:enable
     );
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /price/:currency/:value returns 400 for an invalid payment amount", async () => {
+    const { data, status, statusText } = await axios.get(`/v1/price/usd/200.5`);
+    expect(data).to.equal(
+      "The provided payment amount (200.5) is invalid; it must be a positive non-decimal integer!"
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /price/:currency/:value returns 502 if fiat pricing oracle fails to get a price", async () => {
+    stub(pricingService, "getWCForPayment").throws(Error("Really bad failure"));
+    const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
+
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+    expect(data).to.equal("Fiat Oracle Unavailable");
   });
 
   before(async () => {
