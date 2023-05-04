@@ -19,7 +19,8 @@ import { chargeDisputeStub, paymentIntentStub } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import { localTestUrl, testWallet } from "./helpers/testHelpers";
 
-const dbTestHelper = new DbTestHelper(new PostgresDatabase());
+const paymentDatabase = new PostgresDatabase();
+const dbTestHelper = new DbTestHelper(paymentDatabase);
 const pricingService = new TurboPricingService({});
 const axios = axiosPackage.create({
   baseURL: localTestUrl,
@@ -36,7 +37,7 @@ describe("Router tests", () => {
 
   let mock: MockAdapter;
   before(async () => {
-    server = await createServer({ pricingService });
+    server = await createServer({ pricingService, paymentDatabase });
   });
 
   beforeEach(() => {
@@ -200,6 +201,17 @@ describe("Router tests", () => {
     expect(statusText).to.equal("Forbidden");
 
     expect(data).to.equal("Invalid signature or missing required headers");
+  });
+
+  it("GET /balance returns 503 when the database cannot be reached", async () => {
+    stub(paymentDatabase, "getBalance").throws(Error("Whoops!"));
+    const { status, data, statusText } = await axios.get(`/v1/balance`, {
+      headers: await signedRequestHeadersFromJwk(testWallet),
+    });
+
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
+    expect(data).to.equal("Cloud Database Unavailable");
   });
 
   it("GET /top-up/checkout-session returns 200 and correct response for correct signature", async () => {
