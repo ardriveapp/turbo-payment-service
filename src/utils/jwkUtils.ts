@@ -33,9 +33,10 @@ export function headerToPublicKey(b64UrlHeader: string): KeyObject {
 
 export async function signedRequestHeadersFromJwk(
   jwk: JWKInterface,
-  nonce: string = randomUUID()
+  nonce: string = randomUUID(),
+  data = ""
 ): Promise<AxiosRequestHeaders> {
-  const signature = await signData(jwkInterfaceToPrivateKey(jwk), nonce);
+  const signature = await signData(jwkInterfaceToPrivateKey(jwk), data + nonce);
 
   return {
     "x-public-key": publicKeyToHeader(jwkInterfaceToPublicKey(jwk)),
