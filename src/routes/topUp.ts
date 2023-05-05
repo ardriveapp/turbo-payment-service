@@ -4,7 +4,7 @@ import Stripe from "stripe";
 
 import {
   paymentIntentTopUpMethod,
-  stripeTestModeNJStateSalesTaxRateId,
+  saasStripeTaxCodeId,
   topUpMethods,
 } from "../constants";
 import { PaymentValidationErrors } from "../database/errors";
@@ -91,21 +91,21 @@ export async function topUp(ctx: KoaContext, next: Next) {
         success_url: "https://app.ardrive.io",
         cancel_url: "https://app.ardrive.io",
         currency: payment.type,
+        automatic_tax: { enabled: true },
         payment_method_types: ["card"],
         line_items: [
           {
             price_data: {
               product_data: {
-                name: "ARC",
+                name: "Turbo Credits",
+                description: `${winstonCreditAmount.toARC()} credits on Turbo to destination address "${destinationAddress}"`,
+                tax_code: saasStripeTaxCodeId,
+                metadata: stripeMetadata,
               },
               currency: payment.type,
               unit_amount: payment.amount,
             },
             quantity: 1,
-            tax_rates: [
-              process.env.STRIPE_NJ_SALES_TAX_RATE ??
-                stripeTestModeNJStateSalesTaxRateId,
-            ],
           },
         ],
         payment_intent_data: {

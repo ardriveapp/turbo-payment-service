@@ -71,6 +71,12 @@ export class Winston {
       next.amount.isGreaterThan(max.amount) ? next : max
     );
   }
+
+  toARC(): string {
+    BigNumber.config({ DECIMAL_PLACES: 12 });
+    const w = new BigNumber(this.toString(), 10);
+    return w.shiftedBy(-12).toFixed();
+  }
 }
 
 export function W(amount: BigNumber.Value): Winston {

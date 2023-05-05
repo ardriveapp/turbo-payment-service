@@ -18,5 +18,4 @@ export const TEST_PRIVATE_ROUTE_SECRET = "test-secret";
 
 export const turboFeePercentageAsADecimal = 0.2;
 
-export const stripeTestModeNJStateSalesTaxRateId =
-  "txr_1N4R4qC8apPOWkDL9zUNtGer";
+export const saasStripeTaxCodeId = "txcd_10103000";
