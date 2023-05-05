@@ -2,7 +2,11 @@ import { randomUUID } from "crypto";
 import { Next } from "koa";
 import Stripe from "stripe";
 
-import { paymentIntentTopUpMethod, topUpMethods } from "../constants";
+import {
+  paymentIntentTopUpMethod,
+  stripeTestModeNJStateSalesTaxRateId,
+  topUpMethods,
+} from "../constants";
 import { PaymentValidationErrors } from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
@@ -92,11 +96,17 @@ export async function topUp(ctx: KoaContext, next: Next) {
         line_items: [
           {
             price_data: {
-              product_data: { name: "ARC" },
+              product_data: {
+                name: "ARC",
+              },
               currency: payment.type,
               unit_amount: payment.amount,
             },
             quantity: 1,
+            tax_rates: [
+              process.env.STRIPE_TAX_RATE ??
+                stripeTestModeNJStateSalesTaxRateId,
+            ],
           },
         ],
         payment_intent_data: {
