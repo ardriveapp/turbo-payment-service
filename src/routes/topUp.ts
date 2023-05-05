@@ -103,7 +103,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
             },
             quantity: 1,
             tax_rates: [
-              process.env.STRIPE_TAX_RATE ??
+              process.env.STRIPE_NJ_SALES_TAX_RATE ??
                 stripeTestModeNJStateSalesTaxRateId,
             ],
           },
