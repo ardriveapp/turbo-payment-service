@@ -1,5 +1,5 @@
 import Arweave from "arweave/node/common";
-import axios from "axios";
+import axiosPackage from "axios";
 import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
@@ -10,21 +10,25 @@ import Stripe from "stripe";
 import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
+import { TurboPricingService } from "../src/pricing/pricing";
 import { createServer } from "../src/server";
-import {
-  jwkInterfaceToPrivateKey,
-  jwkInterfaceToPublicKey,
-} from "../src/types/jwkTypes";
-import { toB64Url } from "../src/utils/base64";
+import { Winston } from "../src/types/winston";
+import { signedRequestHeadersFromJwk } from "../src/utils/jwkUtils";
+import { loadSecretsToEnv } from "../src/utils/loadSecretsToEnv";
 import { DbTestHelper } from "./dbTestHelper";
-import { signData } from "./helpers/signData";
 import { chargeDisputeStub, paymentIntentStub } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
-import {
-  localTestUrl,
-  publicKeyToHeader,
-  testWallet,
-} from "./helpers/testHelpers";
+import { localTestUrl, testWallet } from "./helpers/testHelpers";
+
+const paymentDatabase = new PostgresDatabase();
+const dbTestHelper = new DbTestHelper(paymentDatabase);
+const pricingService = new TurboPricingService({});
+const axios = axiosPackage.create({
+  baseURL: localTestUrl,
+  validateStatus: () => true,
+});
+// cspell:disable
+const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:enable
 
 describe("Router tests", () => {
   let server: Server;
@@ -34,11 +38,15 @@ describe("Router tests", () => {
     logger.info("Server closed!");
   }
 
+  let stripe: Stripe;
+
   let mock: MockAdapter;
-  let secret: string;
   before(async () => {
-    secret = TEST_PRIVATE_ROUTE_SECRET;
-    server = await createServer({});
+    await loadSecretsToEnv();
+    stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: "2022-11-15",
+    });
+    server = await createServer({ pricingService, paymentDatabase, stripe });
   });
 
   beforeEach(() => {
@@ -54,9 +62,7 @@ describe("Router tests", () => {
   });
 
   it("GET /health returns 'OK' in the body, a 200 status, and the correct content-length", async () => {
-    const { status, statusText, headers, data } = await axios.get(
-      localTestUrl + "/health"
-    );
+    const { status, statusText, headers, data } = await axios.get("/health");
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
@@ -70,7 +76,7 @@ describe("Router tests", () => {
     mock.onGet("arweave.net/price/1024").reply(200, "100");
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/price/bytes/1024`
+      `/v1/price/bytes/1024`
     );
     const arcPrice = Number(data);
     expect(status).to.equal(200);
@@ -80,14 +86,31 @@ describe("Router tests", () => {
   });
 
   it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
-    const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/price/bytes/1024000000000000000000000000000000000000000000`,
-      {
-        validateStatus: () => true,
-      }
+    const { status, statusText, data } = await axios.get(
+      `/v1/price/bytes/1024000000000000000000000000000000000000000000`
     );
     expect(status).to.equal(400);
     expect(statusText).to.equal("Byte count too large");
+    expect(data).to.equal("Byte count too large");
+  });
+
+  it("GET /price/bytes returns 400 for invalid byte count", async () => {
+    const { status, statusText, data } = await axios.get(
+      `/v1/price/bytes/-54.2`
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal("Invalid byte count");
+  });
+
+  it("GET /price/bytes returns 502 if bytes pricing oracle fails to get a price", async () => {
+    stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
+    const { status, statusText, data } = await axios.get(
+      `/v1/price/bytes/1321321`
+    );
+    expect(status).to.equal(502);
+    expect(data).to.equal("Pricing Oracle Unavailable");
+    expect(statusText).to.equal("Bad Gateway");
   });
 
   it("GET /price/:currency/:value", async () => {
@@ -101,9 +124,7 @@ describe("Router tests", () => {
         },
       });
 
-    const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/price/USD/100`
-    );
+    const { status, statusText, data } = await axios.get(`/v1/price/USD/100`);
 
     const arcAmount = Number(data);
 
@@ -113,52 +134,47 @@ describe("Router tests", () => {
     expect(arcAmount).to.be.a("number");
   });
 
-  it("GET /price/:currency/:value returns 502 for invalid currency", async () => {
-    //Coingecko returns 200 and empty arweave object for invalid currency
-
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=RandomCurrency"
-      )
-      .reply(200, { arweave: {} });
-
+  it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
     const { data, status, statusText } = await axios.get(
-      `${localTestUrl}/v1/price/RandomCurrency/100`,
-      {
-        // stop axios from throwing an error for 502
-        validateStatus: () => true,
-      }
+      `/v1/price/RandomCurrency/100`
     );
     expect(data).to.equal(
-      "The currency type 'randomcurrency' is currently not supported by this API!"
+      // cspell:disable
+      "The currency type 'randomcurrency' is currently not supported by this API!" // cspell:enable
     );
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
   });
 
+  it("GET /price/:currency/:value returns 400 for an invalid payment amount", async () => {
+    const { data, status, statusText } = await axios.get(`/v1/price/usd/200.5`);
+    expect(data).to.equal(
+      "The provided payment amount (200.5) is invalid; it must be a positive non-decimal integer!"
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /price/:currency/:value returns 502 if fiat pricing oracle fails to get a price", async () => {
+    stub(pricingService, "getWCForPayment").throws(Error("Really bad failure"));
+    const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
+
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+    expect(data).to.equal("Fiat Oracle Unavailable");
+  });
+
   before(async () => {
-    await new DbTestHelper(new PostgresDatabase()).insertStubUser({
-      user_address: "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830",
+    await dbTestHelper.insertStubUser({
+      user_address: testAddress,
       winston_credit_balance: "5000000",
     });
   });
 
   it("GET /balance returns 200 for correct signature", async () => {
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(testWallet);
-    const privateKey = jwkInterfaceToPrivateKey(testWallet);
-    const signature = await signData(privateKey, nonce);
-
-    const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/balance`,
-      {
-        headers: {
-          "x-public-key": publicKeyToHeader(publicKey),
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
-      }
-    );
+    const { status, statusText, data } = await axios.get(`/v1/balance`, {
+      headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+    });
 
     const balance = Number(data);
 
@@ -172,22 +188,9 @@ describe("Router tests", () => {
     this.timeout(5_000);
     const jwk = await Arweave.crypto.generateJWK();
 
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(jwk);
-    const privateKey = jwkInterfaceToPrivateKey(jwk);
-    const signature = await signData(privateKey, nonce);
-
-    const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/balance`,
-      {
-        headers: {
-          "x-public-key": publicKeyToHeader(publicKey),
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
-        validateStatus: () => true,
-      }
-    );
+    const { status, statusText, data } = await axios.get(`/v1/balance`, {
+      headers: await signedRequestHeadersFromJwk(jwk, "123"),
+    });
 
     expect(status).to.equal(404);
     expect(statusText).to.equal("Not Found");
@@ -196,28 +199,28 @@ describe("Router tests", () => {
   });
 
   it("GET /balance returns 403 for bad signature", async () => {
-    const nonce = "123";
-    const publicKey = jwkInterfaceToPublicKey(testWallet);
-    const privateKey = jwkInterfaceToPrivateKey(testWallet);
-
-    const signature = await signData(privateKey, "another nonce");
-
-    const { status, data, statusText } = await axios.get(
-      `${localTestUrl}/v1/balance`,
-      {
-        headers: {
-          "x-public-key": publicKeyToHeader(publicKey),
-          "x-nonce": nonce,
-          "x-signature": toB64Url(Buffer.from(signature)),
-        },
-        validateStatus: () => true,
-      }
-    );
+    const { status, data, statusText } = await axios.get(`/v1/balance`, {
+      headers: {
+        ...(await signedRequestHeadersFromJwk(testWallet, "123")),
+        "x-nonce": "a fake different nonce that will not match",
+      },
+    });
 
     expect(status).to.equal(403);
     expect(statusText).to.equal("Forbidden");
 
     expect(data).to.equal("Invalid signature or missing required headers");
+  });
+
+  it("GET /balance returns 503 when the database cannot be reached", async () => {
+    stub(paymentDatabase, "getBalance").throws(Error("Whoops!"));
+    const { status, data, statusText } = await axios.get(`/v1/balance`, {
+      headers: await signedRequestHeadersFromJwk(testWallet),
+    });
+
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
+    expect(data).to.equal("Cloud Database Unavailable");
   });
 
   it("GET /top-up/checkout-session returns 200 and correct response for correct signature", async () => {
@@ -232,7 +235,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
+      `/v1/top-up/checkout-session/${testAddress}/usd/100`
     );
 
     expect(data).to.have.property("topUpQuote");
@@ -261,7 +264,7 @@ describe("Router tests", () => {
       });
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/payment-intent/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/usd/100`
+      `/v1/top-up/payment-intent/${testAddress}/usd/100`
     );
 
     expect(data).to.have.property("topUpQuote");
@@ -288,66 +291,113 @@ describe("Router tests", () => {
     expect(paymentStatus).to.equal("requires_payment_method");
   });
 
-  it("GET /top-up/checkout-session returns 403 for bad arweave address", async () => {
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
-      )
-      .reply(200, {
-        arweave: {
-          usd: 10,
-        },
-      });
-
-    const { status, data } = await axios.get(
-      `${localTestUrl}/v1/top-up/checkout-session/BAD_ADDRESS_OF_DOOM/usd/100`,
-      {
-        validateStatus: () => true,
-      }
+  it("GET /top-up returns 403 for bad arweave address", async () => {
+    const { status, statusText, data } = await axios.get(
+      `/v1/top-up/checkout-session/BAD_ADDRESS_OF_DOOM/usd/100`
     );
     expect(status).to.equal(403);
     expect(data).to.equal(
       "Destination address is not a valid Arweave native address!"
     );
+    expect(statusText).to.equal("Forbidden");
   });
 
-  it("GET /top-up/checkout-session returns 400 for correct signature but invalid currency", async () => {
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
-      )
-      .reply(200, {
-        arweave: {
-          usd: 10,
-        },
-      });
-
+  it("GET /top-up returns 400 for invalid payment method", async () => {
     const { status, data, statusText } = await axios.get(
-      `${localTestUrl}/v1/top-up/checkout-session/-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830/currencyThatDoesNotExist/100`,
-      {
-        validateStatus: () => true,
-      }
+      `/v1/top-up/some-method/${testAddress}/usd/101`
     );
 
     expect(data).to.equal(
-      "The currency type 'currencythatdoesnotexist' is currently not supported by this API!"
+      "Payment method must include one of: payment-intent,checkout-session!"
     );
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
   });
 
+  it("GET /top-up returns 400 for invalid currency", async () => {
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/payment-intent/${testAddress}/currencyThatDoesNotExist/100`
+    );
+
+    expect(data).to.equal(
+      // cspell:disable
+      "The currency type 'currencythatdoesnotexist' is currently not supported by this API!" // cspell:enable
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /top-up returns 400 for invalid payment amount", async () => {
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/checkout-session/${testAddress}/usd/-984`
+    );
+
+    expect(data).to.equal(
+      "The provided payment amount (-984) is invalid; it must be a positive non-decimal integer!"
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /top-up returns 502 when fiat pricing oracle is unreachable", async () => {
+    stub(pricingService, "getWCForPayment").throws(Error("Oh no!"));
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/checkout-session/${testAddress}/usd/1337`
+    );
+
+    expect(data).to.equal("ArweaveToFiat Oracle Error");
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+  });
+
+  it("GET /top-up returns 400 when payment amount is too small", async () => {
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/payment-intent/${testAddress}/usd/10`
+    );
+
+    expect(data).to.equal("That payment amount is too small to accept!");
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /top-up returns 502 when stripe fails to create payment session", async () => {
+    stub(stripe.checkout.sessions, "create").throws(Error("Oh no!"));
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/checkout-session/${testAddress}/usd/1337`
+    );
+
+    expect(data).to.equal("Error creating checkout-session!");
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+  });
+
+  it("GET /top-up returns 503 when database is unreachable", async () => {
+    stub(paymentDatabase, "createTopUpQuote").throws(Error("Bad news"));
+    const { status, data, statusText } = await axios.get(
+      `/v1/top-up/checkout-session/${testAddress}/usd/1337`
+    );
+
+    expect(data).to.equal("Cloud Database Unavailable");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
+  });
+
   it("GET /reserve-balance returns 200 for correct params", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
+    const testAddress = "a stub address";
+    await dbTestHelper.insertStubUser({
+      user_address: testAddress,
+      winston_credit_balance: "1000000000",
+    });
+
     const byteCount = 1;
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
-    const priceUrl = new RegExp("arweave.net/price/.*");
-    mock.onGet(priceUrl).reply(200, 100);
+    stub(pricingService, "getWCForBytes").resolves(new Winston("100"));
 
     const { status, statusText, data } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
+      `/v1/reserve-balance/${testAddress}/${byteCount}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -360,33 +410,27 @@ describe("Router tests", () => {
   });
 
   it("GET /reserve-balance returns 401 for missing authorization", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const byteCount = 1000;
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
-      {
-        validateStatus: () => true,
-      }
+      `/v1/reserve-balance/${testAddress}/${byteCount}`
     );
     expect(statusText).to.equal("Unauthorized");
     expect(status).to.equal(401);
   });
 
   it("GET /reserve-balance returns 403 for insufficient balance", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const byteCount = 100000;
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
+      `/v1/reserve-balance/${testAddress}/${byteCount}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        validateStatus: () => true,
       }
     );
     expect(statusText).to.equal("Insufficient balance");
@@ -397,17 +441,16 @@ describe("Router tests", () => {
     const testAddress = "someRandomAddress";
     const byteCount = 100000;
 
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/reserve-balance/${testAddress}/${byteCount}`,
+      `/v1/reserve-balance/${testAddress}/${byteCount}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        validateStatus: () => true,
       }
     );
     expect(statusText).to.equal("User not found");
@@ -415,14 +458,13 @@ describe("Router tests", () => {
   });
 
   it("GET /refund-balance returns 200 for correct params", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const winstonCredits = 1000;
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/refund-balance/${testAddress}/${winstonCredits}`,
+      `/v1/refund-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -434,14 +476,10 @@ describe("Router tests", () => {
   });
 
   it("GET /refund-balance returns 401 for missing authorization", async () => {
-    const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830";
     const winstonCredits = 1000;
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/refund-balance/${testAddress}/${winstonCredits}`,
-      {
-        validateStatus: () => true,
-      }
+      `/v1/refund-balance/${testAddress}/${winstonCredits}`
     );
     expect(statusText).to.equal("Unauthorized");
     expect(status).to.equal(401);
@@ -450,17 +488,16 @@ describe("Router tests", () => {
   it("GET /refund-balance returns 403 if user not found", async () => {
     const testAddress = "someRandomAddress";
     const winstonCredits = 100000;
-    const token = sign({}, secret, {
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `${localTestUrl}/v1/refund-balance/${testAddress}/${winstonCredits}`,
+      `/v1/refund-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
         },
-        validateStatus: () => true,
       }
     );
 
@@ -531,10 +568,7 @@ describe("with a stubbed stripe instance", () => {
       } as unknown as Stripe.Event);
 
       const { status, statusText, data } = await axios.post(
-        `${localTestUrl}/v1/stripe-webhook`,
-        {
-          validateStatus: () => true,
-        }
+        `/v1/stripe-webhook`
       );
 
       expect(status).to.equal(200);
@@ -548,11 +582,7 @@ describe("with a stubbed stripe instance", () => {
   it("POST /stripe-webhook returns 400 for invalid stripe requests", async () => {
     stub(stripe.webhooks, "constructEvent").throws(Error("bad"));
 
-    const { status, statusText, data } = await axios.post(
-      `${localTestUrl}/v1/stripe-webhook`,
-      {},
-      { validateStatus: () => true }
-    );
+    const { status, statusText, data } = await axios.post(`/v1/stripe-webhook`);
 
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
