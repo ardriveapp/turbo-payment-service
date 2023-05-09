@@ -12,6 +12,7 @@ import logger from "../logger";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
+import { winstonToArc } from "../types/winston";
 import { isValidArweaveBase64URL } from "../utils/base64";
 
 export async function topUp(ctx: KoaContext, next: Next) {
@@ -98,7 +99,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
             price_data: {
               product_data: {
                 name: "Turbo Credits",
-                description: `${winstonCreditAmount.toARC()} credits on Turbo to destination address "${destinationAddress}"`,
+                description: `${winstonToArc(
+                  winstonCreditAmount
+                )} credits on Turbo to destination address "${destinationAddress}"`,
                 tax_code: electronicallySuppliedServicesTaxCode,
                 metadata: stripeMetadata,
               },
