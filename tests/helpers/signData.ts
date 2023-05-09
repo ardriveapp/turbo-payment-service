@@ -1,4 +1,14 @@
-import crypto, { KeyLike } from "crypto";
+import { AxiosRequestHeaders } from "axios";
+import { Buffer } from "buffer";
+import crypto, { KeyLike, randomUUID } from "crypto";
+
+import {
+  JWKInterface,
+  jwkInterfaceToPrivateKey,
+  jwkInterfaceToPublicKey,
+} from "../../src/types/jwkTypes";
+import { toB64Url } from "../../src/utils/base64";
+import { publicKeyToHeader } from "../../tests/helpers/testHelpers";
 
 export async function signData(
   privateKey: KeyLike,
@@ -17,4 +27,18 @@ export async function signData(
     saltLength: 0, // We do not need to salt the signature since we combine with a random UUID
   });
   return Promise.resolve(signature);
+}
+
+export async function signedRequestHeadersFromJwk(
+  jwk: JWKInterface,
+  nonce: string = randomUUID(),
+  data = ""
+): Promise<AxiosRequestHeaders> {
+  const signature = await signData(jwkInterfaceToPrivateKey(jwk), data + nonce);
+
+  return {
+    "x-public-key": publicKeyToHeader(jwkInterfaceToPublicKey(jwk)),
+    "x-nonce": nonce,
+    "x-signature": toB64Url(Buffer.from(signature)),
+  };
 }

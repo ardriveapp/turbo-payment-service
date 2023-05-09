@@ -2,12 +2,17 @@ import { randomUUID } from "crypto";
 import { Next } from "koa";
 import Stripe from "stripe";
 
-import { paymentIntentTopUpMethod, topUpMethods } from "../constants";
+import {
+  electronicallySuppliedServicesTaxCode,
+  paymentIntentTopUpMethod,
+  topUpMethods,
+} from "../constants";
 import { PaymentValidationErrors } from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
+import { winstonToArc } from "../types/winston";
 import { isValidArweaveBase64URL } from "../utils/base64";
 
 export async function topUp(ctx: KoaContext, next: Next) {
@@ -44,7 +49,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     winstonCreditAmount = await pricingService.getWCForPayment(payment);
   } catch (error) {
     logger.error(error);
-    ctx.response.status = 400;
+    ctx.response.status = 502;
     ctx.body = "ArweaveToFiat Oracle Error";
     return next;
   }
@@ -87,11 +92,19 @@ export async function topUp(ctx: KoaContext, next: Next) {
         success_url: "https://app.ardrive.io",
         cancel_url: "https://app.ardrive.io",
         currency: payment.type,
+        automatic_tax: { enabled: true },
         payment_method_types: ["card"],
         line_items: [
           {
             price_data: {
-              product_data: { name: "ARC" },
+              product_data: {
+                name: "Turbo Credits",
+                description: `${winstonToArc(
+                  winstonCreditAmount
+                )} credits on Turbo to destination address "${destinationAddress}"`,
+                tax_code: electronicallySuppliedServicesTaxCode,
+                metadata: stripeMetadata,
+              },
               currency: payment.type,
               unit_amount: payment.amount,
             },
@@ -105,7 +118,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
       });
     }
   } catch (error) {
-    if ((error as { raw: { code: string } }).raw.code === "amount_too_small") {
+    const wasPaymentBelowMinimumAllowedByStripe =
+      (error as { raw: { code: string } })?.raw?.code === "amount_too_small";
+    if (wasPaymentBelowMinimumAllowedByStripe) {
       ctx.response.status = 400;
       ctx.body = "That payment amount is too small to accept!";
     } else {

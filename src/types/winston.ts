@@ -76,3 +76,9 @@ export class Winston {
 export function W(amount: BigNumber.Value): Winston {
   return new Winston(amount);
 }
+
+export function winstonToArc(winston: Winston): string {
+  BigNumber.config({ DECIMAL_PLACES: 12 });
+  const w = new BigNumber(winston.toString(), 10);
+  return w.shiftedBy(-12).toFixed();
+}
