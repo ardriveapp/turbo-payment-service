@@ -3,8 +3,8 @@ import { Next } from "koa";
 import Stripe from "stripe";
 
 import {
+  electronicallySuppliedServicesTaxCode,
   paymentIntentTopUpMethod,
-  saasStripeTaxCodeId,
   topUpMethods,
 } from "../constants";
 import { PaymentValidationErrors } from "../database/errors";
@@ -99,7 +99,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
               product_data: {
                 name: "Turbo Credits",
                 description: `${winstonCreditAmount.toARC()} credits on Turbo to destination address "${destinationAddress}"`,
-                tax_code: saasStripeTaxCodeId,
+                tax_code: electronicallySuppliedServicesTaxCode,
                 metadata: stripeMetadata,
               },
               currency: payment.type,
