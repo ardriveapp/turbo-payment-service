@@ -2,12 +2,17 @@ import { randomUUID } from "crypto";
 import { Next } from "koa";
 import Stripe from "stripe";
 
-import { paymentIntentTopUpMethod, topUpMethods } from "../constants";
+import {
+  electronicallySuppliedServicesTaxCode,
+  paymentIntentTopUpMethod,
+  topUpMethods,
+} from "../constants";
 import { PaymentValidationErrors } from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
+import { winstonToArc } from "../types/winston";
 import { isValidArweaveBase64URL } from "../utils/base64";
 
 export async function topUp(ctx: KoaContext, next: Next) {
@@ -92,7 +97,14 @@ export async function topUp(ctx: KoaContext, next: Next) {
         line_items: [
           {
             price_data: {
-              product_data: { name: "ARC" },
+              product_data: {
+                name: "Turbo Credits",
+                description: `${winstonToArc(
+                  winstonCreditAmount
+                )} credits on Turbo to destination address "${destinationAddress}"`,
+                tax_code: electronicallySuppliedServicesTaxCode,
+                metadata: stripeMetadata,
+              },
               currency: payment.type,
               unit_amount: payment.amount,
             },
