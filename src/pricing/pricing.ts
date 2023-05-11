@@ -1,4 +1,12 @@
-import { turboFeePercentageAsADecimal } from "../constants";
+import {
+  maxUSDPaymentAmount,
+  minUSDPaymentAmount,
+  turboFeePercentageAsADecimal,
+} from "../constants";
+import {
+  PaymentAmountTooLarge,
+  PaymentAmountTooSmall,
+} from "../database/errors";
 import { Payment } from "../types/payment";
 import { ByteCount, WC, Winston } from "../types/types";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
@@ -30,6 +38,33 @@ export class TurboPricingService implements PricingService {
   async getWCForPayment(payment: Payment): Promise<Winston> {
     const fiatPriceOfOneAR =
       await this.arweaveToFiatOracle.getFiatPriceForOneAR(payment.type);
+
+    const { minAmount, maxAmount } = await (async () => {
+      if (payment.type === "usd") {
+        return {
+          minAmount: minUSDPaymentAmount,
+          maxAmount: maxUSDPaymentAmount,
+        };
+      }
+
+      const usdPriceOfOneAR =
+        await this.arweaveToFiatOracle.getFiatPriceForOneAR("usd");
+
+      const convertFromUSDLimit = (amount: number) =>
+        Math.round((amount / usdPriceOfOneAR) * fiatPriceOfOneAR);
+
+      return {
+        minAmount: convertFromUSDLimit(minUSDPaymentAmount),
+        maxAmount: convertFromUSDLimit(maxUSDPaymentAmount),
+      };
+    })();
+
+    if (payment.amount < minAmount) {
+      throw new PaymentAmountTooSmall(payment, minAmount);
+    }
+    if (payment.amount >= maxAmount) {
+      throw new PaymentAmountTooLarge(payment, maxAmount);
+    }
 
     const baseWinstonCreditsFromPayment = payment.winstonCreditAmountForARPrice(
       fiatPriceOfOneAR,
