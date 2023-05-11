@@ -10,19 +10,32 @@ import Stripe from "stripe";
 import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
+import {
+  CoingeckoArweaveToFiatOracle,
+  ReadThroughArweaveToFiatOracle,
+} from "../src/pricing/oracles/arweaveToFiatOracle";
 import { TurboPricingService } from "../src/pricing/pricing";
 import { createServer } from "../src/server";
+import { supportedPaymentCurrencyTypes } from "../src/types/supportedCurrencies";
 import { Winston } from "../src/types/winston";
 import { loadSecretsToEnv } from "../src/utils/loadSecretsToEnv";
 import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
 import { DbTestHelper } from "./dbTestHelper";
-import { chargeDisputeStub, paymentIntentStub } from "./helpers/stubs";
+import {
+  chargeDisputeStub,
+  expectedArPrices,
+  paymentIntentStub,
+} from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import { localTestUrl, testWallet } from "./helpers/testHelpers";
 
 const paymentDatabase = new PostgresDatabase();
 const dbTestHelper = new DbTestHelper(paymentDatabase);
-const pricingService = new TurboPricingService({});
+const coinGeckoOracle = new CoingeckoArweaveToFiatOracle();
+const arweaveToFiatOracle = new ReadThroughArweaveToFiatOracle({
+  oracle: coinGeckoOracle,
+});
+const pricingService = new TurboPricingService({ arweaveToFiatOracle });
 const axios = axiosPackage.create({
   baseURL: localTestUrl,
   validateStatus: () => true,
@@ -153,6 +166,66 @@ describe("Router tests", () => {
     );
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /price/:currency/:value returns 400 for a payment amount too large in each supported currency", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+
+    for (const currencyType of supportedPaymentCurrencyTypes) {
+      const maxAmount =
+        currencyType === "usd"
+          ? 10000_00
+          : Math.round(
+              (10000_00 / expectedArPrices.arweave.usd) *
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                expectedArPrices.arweave[currencyType]
+            );
+
+      const { data, status, statusText } = await axios.get(
+        `/v1/price/${currencyType}/${maxAmount + 1}`
+      );
+
+      expect(data).to.equal(
+        `The provided payment amount (${
+          maxAmount + 1
+        }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmount}!`
+      );
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+    }
+  });
+
+  it("GET /price/:currency/:value returns 400 for a payment amount too small in each supported currency", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+
+    for (const currencyType of supportedPaymentCurrencyTypes) {
+      const minAmount =
+        currencyType === "usd"
+          ? 10_00
+          : Math.round(
+              (10_00 / expectedArPrices.arweave.usd) *
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                expectedArPrices.arweave[currencyType]
+            );
+
+      const { data, status, statusText } = await axios.get(
+        `/v1/price/${currencyType}/${minAmount - 1}`
+      );
+
+      expect(data).to.equal(
+        `The provided payment amount (${
+          minAmount - 1
+        }) is too small for the currency type "${currencyType}"; it must be above ${minAmount}!`
+      );
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+    }
   });
 
   it("GET /price/:currency/:value returns 502 if fiat pricing oracle fails to get a price", async () => {
