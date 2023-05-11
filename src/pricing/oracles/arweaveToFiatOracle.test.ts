@@ -1,47 +1,89 @@
-import axios from "axios";
-import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
+import { stub } from "sinon";
 
-import { CoingeckoArweaveToFiatOracle } from "./arweaveToFiatOracle";
+import { createAxiosInstance } from "../../axiosClient";
+import {
+  CoingeckoArweaveToFiatOracle,
+  ReadThroughArweaveToFiatOracle,
+} from "./arweaveToFiatOracle";
+
+const expectedArPrices = {
+  arweave: {
+    usd: 7.02,
+    aed: 25.78,
+    ars: 1604.35,
+    aud: 10.36,
+    bdt: 754.47,
+    bmd: 7.02,
+    brl: 34.72,
+    cad: 9.39,
+    chf: 6.25,
+    clp: 5528.94,
+    cny: 48.68,
+    czk: 149.96,
+    dkk: 47.61,
+    eur: 6.39,
+    gbp: 5.56,
+    hkd: 54.99,
+    huf: 2362.82,
+    idr: 103201,
+    ils: 25.61,
+    inr: 575.23,
+    jpy: 943.32,
+    krw: 9256.61,
+    lkr: 2224.06,
+    mmk: 14756.72,
+    mxn: 123.3,
+    myr: 31.26,
+    ngn: 3239.16,
+    nok: 73.8,
+    nzd: 11.03,
+    php: 391.16,
+    pkr: 1997.69,
+    pln: 28.89,
+    rub: 534.4,
+    sar: 26.33,
+    sek: 71.75,
+    sgd: 9.31,
+    thb: 236,
+    try: 137.24,
+    twd: 215.55,
+    uah: 258.2,
+    vnd: 164811,
+    zar: 132.44,
+  },
+};
 
 describe("CoingeckoArweaveToFiatOracle", () => {
-  let mock: MockAdapter;
-  beforeEach(() => {
-    mock = new MockAdapter(axios);
-  });
+  const axios = createAxiosInstance({});
+  const oracle = new CoingeckoArweaveToFiatOracle(axios);
 
-  afterEach(() => {
-    mock.restore();
+  describe("getFiatPricesForOneAR", () => {
+    it("should return a an object for the AR price with each supported fiat currency", async () => {
+      stub(axios, "get").resolves({
+        data: expectedArPrices,
+      });
+
+      const arPrices = await oracle.getFiatPricesForOneAR();
+      expect(arPrices).to.deep.equal(expectedArPrices.arweave);
+    });
   });
+});
+
+describe("ReadThroughArweaveToFiatOracle", () => {
+  const axios = createAxiosInstance({});
+  const oracle = new CoingeckoArweaveToFiatOracle(axios);
+
+  const readThroughOracle = new ReadThroughArweaveToFiatOracle({ oracle });
 
   describe("getFiatPriceForOneAR", () => {
-    it("should return a number for valid fiat currency", async () => {
-      const oracle = new CoingeckoArweaveToFiatOracle();
-      const expectedPrice = 1.23;
-      mock
-        .onGet(
-          "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
-        )
-        .reply(200, {
-          arweave: {
-            usd: expectedPrice,
-          },
-        });
-      const arPrice = await oracle.getFiatPriceForOneAR("usd");
-      expect(arPrice).to.equal(expectedPrice);
-    });
+    it("should return a an object for the AR price with each supported fiat currency", async () => {
+      stub(axios, "get").resolves({
+        data: expectedArPrices,
+      });
 
-    it("should throw an error for an invalid fiat currency", async () => {
-      // COINGECKO API returns an empty object with status 200 for invalid fiat currencies
-      const oracle = new CoingeckoArweaveToFiatOracle();
-      mock.onGet().reply(200, { arweave: {} });
-
-      try {
-        await oracle.getFiatPriceForOneAR("invalid-fiat");
-        expect.fail("Error: coingecko returned bad response undefined");
-      } catch (error) {
-        expect(error).to.exist;
-      }
+      const arPrice = await readThroughOracle.getFiatPriceForOneAR("usd");
+      expect(arPrice).to.equal(expectedArPrices.arweave.usd);
     });
   });
 });
