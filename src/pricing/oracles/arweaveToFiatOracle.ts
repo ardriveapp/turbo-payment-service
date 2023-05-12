@@ -8,6 +8,9 @@ interface CoinGeckoResponse {
   [currencyType: string]: number;
 }
 
+const coinGeckoUrl =
+  process.env.COINGECKO_API_URL ?? "https://api.coingecko.com/api/v3/";
+
 /** Type guard thats checks that each supported payment currency type exists on response */
 function isCoinGeckoResponse(response: unknown): response is CoinGeckoResponse {
   for (const curr of supportedPaymentCurrencyTypes) {
@@ -30,7 +33,7 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
       .toString()
       .replace("'", "");
 
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${currencyTypesString}`;
+    const url = `${coinGeckoUrl}simple/price?ids=arweave&vs_currencies=${currencyTypesString}`;
     try {
       logger.info(`Getting AR prices from Coingecko`, { url });
       const { data } = await this.axiosInstance.get(url);
