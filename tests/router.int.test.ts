@@ -127,24 +127,15 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value", async () => {
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
-      )
-      .reply(200, {
-        arweave: {
-          usd: 10,
-        },
-      });
-
-    const { status, statusText, data } = await axios.get(`/v1/price/USD/100`);
-
-    const arcAmount = Number(data);
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { status, statusText, data } = await axios.get(`/v1/price/USD/1000`);
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(arcAmount).to.be.a("number");
+    expect(+new Winston(data)).to.equal(1139601139601);
   });
 
   it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
@@ -297,18 +288,12 @@ describe("Router tests", () => {
   });
 
   it("GET /top-up/checkout-session returns 200 and correct response for correct signature", async () => {
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
-      )
-      .reply(200, {
-        arweave: {
-          usd: 10,
-        },
-      });
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
 
     const { status, statusText, data } = await axios.get(
-      `/v1/top-up/checkout-session/${testAddress}/usd/100`
+      `/v1/top-up/checkout-session/${testAddress}/usd/1000`
     );
 
     expect(data).to.have.property("topUpQuote");
@@ -321,23 +306,17 @@ describe("Router tests", () => {
 
     expect(object).to.equal("checkout.session");
     expect(payment_method_types).to.deep.equal(["card"]);
-    expect(amount_total).to.equal(100);
+    expect(amount_total).to.equal(1000);
     expect(url).to.be.a.string;
   });
 
   it("GET /top-up/payment-intent returns 200 and correct response for correct signature", async () => {
-    mock
-      .onGet(
-        "https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=usd"
-      )
-      .reply(200, {
-        arweave: {
-          usd: 10,
-        },
-      });
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
 
     const { status, statusText, data } = await axios.get(
-      `/v1/top-up/payment-intent/${testAddress}/usd/100`
+      `/v1/top-up/payment-intent/${testAddress}/usd/1000`
     );
 
     expect(data).to.have.property("topUpQuote");
@@ -357,7 +336,7 @@ describe("Router tests", () => {
 
     expect(object).to.equal("payment_intent");
     expect(payment_method_types).to.deep.equal(["card"]);
-    expect(amount).to.equal(100);
+    expect(amount).to.equal(1000);
     expect(currency).to.equal("usd");
     expect(client_secret).to.be.a.string;
     expect(metadata.topUpQuoteId).to.be.a.string;
@@ -418,19 +397,73 @@ describe("Router tests", () => {
       `/v1/top-up/checkout-session/${testAddress}/usd/1337`
     );
 
-    expect(data).to.equal("ArweaveToFiat Oracle Error");
+    expect(data).to.equal("Fiat Oracle Unavailable");
     expect(status).to.equal(502);
     expect(statusText).to.equal("Bad Gateway");
   });
 
-  it("GET /top-up returns 400 when payment amount is too small", async () => {
-    const { status, data, statusText } = await axios.get(
-      `/v1/top-up/payment-intent/${testAddress}/usd/10`
+  it("GET /top-up returns 400 for a payment amount too large in each supported currency", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
     );
 
-    expect(data).to.equal("That payment amount is too small to accept!");
-    expect(status).to.equal(400);
-    expect(statusText).to.equal("Bad Request");
+    for (const currencyType of supportedPaymentCurrencyTypes) {
+      const maxAmount =
+        currencyType === "usd"
+          ? 10000_00
+          : Math.round(
+              (10000_00 / expectedArPrices.arweave.usd) *
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                expectedArPrices.arweave[currencyType]
+            );
+
+      const { data, status, statusText } = await axios.get(
+        `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
+          maxAmount + 1
+        }`
+      );
+
+      expect(data).to.equal(
+        `The provided payment amount (${
+          maxAmount + 1
+        }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmount}!`
+      );
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+    }
+  });
+
+  it("GET /top-up returns 400 for a payment amount too small in each supported currency", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+
+    for (const currencyType of supportedPaymentCurrencyTypes) {
+      const minAmount =
+        currencyType === "usd"
+          ? 10_00
+          : Math.round(
+              (10_00 / expectedArPrices.arweave.usd) *
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-expect-error
+                expectedArPrices.arweave[currencyType]
+            );
+
+      const { data, status, statusText } = await axios.get(
+        `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
+          minAmount - 1
+        }`
+      );
+
+      expect(data).to.equal(
+        `The provided payment amount (${
+          minAmount - 1
+        }) is too small for the currency type "${currencyType}"; it must be above ${minAmount}!`
+      );
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+    }
   });
 
   it("GET /top-up returns 502 when stripe fails to create payment session", async () => {
