@@ -44,4 +44,7 @@ export interface Database {
   getChargebackReceipt: (
     chargebackReceiptId: ChargebackReceiptId
   ) => Promise<ChargebackReceipt>;
+  checkForExistingPaymentByTopUpQuoteId: (
+    topUpQuoteId: TopUpQuoteId
+  ) => Promise<boolean>;
 }
