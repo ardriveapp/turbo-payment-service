@@ -8,6 +8,16 @@ interface CoinGeckoResponse {
   [currencyType: string]: number;
 }
 
+/** Type guard thats checks that each supported payment currency type exists on response */
+function isCoinGeckoResponse(response: unknown): response is CoinGeckoResponse {
+  for (const curr of supportedPaymentCurrencyTypes) {
+    if (typeof (response as CoinGeckoResponse)[curr] !== "number") {
+      return false;
+    }
+  }
+  return true;
+}
+
 export interface ArweaveToFiatOracle {
   getFiatPricesForOneAR: () => Promise<CoinGeckoResponse>;
 }
@@ -23,10 +33,20 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
     const url = `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${currencyTypesString}`;
     try {
       logger.info(`Getting AR prices from Coingecko`, { url });
-      const result = await this.axiosInstance.get(url);
+      const { data } = await this.axiosInstance.get(url);
 
-      // todo: typecheck this 😅
-      return result.data.arweave;
+      const coinGeckoResponse = data.arweave;
+
+      if (!isCoinGeckoResponse(coinGeckoResponse)) {
+        const errorMsg = "Unexpected response shape from coin gecko!";
+        logger.error(errorMsg, {
+          responseData: data,
+          url,
+        });
+        throw Error(errorMsg);
+      }
+
+      return coinGeckoResponse;
     } catch (error) {
       logger.error(`Error getting AR price in from Coingecko`, { url });
       logger.error(error);
