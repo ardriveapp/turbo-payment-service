@@ -16,9 +16,9 @@ promClient.collectDefaultMetrics({ register: metricsRegistry });
 
 const router = new Router();
 
-router.get("/v1/price/:amount", priceRoutes);
-router.get("/v1/price/bytes/:amount", priceRoutes);
-router.get("/v1/price/:currency/:amount", priceRoutes);
+router.get("/v1/price/:amount", verifySignature, priceRoutes);
+router.get("/v1/price/bytes/:amount", verifySignature, priceRoutes);
+router.get("/v1/price/:currency/:amount", verifySignature, priceRoutes);
 
 router.get(
   "/v1/top-up/:method/:address/:currency/:amount",
