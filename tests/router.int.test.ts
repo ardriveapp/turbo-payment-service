@@ -227,6 +227,20 @@ describe("Router tests", () => {
     expect(data).to.equal("Fiat Oracle Unavailable");
   });
 
+  it("GET /price/:currency/:value returns 502 if fiat pricing oracle response is unexpected", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves({
+      // @ts-expect-error
+      weird: "types",
+      // @ts-expect-error
+      from: ["c", 0, "in", "ge", "ck", 0],
+    });
+    const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
+
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+    expect(data).to.equal("Fiat Oracle Unavailable");
+  });
+
   before(async () => {
     await dbTestHelper.insertStubUser({
       user_address: testAddress,
