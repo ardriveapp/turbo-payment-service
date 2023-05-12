@@ -773,9 +773,27 @@ describe("Caching behavior tests", () => {
       )
     );
 
-    // We expect the pricing service spy to be called 10 times and twice for each supported currencies
+    // Get random price for each supported currency concurrently
+    await Promise.all(
+      supportedPaymentCurrencyTypes.map((currencyType) =>
+        axios.get(
+          `/v1/price/${currencyType}/${
+            currencyType === "usd"
+              ? Math.floor(Math.random() * (9999 - 11 + 1)) + 11
+              : Math.round(
+                  ((Math.floor(Math.random() * (9999 - 11 + 1)) + 11) /
+                    expectedArPrices.arweave.usd) *
+                    // @ts-expect-error
+                    expectedArPrices.arweave[currencyType]
+                )
+          }`
+        )
+      )
+    );
+
+    // We expect the pricing service spy to be called 10 times and thrice for each supported currencies
     expect(pricingSpy.callCount).to.equal(
-      10 + supportedPaymentCurrencyTypes.length * 2
+      10 + supportedPaymentCurrencyTypes.length * 3
     );
 
     // But the CoinGecko oracle is only called the one time
