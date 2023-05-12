@@ -3,7 +3,7 @@ import { Next } from "koa";
 import {
   PaymentAmountTooLarge,
   PaymentAmountTooSmall,
-  PaymentValidationErrors,
+  PaymentValidationError,
 } from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
@@ -21,7 +21,7 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
     });
   } catch (error) {
     ctx.response.status = 400;
-    ctx.body = (error as PaymentValidationErrors).message;
+    ctx.body = (error as PaymentValidationError).message;
     return next;
   }
 
