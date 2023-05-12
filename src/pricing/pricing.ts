@@ -15,6 +15,7 @@ import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle"
 
 export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
+  assertMinAndMaxPayment: (payment: Payment) => Promise<void>;
   getWCForBytes: (bytes: ByteCount) => Promise<WC>;
 }
 
@@ -35,7 +36,7 @@ export class TurboPricingService implements PricingService {
       arweaveToFiatOracle ?? new ReadThroughArweaveToFiatOracle({});
   }
 
-  async getWCForPayment(payment: Payment): Promise<Winston> {
+  public async assertMinAndMaxPayment(payment: Payment): Promise<void> {
     const fiatPriceOfOneAR =
       await this.arweaveToFiatOracle.getFiatPriceForOneAR(payment.type);
 
@@ -65,6 +66,11 @@ export class TurboPricingService implements PricingService {
     if (payment.amount >= maxAmount) {
       throw new PaymentAmountTooLarge(payment, maxAmount);
     }
+  }
+
+  public async getWCForPayment(payment: Payment): Promise<Winston> {
+    const fiatPriceOfOneAR =
+      await this.arweaveToFiatOracle.getFiatPriceForOneAR(payment.type);
 
     const baseWinstonCreditsFromPayment = payment.winstonCreditAmountForARPrice(
       fiatPriceOfOneAR,

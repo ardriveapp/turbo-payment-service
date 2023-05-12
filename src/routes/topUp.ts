@@ -7,11 +7,7 @@ import {
   paymentIntentTopUpMethod,
   topUpMethods,
 } from "../constants";
-import {
-  PaymentAmountTooLarge,
-  PaymentAmountTooSmall,
-  PaymentValidationErrors,
-} from "../database/errors";
+import { PaymentValidationError } from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
@@ -42,20 +38,10 @@ export async function topUp(ctx: KoaContext, next: Next) {
       amount,
       type: currency,
     });
-  } catch (error) {
-    ctx.response.status = 400;
-    ctx.body = (error as PaymentValidationErrors).message;
-    return next;
-  }
 
-  let winstonCreditAmount: WC;
-  try {
-    winstonCreditAmount = await pricingService.getWCForPayment(payment);
-  } catch (error: unknown) {
-    if (
-      error instanceof PaymentAmountTooLarge ||
-      error instanceof PaymentAmountTooSmall
-    ) {
+    await pricingService.assertMinAndMaxPayment(payment);
+  } catch (error) {
+    if (error instanceof PaymentValidationError) {
       ctx.response.status = 400;
       ctx.body = error.message;
     } else {
@@ -63,6 +49,17 @@ export async function topUp(ctx: KoaContext, next: Next) {
       ctx.response.status = 502;
       ctx.body = "Fiat Oracle Unavailable";
     }
+
+    return next;
+  }
+
+  let winstonCreditAmount: WC;
+  try {
+    winstonCreditAmount = await pricingService.getWCForPayment(payment);
+  } catch (error: unknown) {
+    logger.error(error);
+    ctx.response.status = 502;
+    ctx.body = "Fiat Oracle Unavailable";
 
     return next;
   }
