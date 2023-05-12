@@ -45,7 +45,10 @@ export async function handlePaymentSuccessEvent(
     logger.error(error);
 
     if (
-      await paymentDatabase.checkForExistingPaymentByTopUpQuoteId(topUpQuoteId)
+      topUpQuoteId &&
+      (await paymentDatabase.checkForExistingPaymentByTopUpQuoteId(
+        topUpQuoteId
+      ))
     ) {
       logger.error(
         "This top up quote ID exists in another state in the database!",
