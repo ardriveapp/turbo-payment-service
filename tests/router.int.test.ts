@@ -472,7 +472,9 @@ describe("Router tests", () => {
       `/v1/top-up/checkout-session/${testAddress}/usd/1337`
     );
 
-    expect(data).to.equal("Error creating checkout-session!");
+    expect(data).to.equal(
+      "Error creating stripe payment session with method: checkout-session!"
+    );
     expect(status).to.equal(502);
     expect(statusText).to.equal("Bad Gateway");
   });

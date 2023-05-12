@@ -131,16 +131,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
       });
     }
   } catch (error) {
-    const wasPaymentBelowMinimumAllowedByStripe =
-      (error as { raw: { code: string } })?.raw?.code === "amount_too_small";
-    if (wasPaymentBelowMinimumAllowedByStripe) {
-      ctx.response.status = 400;
-      ctx.body = "That payment amount is too small to accept!";
-    } else {
-      ctx.response.status = 502;
-      ctx.body = `Error creating ${method}!`;
-      logger.error(error);
-    }
+    ctx.response.status = 502;
+    ctx.body = `Error creating stripe payment session with method: ${method}!`;
+    logger.error(error);
     return next;
   }
 
