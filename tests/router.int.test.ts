@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/ban-ts-comment */
 import Arweave from "arweave/node/common";
 import axiosPackage from "axios";
 import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
 import { sign } from "jsonwebtoken";
-import { stub } from "sinon";
+import { spy, stub } from "sinon";
 import Stripe from "stripe";
 
 import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
@@ -170,7 +171,6 @@ describe("Router tests", () => {
           ? 10000_00
           : Math.round(
               (10000_00 / expectedArPrices.arweave.usd) *
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
                 expectedArPrices.arweave[currencyType]
             );
@@ -200,7 +200,6 @@ describe("Router tests", () => {
           ? 10_00
           : Math.round(
               (10_00 / expectedArPrices.arweave.usd) *
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
                 expectedArPrices.arweave[currencyType]
             );
@@ -413,7 +412,6 @@ describe("Router tests", () => {
           ? 10000_00
           : Math.round(
               (10000_00 / expectedArPrices.arweave.usd) *
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
                 expectedArPrices.arweave[currencyType]
             );
@@ -445,7 +443,6 @@ describe("Router tests", () => {
           ? 10_00
           : Math.round(
               (10_00 / expectedArPrices.arweave.usd) *
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
                 // @ts-expect-error
                 expectedArPrices.arweave[currencyType]
             );
@@ -695,5 +692,93 @@ describe("with a stubbed stripe instance", () => {
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
     expect(data).to.equal("Webhook Error: bad");
+  });
+});
+
+describe("Caching behavior tests", () => {
+  let server: Server;
+
+  const coinGeckoOracle = new CoingeckoArweaveToFiatOracle();
+  const arweaveToFiatOracle = new ReadThroughArweaveToFiatOracle({
+    oracle: coinGeckoOracle,
+  });
+  const pricingService = new TurboPricingService({ arweaveToFiatOracle });
+
+  function closeServer() {
+    server.close();
+    logger.info("Server closed!");
+  }
+
+  before(async () => {
+    server = await createServer({ pricingService });
+  });
+
+  after(() => {
+    closeServer();
+  });
+
+  it("GET /price/:currency/:value only calls the oracle once for many subsequent price calls", async () => {
+    const coinGeckoStub = stub(
+      coinGeckoOracle,
+      "getFiatPricesForOneAR"
+    ).resolves(expectedArPrices.arweave);
+
+    const pricingSpy = spy(pricingService, "getWCForPayment");
+
+    // Get ten USD prices concurrently
+    await Promise.all([
+      axios.get(`/v1/price/USD/1000`),
+      axios.get(`/v1/price/USD/10000`),
+      axios.get(`/v1/price/USD/100000`),
+      axios.get(`/v1/price/USD/1000000`),
+      axios.get(`/v1/price/USD/500000`),
+      axios.get(`/v1/price/USD/250000`),
+      axios.get(`/v1/price/USD/125000`),
+      axios.get(`/v1/price/USD/62500`),
+      axios.get(`/v1/price/USD/31250`),
+      axios.get(`/v1/price/USD/15625`),
+    ]);
+
+    // Get maximum price for each supported currency concurrently
+    await Promise.all(
+      supportedPaymentCurrencyTypes.map((currencyType) =>
+        axios.get(
+          `/v1/price/${currencyType}/${
+            currencyType === "usd"
+              ? 10000_00
+              : Math.round(
+                  (10000_00 / expectedArPrices.arweave.usd) *
+                    // @ts-expect-error
+                    expectedArPrices.arweave[currencyType]
+                )
+          }`
+        )
+      )
+    );
+
+    // Get minimum price for each supported currency concurrently
+    await Promise.all(
+      supportedPaymentCurrencyTypes.map((currencyType) =>
+        axios.get(
+          `/v1/price/${currencyType}/${
+            currencyType === "usd"
+              ? 10_00
+              : Math.round(
+                  (10_00 / expectedArPrices.arweave.usd) *
+                    // @ts-expect-error
+                    expectedArPrices.arweave[currencyType]
+                )
+          }`
+        )
+      )
+    );
+
+    // We expect the pricing service spy to be called 10 times and twice for each supported currencies
+    expect(pricingSpy.callCount).to.equal(
+      10 + supportedPaymentCurrencyTypes.length * 2
+    );
+
+    // But the CoinGecko oracle is only called the one time
+    expect(coinGeckoStub.calledOnce).to.be.true;
   });
 });
