@@ -13,6 +13,7 @@ export function getDefaultArch(): Architecture {
   return {
     paymentDatabase: new PostgresDatabase(),
     pricingService: new TurboPricingService({}),
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     stripe: new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2022-11-15",
       appInfo: {
