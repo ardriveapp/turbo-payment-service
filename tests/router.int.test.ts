@@ -8,6 +8,7 @@ import { sign } from "jsonwebtoken";
 import { spy, stub } from "sinon";
 import Stripe from "stripe";
 
+import { createAxiosInstance } from "../src/axiosClient";
 import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
@@ -32,7 +33,10 @@ import { localTestUrl, testWallet } from "./helpers/testHelpers";
 
 const paymentDatabase = new PostgresDatabase();
 const dbTestHelper = new DbTestHelper(paymentDatabase);
-const coinGeckoOracle = new CoingeckoArweaveToFiatOracle();
+const coinGeckoAxios = createAxiosInstance({
+  config: { validateStatus: () => true },
+});
+const coinGeckoOracle = new CoingeckoArweaveToFiatOracle(coinGeckoAxios);
 const arweaveToFiatOracle = new ReadThroughArweaveToFiatOracle({
   oracle: coinGeckoOracle,
 });
@@ -125,6 +129,22 @@ describe("Router tests", () => {
     expect(status).to.equal(502);
     expect(data).to.equal("Pricing Oracle Unavailable");
     expect(statusText).to.equal("Bad Gateway");
+  });
+
+  it("GET /price/:currency/:value returns 502 if fiat pricing oracle response is unexpected", async () => {
+    stub(coinGeckoAxios, "get").resolves({
+      data: {
+        arweave: {
+          weird: "types",
+          from: ["c", 0, "in", "ge", "ck", 0],
+        },
+      },
+    });
+    const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
+
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+    expect(data).to.equal("Fiat Oracle Unavailable");
   });
 
   it("GET /price/:currency/:value", async () => {
@@ -220,20 +240,6 @@ describe("Router tests", () => {
 
   it("GET /price/:currency/:value returns 502 if fiat pricing oracle fails to get a price", async () => {
     stub(pricingService, "getWCForPayment").throws(Error("Really bad failure"));
-    const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
-
-    expect(status).to.equal(502);
-    expect(statusText).to.equal("Bad Gateway");
-    expect(data).to.equal("Fiat Oracle Unavailable");
-  });
-
-  it("GET /price/:currency/:value returns 502 if fiat pricing oracle response is unexpected", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves({
-      // @ts-expect-error
-      weird: "types",
-      // @ts-expect-error
-      from: ["c", 0, "in", "ge", "ck", 0],
-    });
     const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
 
     expect(status).to.equal(502);
