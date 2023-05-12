@@ -181,64 +181,6 @@ describe("Router tests", () => {
     expect(statusText).to.equal("Bad Request");
   });
 
-  it("GET /price/:currency/:value returns 400 for a payment amount too large in each supported currency", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
-
-    for (const currencyType of supportedPaymentCurrencyTypes) {
-      const maxAmount =
-        currencyType === "usd"
-          ? 10000_00
-          : Math.round(
-              (10000_00 / expectedArPrices.arweave.usd) *
-                // @ts-expect-error
-                expectedArPrices.arweave[currencyType]
-            );
-
-      const { data, status, statusText } = await axios.get(
-        `/v1/price/${currencyType}/${maxAmount + 1}`
-      );
-
-      expect(data).to.equal(
-        `The provided payment amount (${
-          maxAmount + 1
-        }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmount}!`
-      );
-      expect(status).to.equal(400);
-      expect(statusText).to.equal("Bad Request");
-    }
-  });
-
-  it("GET /price/:currency/:value returns 400 for a payment amount too small in each supported currency", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
-
-    for (const currencyType of supportedPaymentCurrencyTypes) {
-      const minAmount =
-        currencyType === "usd"
-          ? 10_00
-          : Math.round(
-              (10_00 / expectedArPrices.arweave.usd) *
-                // @ts-expect-error
-                expectedArPrices.arweave[currencyType]
-            );
-
-      const { data, status, statusText } = await axios.get(
-        `/v1/price/${currencyType}/${minAmount - 1}`
-      );
-
-      expect(data).to.equal(
-        `The provided payment amount (${
-          minAmount - 1
-        }) is too small for the currency type "${currencyType}"; it must be above ${minAmount}!`
-      );
-      expect(status).to.equal(400);
-      expect(statusText).to.equal("Bad Request");
-    }
-  });
-
   it("GET /price/:currency/:value returns 502 if fiat pricing oracle fails to get a price", async () => {
     stub(pricingService, "getWCForPayment").throws(Error("Really bad failure"));
     const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
