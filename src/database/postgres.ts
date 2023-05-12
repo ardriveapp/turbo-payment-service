@@ -161,7 +161,7 @@ export class PostgresDatabase implements Database {
         );
       }
 
-      if (+payment_amount !== paymentAmount || currencyType !== currency_type) {
+      if (paymentAmount < +payment_amount || currencyType !== currency_type) {
         throw Error(
           `Amount from top up quote (${payment_amount} ${currency_type}) does not match the amount paid on the payment receipt (${paymentAmount} ${currencyType})!`
         );
