@@ -5,7 +5,7 @@ interface ReadThroughPromiseCacheParams<K, V> {
   /**
    * @example
     readThroughFunction = () => {
-        // try elasticcache
+        // try elastic cache
         if hit, return it
         else try fiatOracle
         return myArweaveToFiatOracle.getFiatPerOneAR();
@@ -40,7 +40,8 @@ export class ReadThroughPromiseCache<K, V> {
       throw err;
     });
 
-    this.cache.put(key, valuePromise);
+    void this.cache.put(key, valuePromise);
+
     return valuePromise;
   }
 }

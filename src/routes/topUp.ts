@@ -7,7 +7,7 @@ import {
   paymentIntentTopUpMethod,
   topUpMethods,
 } from "../constants";
-import { PaymentValidationErrors } from "../database/errors";
+import { PaymentValidationError } from "../database/errors";
 import logger from "../logger";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
@@ -38,19 +38,29 @@ export async function topUp(ctx: KoaContext, next: Next) {
       amount,
       type: currency,
     });
+
+    await pricingService.assertMinAndMaxPayment(payment);
   } catch (error) {
-    ctx.response.status = 400;
-    ctx.body = (error as PaymentValidationErrors).message;
+    if (error instanceof PaymentValidationError) {
+      ctx.response.status = 400;
+      ctx.body = error.message;
+    } else {
+      logger.error(error);
+      ctx.response.status = 502;
+      ctx.body = "Fiat Oracle Unavailable";
+    }
+
     return next;
   }
 
   let winstonCreditAmount: WC;
   try {
     winstonCreditAmount = await pricingService.getWCForPayment(payment);
-  } catch (error) {
+  } catch (error: unknown) {
     logger.error(error);
     ctx.response.status = 502;
-    ctx.body = "ArweaveToFiat Oracle Error";
+    ctx.body = "Fiat Oracle Unavailable";
+
     return next;
   }
   const oneSecondMs = 1000;
@@ -118,16 +128,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
       });
     }
   } catch (error) {
-    const wasPaymentBelowMinimumAllowedByStripe =
-      (error as { raw: { code: string } })?.raw?.code === "amount_too_small";
-    if (wasPaymentBelowMinimumAllowedByStripe) {
-      ctx.response.status = 400;
-      ctx.body = "That payment amount is too small to accept!";
-    } else {
-      ctx.response.status = 502;
-      ctx.body = `Error creating ${method}!`;
-      logger.error(error);
-    }
+    ctx.response.status = 502;
+    ctx.body = `Error creating stripe payment session with method: ${method}!`;
+    logger.error(error);
     return next;
   }
 
