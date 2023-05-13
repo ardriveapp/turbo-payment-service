@@ -17,6 +17,7 @@ import {
   CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
+  FailedTopUpQuoteDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
   PromotionalInfo,
@@ -365,6 +366,36 @@ export class PostgresDatabase implements Database {
           user_address: userAddress,
         })
         .update({ winston_credit_balance: newBalance.toString() });
+    });
+  }
+
+  public async checkForExistingPaymentByTopUpQuoteId(
+    top_up_quote_id: string
+  ): Promise<boolean> {
+    return this.knex.transaction(async (knexTransaction) => {
+      const [
+        paymentReceiptResult,
+        chargebackReceiptResult,
+        failedTopUpQuoteReceiptResult,
+      ] = await Promise.all([
+        knexTransaction<PaymentReceiptDBResult>(
+          tableNames.paymentReceipt
+        ).where({ top_up_quote_id }),
+        knexTransaction<ChargebackReceiptDBResult>(
+          tableNames.chargebackReceipt
+        ).where({
+          top_up_quote_id,
+        }),
+        knexTransaction<FailedTopUpQuoteDBResult>(
+          tableNames.failedTopUpQuote
+        ).where({ top_up_quote_id }),
+      ]);
+      return (
+        !!paymentReceiptResult.length ||
+        !!chargebackReceiptResult.length ||
+        !!failedTopUpQuoteReceiptResult.length ||
+        false
+      );
     });
   }
 }
