@@ -19,8 +19,8 @@ export async function loadSecretsToEnv() {
     return;
   }
 
-  if (process.env.NODE_ENV === "test") {
-    // Do not get AWS secrets in the test env
+  if (!["dev", "prod"].includes(process.env.NODE_ENV ?? "")) {
+    // Only get AWS secrets in dev or prod environments
     return;
   }
 
