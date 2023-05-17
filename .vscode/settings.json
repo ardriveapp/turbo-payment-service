@@ -5,6 +5,7 @@
   "editor.formatOnSaveMode": "file",
   "typescript.preferences.importModuleSpecifier": "relative",
   "cSpell.words": [
+    "alexsasharegan",
     "ario",
     "bignumber",
     "capturable",
@@ -13,8 +14,10 @@
     "knexfile",
     "livemode",
     "nvmrc",
+    "openapi",
     "Readables",
     "sats",
+    "trivago",
     "typecheck",
     "uncategorized",
     "winstons"
