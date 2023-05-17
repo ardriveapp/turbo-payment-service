@@ -1,0 +1,251 @@
+openapi: 3.0.0
+info:
+  title: Payment Service
+  version: 0.1.0
+
+servers:
+  - url: /v1
+
+components:
+  schemas:
+    ByteCount:
+      type: integer
+      description: A positive integer within representing the byte count of data items to get a base credit amount for
+      pattern: "^[0-9]+$"
+      example: 5242880
+
+    BaseCredits:
+      type: string
+      example: "332824926"
+
+    CurrencyType:
+      type: string
+      description: Currency type of a given payment amount
+      example: usd
+
+    PaymentAmount:
+      type: integer
+      description: Payment amount in a given currency's smallest unit value
+      example: 1000
+
+    SignatureHeader:
+      type: string
+      description: The signature value derived from signing the request's data concatenated with the provided nonce using the private key from the provided public key
+
+    NonceHeader:
+      type: string
+      description: The nonce value concatenated with the request's data when deriving the provided the signature
+
+    PublicKeyHeader:
+      type: string
+      description: The public key from the private key used to derive the provided signature
+
+paths:
+  # Price Bytes
+  /price/bytes/{byteCount}:
+    get:
+      summary: Get Amount of Credits for Byte Count
+      description: Returns the current amount of base credits it will cost to upload a given byte count worth of data items
+
+      parameters:
+        - name: byteCount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/ByteCount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                "$ref": "#/components/schemas/BaseCredits"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Invalid byte count"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Pricing Oracle Unavailable"
+
+  # Credits for payment endpoint
+  /price/{type}/{amount}:
+    get:
+      summary: Get amount Credits for Payment Type and Amount
+      description: Returns the current amount of base credits this service will quote for a given payment type and amount
+
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/CurrencyType"
+        - name: amount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/PaymentAmount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                "$ref": "#/components/schemas/BaseCredits"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Payment Amount is Invalid"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Fiat Oracle Unavailable"
+
+  # Balance endpoint
+  /balance:
+    parameters:
+      - name: x-signature
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/SignatureHeader"
+
+      - name: x-nonce
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/NonceHeader"
+
+      - name: x-public-key
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/PublicKeyHeader"
+
+    get:
+      summary: Get Current Balance of Credits
+      description: Use a signed request or a previously obtained JWT to get the balance of the given wallet's current balance in base credits
+
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                "$ref": "#/components/schemas/BaseCredits"
+
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Invalid signature or missing required headers"
+
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "User Not Found"
+
+        "503":
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Cloud Database Unavailable"
+
+  /top-up/{method}/{address}/{currency}/{amount}:
+    get:
+      summary: Top Up Turbo Credits
+      parameters:
+        - name: method
+          in: path
+          required: true
+          schema:
+            type: string
+            example: checkout-session
+
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Destination wallet address for credits to be purchased
+
+        - name: currency
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/CurrencyType"
+
+        - name: amount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/PaymentAmount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                type: object
+                properties:
+                  paymentSession:
+                    type: object
+                    # TODO: Add values we depend on and/or want to observe such as:
+                    #  - metadata
+                    #  - payment intent id
+                  topUpQuote:
+                    type:
+                      object
+                      # TODO: add schema
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Destination address is not a valid Arweave native address!"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Payment Amount is Invalid!"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Fiat Oracle Unavailable"
