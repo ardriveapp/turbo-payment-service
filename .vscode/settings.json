@@ -5,6 +5,7 @@
   "editor.formatOnSaveMode": "file",
   "typescript.preferences.importModuleSpecifier": "relative",
   "cSpell.words": [
+    "abcdefghijklmnopqrxtuvwxyz",
     "alexsasharegan",
     "ario",
     "bignumber",
@@ -17,6 +18,7 @@
     "openapi",
     "Readables",
     "sats",
+    "sslmode",
     "trivago",
     "typecheck",
     "uncategorized",
