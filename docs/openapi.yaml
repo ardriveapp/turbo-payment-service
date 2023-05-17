@@ -10,22 +10,23 @@ components:
   schemas:
     ByteCount:
       type: integer
-      description: A positive integer within representing the byte count of data items to get a base credit amount for
+      description: A positive integer representing a byte count of data items
       pattern: "^[0-9]+$"
       example: 5242880
 
     BaseCredits:
       type: string
+      description: A big number string representing an amount of base credits. One credit is equivalent to 1,000,000,000,000 base credits
       example: "332824926"
 
     CurrencyType:
       type: string
-      description: Currency type of a given payment amount
+      description: Currency type for a given payment amount
       example: usd
 
     PaymentAmount:
       type: integer
-      description: Payment amount in a given currency's smallest unit value
+      description: Payment amount in a given currency's smallest unit value. For example, $10 USD is 1000
       example: 1000
 
     SignatureHeader:
@@ -42,7 +43,7 @@ components:
 
     TopUpQuote:
       type: object
-      description: A copy of the top up quote that was saved to the service's Database
+      description: A copy of the top up quote that was saved to the service's database
       properties:
         topUpQuoteId:
           type: string
@@ -79,15 +80,15 @@ components:
           example: cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy # cspell:enable
         client_secret:
           type: string
-          description: On a payment-intent top up flow, this is the client secret that must be provided in order to confirm the payment intent with a payment method # cspell:disable
+          description: Available on the payment-intent top up flow, this is the client secret that must be provided in order to confirm the payment intent with a payment method # cspell:disable
           example: cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl # cspell:enable
         url:
           type: string
-          description: On a checkout-session top up flow, this is the URL in which to fulfill the quote
+          description: Available on a checkout-session top up flow, this is the URL in which to fulfill the quote
           example: https://checkout.stripe.com/c/pay/cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl
 
 paths:
-  # Price Bytes
+  # Credits Price for ByteCount of Data Items
   /price/bytes/{byteCount}:
     get:
       summary: Get Amount of Credits for Byte Count
