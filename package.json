@@ -67,12 +67,14 @@
     "koa": "2.13.4",
     "koa-jwt": "^4.0.4",
     "koa-router": "11.0.1",
+    "koa2-swagger-ui": "^5.8.0",
     "p-limit": "^3.1.0",
     "pg": "^8.8.0",
     "prom-client": "^14.1.0",
     "raw-body": "^2.5.2",
     "sinon-chai": "^3.7.0",
     "stripe": "^11.13.0",
-    "winston": "^3.8.2"
+    "winston": "^3.8.2",
+    "yaml": "^2.2.2"
   }
 }
