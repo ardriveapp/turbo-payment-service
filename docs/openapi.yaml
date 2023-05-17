@@ -40,6 +40,52 @@ components:
       type: string
       description: The public key from the private key used to derive the provided signature
 
+    TopUpQuote:
+      type: object
+      description: A copy of the top up quote that was saved to the service's Database
+      properties:
+        topUpQuoteId:
+          type: string
+          example: caa8b54a-eb5e-4134-8ae2-a3946a428ec7
+        destinationAddress:
+          type: string
+          example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+        destinationAddressType:
+          type: string
+          example: arweave
+        paymentAmount:
+          type: integer
+          example: 1000
+        currencyType:
+          type: string
+          example: usd
+        winstonCreditAmount:
+          type: string
+          example: 1000000000
+        quoteExpirationDate:
+          type: string
+          example: 2023-05-17T21:46:38.404Z
+        paymentProvider:
+          type: string
+          example: stripe
+
+    PaymentSession:
+      type: object
+      description: The full payment-intent or checkout-session from a payment provider
+      properties:
+        id:
+          type: string
+          description: The payment provider's given ID for this payment intent # cspell:disable
+          example: cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy # cspell:enable
+        client_secret:
+          type: string
+          description: On a payment-intent top up flow, this is the client secret that must be provided in order to confirm the payment intent with a payment method # cspell:disable
+          example: cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl # cspell:enable
+        url:
+          type: string
+          description: On a checkout-session top up flow, this is the URL in which to fulfill the quote
+          example: https://checkout.stripe.com/c/pay/cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl
+
 paths:
   # Price Bytes
   /price/bytes/{byteCount}:
@@ -212,19 +258,17 @@ paths:
         "200":
           description: OK
           content:
-            text/plain:
+            application/json:
               schema:
                 type: object
                 properties:
                   paymentSession:
-                    type: object
-                    # TODO: Add values we depend on and/or want to observe such as:
-                    #  - metadata
-                    #  - payment intent id
+                    allOf:
+                      - "$ref": "#/components/schemas/PaymentSession"
                   topUpQuote:
-                    type:
-                      object
-                      # TODO: add schema
+                    allOf:
+                      - "$ref": "#/components/schemas/TopUpQuote"
+
         "403":
           description: Forbidden
           content:
