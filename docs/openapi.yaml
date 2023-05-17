@@ -128,7 +128,7 @@ paths:
   # Credits for payment endpoint
   /price/{type}/{amount}:
     get:
-      summary: Get amount Credits for Payment Type and Amount
+      summary: Get Credits for Payment Type and Amount
       description: Returns the current amount of base credits this service will quote for a given payment type and amount
 
       parameters:
@@ -191,7 +191,7 @@ paths:
 
     get:
       summary: Get Current Balance of Credits
-      description: Use a signed request or a previously obtained JWT to get the balance of the given wallet's current balance in base credits
+      description: Use a signed request or a previously obtained JWT to get the the signing wallet's current service balance in base credits
 
       responses:
         "200":
@@ -227,7 +227,9 @@ paths:
 
   /top-up/{method}/{address}/{currency}/{amount}:
     get:
-      summary: Top Up Turbo Credits
+      summary: Get Top Up Quote for Credits
+      description: Get a top up quote and payment session for a given method (payment-intent or checkout-session), destination address, currency type, and payment amount
+
       parameters:
         - name: method
           in: path
@@ -241,7 +243,7 @@ paths:
           required: true
           schema:
             type: string
-            description: Destination wallet address for credits to be purchased
+            description: Destination wallet address
 
         - name: currency
           in: path
