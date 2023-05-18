@@ -20,15 +20,20 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
   const { pricingService, paymentDatabase, stripe } = ctx.state;
   const { amount, currency, method, address: destinationAddress } = ctx.params;
+
+  const loggerObject = { amount, currency, method, destinationAddress };
+
   if (!topUpMethods.includes(method)) {
     ctx.response.status = 400;
     ctx.body = `Payment method must include one of: ${topUpMethods.toString()}!`;
+    logger.info("top-up GET -- Invalid payment method", loggerObject);
     return next;
   }
 
   if (!isValidArweaveBase64URL(destinationAddress)) {
     ctx.response.status = 403;
     ctx.body = "Destination address is not a valid Arweave native address!";
+    logger.info("top-up GET -- Invalid destination address", loggerObject);
     return next;
   }
 
@@ -44,6 +49,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     if (error instanceof PaymentValidationError) {
       ctx.response.status = 400;
       ctx.body = error.message;
+      logger.info(error.message, loggerObject);
     } else {
       logger.error(error);
       ctx.response.status = 502;
@@ -63,6 +69,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
     return next;
   }
+
   const oneSecondMs = 1000;
   const oneMinuteMs = oneSecondMs * 60;
   const fiveMinutesMs = oneMinuteMs * 5;
@@ -90,6 +97,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     | Stripe.Response<Stripe.PaymentIntent>
     | Stripe.Response<Stripe.Checkout.Session>;
   try {
+    logger.info(`Creating stripe ${method}...`, loggerObject);
     if (method === paymentIntentTopUpMethod) {
       intentOrCheckout = await stripe.paymentIntents.create({
         amount: payment.amount,
