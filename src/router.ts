@@ -8,7 +8,7 @@ import { priceRoutes } from "./routes/priceRoutes";
 import { refundBalance } from "./routes/refundBalance";
 import { reserveBalance } from "./routes/reserveBalance";
 import { stripeRoute } from "./routes/stripe/stripeRoute";
-import { addSwaggerRoutes } from "./routes/swagger";
+import { swaggerDocs, swaggerDocsJSON } from "./routes/swagger";
 import { topUp } from "./routes/topUp";
 import { KoaContext } from "./server";
 
@@ -47,6 +47,7 @@ router.get("/metrics", async (ctx: KoaContext, next: Next) => {
   return next;
 });
 
-addSwaggerRoutes(router);
+router.get("/openapi.json", swaggerDocsJSON);
+router.get("/api-docs", swaggerDocs);
 
 export default router;

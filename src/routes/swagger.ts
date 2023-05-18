@@ -1,18 +1,25 @@
 import { readFileSync } from "fs";
+import { Next } from "koa";
 import { koaSwagger } from "koa2-swagger-ui";
-import Router from "koa-router";
 import YAML from "yaml";
 
-export function addSwaggerRoutes(router: Router) {
-  const openApiSpec = YAML.parse(readFileSync("docs/openapi.yaml", "utf8"));
+import logger from "../logger";
+import { KoaContext } from "../server";
 
-  router.get("/openapi.json", (ctx, next) => {
-    ctx.response.body = JSON.stringify(openApiSpec, null, 2);
-    return next;
-  });
-
-  router.get(
-    "/api-docs",
-    koaSwagger({ routePrefix: false, swaggerOptions: { spec: openApiSpec } })
-  );
+function loadSwaggerYAML() {
+  try {
+    return YAML.parse(readFileSync("docs/openapi.yaml", "utf8"));
+  } catch (error) {
+    logger.error(error);
+    throw Error("OpenAPI spec could not be read!");
+  }
 }
+export function swaggerDocsJSON(ctx: KoaContext, next: Next) {
+  ctx.response.body = JSON.stringify(loadSwaggerYAML(), null, 2);
+  return next;
+}
+
+export const swaggerDocs = koaSwagger({
+  routePrefix: false,
+  swaggerOptions: { spec: loadSwaggerYAML() },
+});
