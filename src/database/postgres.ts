@@ -189,7 +189,11 @@ export class PostgresDatabase implements Database {
         })
       )[0];
       if (destinationUser === undefined) {
-        // No user exists, create new user with balance
+        logger.info("No existing user was found; creating new user...", {
+          userAddress: destination_address,
+          newBalance: winston_credit_amount,
+          paymentReceipt,
+        });
         await knexTransaction<UserDBResult>(tableNames.user).insert({
           user_address: destination_address,
           user_address_type: destination_address_type,
@@ -203,6 +207,13 @@ export class PostgresDatabase implements Database {
         const newBalance = currentBalance.plus(
           new Winston(winston_credit_amount)
         );
+
+        logger.info("Incrementing balance...", {
+          userAddress: destination_address,
+          currentBalance,
+          newBalance,
+          paymentReceipt,
+        });
         await knexTransaction<UserDBResult>(tableNames.user)
           .where({
             user_address: destination_address,
