@@ -37,7 +37,7 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
   } catch (error) {
     ctx.response.status = 502;
     ctx.body = "Pricing Oracle Unavailable";
-    logger.error("Pricing Oracle Unavailable", { bytesValue }, error);
+    logger.error("Pricing Oracle Unavailable", { bytesValue });
   }
   return next;
 }
