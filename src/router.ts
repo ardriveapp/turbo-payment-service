@@ -21,11 +21,7 @@ router.get("/v1/price/:amount", verifySignature, priceRoutes);
 router.get("/v1/price/bytes/:amount", verifySignature, priceRoutes);
 router.get("/v1/price/:currency/:amount", verifySignature, priceRoutes);
 
-router.get(
-  "/v1/top-up/:method/:address/:currency/:amount",
-  verifySignature,
-  topUp
-);
+router.get("/v1/top-up/:method/:address/:currency/:amount", topUp);
 
 router.post("/v1/stripe-webhook", stripeRoute);
 

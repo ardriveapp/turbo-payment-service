@@ -34,10 +34,9 @@ export class ReadThroughPromiseCache<K, V> {
 
     const valuePromise = this.readThroughFunction(key);
 
-    valuePromise.catch((err) => {
-      logger.error(`Error getting value for key ${key}`, err);
+    valuePromise.catch(() => {
+      logger.error(`Error getting value for key ${key}`);
       this.cache.remove(key);
-      throw err;
     });
 
     void this.cache.put(key, valuePromise);

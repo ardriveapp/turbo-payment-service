@@ -2,38 +2,36 @@ import { Next } from "koa";
 import getRawBody from "raw-body";
 import { Stripe } from "stripe";
 
-import logger from "../../logger";
 import { KoaContext } from "../../server";
 import { handleDisputeCreatedEvent } from "./eventHandlers/disputeCreatedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
 export async function stripeRoute(ctx: KoaContext, next: Next) {
-  const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+  const logger = ctx.state.logger;
 
+  const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
   if (!WEBHOOK_SECRET) {
     throw new Error("Stripe webhook secret not set");
   }
 
   const stripe = ctx.state.stripe;
 
-  logger.child({ path: ctx.path });
-  //get the webhook signature for verification
+  // get the webhook signature and raw body for verification
   const sig = ctx.request.headers["stripe-signature"] as string;
   const rawBody = await getRawBody(ctx.req);
 
   let event;
 
   try {
-    logger.info("Verifying webhook signature...");
+    logger.info("Verifying stripe webhook signature...");
 
     event = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.info(`⚠️ Webhook signature verification failed.`);
-    logger.info(err.message);
+    logger.error(err);
     ctx.status = 400;
-    ctx.response.body = `Webhook Error: ${err.message}`;
-    return;
+    ctx.response.body = `Webhook Error!`;
+    return next;
   }
 
   // Extract the data from the event.
@@ -42,11 +40,10 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     | Stripe.PaymentIntent
     | Stripe.Charge
     | Stripe.Dispute;
+
+  const loggerObject = { eventType: event.type, ...eventObject.metadata };
   // Funds have been captured
-  const walletAddress = eventObject.metadata["address"];
-  logger.info(
-    `🔔  Webhook received for Wallet ${walletAddress}: ${eventObject.status}!`
-  );
+  logger.info("🔔 Stripe webhook event received", loggerObject);
   // Return a 200 response to acknowledge receipt of the event.
   // Otherwise, Stripe will keep trying to send the event.
   // Handle errors internally
@@ -66,7 +63,11 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
           stripe
         );
       } catch (error) {
-        logger.error("Payment Success Event handler failed", error);
+        logger.error(
+          "Payment Success Event handler failed",
+          error,
+          loggerObject
+        );
       }
       break;
     case "charge.dispute.created":
@@ -77,7 +78,11 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
           ctx.state.paymentDatabase
         );
       } catch (error) {
-        logger.error("Dispute Created Event handler failed", error);
+        logger.error(
+          "Dispute Created Event handler failed",
+          error,
+          loggerObject
+        );
       }
 
       break;
@@ -85,7 +90,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     // ... handle other event types
     // If we see any events logged here that we don't handle, we should disable them on the stripe dashboard.
     default:
-      logger.error(`Unhandled event type ${event.type}`);
+      logger.error(`Unhandled event type`, loggerObject);
 
       return;
   }

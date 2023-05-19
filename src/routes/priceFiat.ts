@@ -5,12 +5,11 @@ import {
   PaymentAmountTooSmall,
   PaymentValidationError,
 } from "../database/errors";
-import logger from "../logger";
 import { KoaContext } from "../server";
 import { Payment } from "../types/payment";
 
 export async function priceFiatHandler(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
   const { pricingService } = ctx.state;
 
   let payment: Payment;
@@ -24,11 +23,15 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
     ctx.body = (error as PaymentValidationError).message;
     return next;
   }
-
   logger.info("Payment Price GET Route :", { payment });
 
   try {
     const winstonCreditAmount = await pricingService.getWCForPayment(payment);
+
+    logger.info("Base credit amount found for payment", {
+      payment,
+      winstonCreditAmount,
+    });
 
     ctx.body = winstonCreditAmount;
     ctx.response.status = 200;
@@ -39,8 +42,8 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
     ) {
       ctx.response.status = 400;
       ctx.body = error.message;
+      logger.info(error.message);
     } else {
-      logger.error(error);
       ctx.response.status = 502;
       ctx.body = "Fiat Oracle Unavailable";
     }

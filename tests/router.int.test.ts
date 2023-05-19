@@ -109,7 +109,7 @@ describe("Router tests", () => {
       `/v1/price/bytes/1024000000000000000000000000000000000000000000`
     );
     expect(status).to.equal(400);
-    expect(statusText).to.equal("Byte count too large");
+    expect(statusText).to.equal("Bad Request");
     expect(data).to.equal("Byte count too large");
   });
 
@@ -654,7 +654,7 @@ describe("with a stubbed stripe instance", () => {
 
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
-    expect(data).to.equal("Webhook Error: bad");
+    expect(data).to.equal("Webhook Error!");
   });
 });
 

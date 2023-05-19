@@ -100,7 +100,7 @@ export class PostgresDatabase implements Database {
 
   public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {
     const promoInfo = (await this.getUser(userAddress)).promotionalInfo;
-    logger.info("promo info:", { type: typeof promoInfo, promoInfo });
+    this.log.info("promo info:", { type: typeof promoInfo, promoInfo });
     return promoInfo;
   }
 
@@ -189,7 +189,11 @@ export class PostgresDatabase implements Database {
         })
       )[0];
       if (destinationUser === undefined) {
-        // No user exists, create new user with balance
+        this.log.info("No existing user was found; creating new user...", {
+          userAddress: destination_address,
+          newBalance: winston_credit_amount,
+          paymentReceipt,
+        });
         await knexTransaction<UserDBResult>(tableNames.user).insert({
           user_address: destination_address,
           user_address_type: destination_address_type,
@@ -203,6 +207,13 @@ export class PostgresDatabase implements Database {
         const newBalance = currentBalance.plus(
           new Winston(winston_credit_amount)
         );
+
+        this.log.info("Incrementing balance...", {
+          userAddress: destination_address,
+          currentBalance,
+          newBalance,
+          paymentReceipt,
+        });
         await knexTransaction<UserDBResult>(tableNames.user)
           .where({
             user_address: destination_address,

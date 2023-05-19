@@ -28,7 +28,6 @@ export async function handlePaymentSuccessEvent(
 
     logger.info("Creating payment receipt...", loggerObject);
 
-    // TODO: Return new balance and winston credited here for logging and metrics in PE-3562
     await paymentDatabase.createPaymentReceipt({
       paymentReceiptId,
       paymentAmount: pi.amount,
