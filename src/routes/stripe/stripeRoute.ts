@@ -8,7 +8,7 @@ import { handleDisputeCreatedEvent } from "./eventHandlers/disputeCreatedEventHa
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
 export async function stripeRoute(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const _logger = logger.child({ path: ctx.path });
 
   const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
   if (!WEBHOOK_SECRET) {
