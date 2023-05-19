@@ -100,7 +100,7 @@ export class PostgresDatabase implements Database {
 
   public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {
     const promoInfo = (await this.getUser(userAddress)).promotionalInfo;
-    logger.info("promo info:", { type: typeof promoInfo, promoInfo });
+    this.log.info("promo info:", { type: typeof promoInfo, promoInfo });
     return promoInfo;
   }
 
@@ -189,7 +189,7 @@ export class PostgresDatabase implements Database {
         })
       )[0];
       if (destinationUser === undefined) {
-        logger.info("No existing user was found; creating new user...", {
+        this.log.info("No existing user was found; creating new user...", {
           userAddress: destination_address,
           newBalance: winston_credit_amount,
           paymentReceipt,
@@ -208,7 +208,7 @@ export class PostgresDatabase implements Database {
           new Winston(winston_credit_amount)
         );
 
-        logger.info("Incrementing balance...", {
+        this.log.info("Incrementing balance...", {
           userAddress: destination_address,
           currentBalance,
           newBalance,
