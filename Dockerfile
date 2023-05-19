@@ -25,6 +25,7 @@ USER node
 
 # Copy build files
 COPY --from=builder --chown=node /usr/src/app .
+COPY ./docs/openapi.yaml /app/docs/openapi.yaml
 
 EXPOSE 3000
 CMD ["./lib/index.js"]
