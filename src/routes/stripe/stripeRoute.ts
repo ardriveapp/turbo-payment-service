@@ -2,13 +2,12 @@ import { Next } from "koa";
 import getRawBody from "raw-body";
 import { Stripe } from "stripe";
 
-import logger from "../../logger";
 import { KoaContext } from "../../server";
 import { handleDisputeCreatedEvent } from "./eventHandlers/disputeCreatedEventHandler";
 import { handlePaymentSuccessEvent } from "./eventHandlers/paymentSuccessEventHandler";
 
 export async function stripeRoute(ctx: KoaContext, next: Next) {
-  const _logger = logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
 
   const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
   if (!WEBHOOK_SECRET) {

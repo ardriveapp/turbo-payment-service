@@ -2,17 +2,19 @@ import cors from "@koa/cors";
 import Koa, { DefaultState, ParameterizedContext } from "koa";
 import jwt from "koa-jwt";
 import Stripe from "stripe";
+import { Logger } from "winston";
 
 import { Architecture } from "./architecture";
 import { TEST_PRIVATE_ROUTE_SECRET, defaultPort } from "./constants";
 import { PostgresDatabase } from "./database/postgres";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
+import { loggerMiddleware } from "./middleware/logger";
 import { TurboPricingService } from "./pricing/pricing";
 import router from "./router";
 import { loadSecretsToEnv } from "./utils/loadSecretsToEnv";
 
-type KoaState = DefaultState & Architecture;
+type KoaState = DefaultState & Architecture & { logger: Logger };
 export type KoaContext = ParameterizedContext<KoaState>;
 
 logger.info(`Starting server with node environment ${process.env.NODE_ENV}...`);
@@ -40,6 +42,8 @@ export async function createServer(
   if (!STRIPE_SECRET_KEY) {
     throw new Error("Stripe secret key or webhook secret not set");
   }
+
+  app.use(loggerMiddleware);
 
   app.use(cors({ allowMethods: ["GET", "POST"] }));
   // NOTE: Middleware that use the JWT must handle ctx.state.user being undefined and throw
