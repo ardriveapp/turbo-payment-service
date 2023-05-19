@@ -1,12 +1,11 @@
 import { Next } from "koa";
 
 import { InsufficientBalance, UserNotFoundWarning } from "../database/errors";
-import logger from "../logger";
 import { KoaContext } from "../server";
 import { ByteCount } from "../types/byteCount";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
 
   const { paymentDatabase, pricingService } = ctx.state;
 

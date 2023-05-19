@@ -5,12 +5,11 @@ import {
   PaymentAmountTooSmall,
   PaymentValidationError,
 } from "../database/errors";
-import logger from "../logger";
 import { KoaContext } from "../server";
 import { Payment } from "../types/payment";
 
 export async function priceFiatHandler(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
   const { pricingService } = ctx.state;
 
   let payment: Payment;

@@ -8,7 +8,6 @@ import {
   topUpMethods,
 } from "../constants";
 import { PaymentValidationError } from "../database/errors";
-import logger from "../logger";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
@@ -16,7 +15,7 @@ import { winstonToArc } from "../types/winston";
 import { isValidArweaveBase64URL } from "../utils/base64";
 
 export async function topUp(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
 
   const { pricingService, paymentDatabase, stripe } = ctx.state;
   const { amount, currency, method, address: destinationAddress } = ctx.params;

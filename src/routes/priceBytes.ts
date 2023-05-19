@@ -1,11 +1,10 @@
 import { Next } from "koa";
 
-import logger from "../logger";
 import { KoaContext } from "../server";
 import { ByteCount } from "../types/types";
 
 export async function priceBytesHandler(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
   const { pricingService } = ctx.state;
 
   const bytesValue = ctx.params.amount;

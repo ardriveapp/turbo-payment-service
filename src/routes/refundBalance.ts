@@ -1,12 +1,11 @@
 import { Next } from "koa";
 
 import { UserNotFoundWarning } from "../database/errors";
-import logger from "../logger";
 import { KoaContext } from "../server";
 import { Winston } from "../types/winston";
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
 
   const { paymentDatabase } = ctx.state;
 
