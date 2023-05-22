@@ -63,7 +63,7 @@ export class TurboPricingService implements PricingService {
     if (payment.amount < minAmount) {
       throw new PaymentAmountTooSmall(payment, minAmount);
     }
-    if (payment.amount >= maxAmount) {
+    if (payment.amount > maxAmount) {
       throw new PaymentAmountTooLarge(payment, maxAmount);
     }
   }
