@@ -9,7 +9,11 @@ import { spy, stub } from "sinon";
 import Stripe from "stripe";
 
 import { createAxiosInstance } from "../src/axiosClient";
-import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
+import {
+  TEST_PRIVATE_ROUTE_SECRET,
+  maxUSDPaymentAmount,
+  minUSDPaymentAmount,
+} from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
 import {
@@ -370,25 +374,22 @@ describe("Router tests", () => {
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const maxAmount =
-        currencyType === "usd"
-          ? 10000_00
-          : Math.round(
-              (10000_00 / expectedArPrices.arweave.usd) *
-                // @ts-expect-error
-                expectedArPrices.arweave[currencyType]
-            );
+      const maxAmountAllowed = Math.round(
+        (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
+          // @ts-expect-error
+          expectedArPrices.arweave[currencyType]
+      );
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
-          maxAmount + 1
+          maxAmountAllowed + 1
         }`
       );
 
       expect(data).to.equal(
         `The provided payment amount (${
-          maxAmount + 1
-        }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmount}!`
+          maxAmountAllowed + 1
+        }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmountAllowed}!`
       );
       expect(status).to.equal(400);
       expect(statusText).to.equal("Bad Request");
@@ -401,25 +402,22 @@ describe("Router tests", () => {
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const minAmount =
-        currencyType === "usd"
-          ? 10_00
-          : Math.round(
-              (10_00 / expectedArPrices.arweave.usd) *
-                // @ts-expect-error
-                expectedArPrices.arweave[currencyType]
-            );
+      const minAmountAllowed = Math.round(
+        (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
+          // @ts-expect-error
+          expectedArPrices.arweave[currencyType]
+      );
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
-          minAmount - 1
+          minAmountAllowed - 1
         }`
       );
 
       expect(data).to.equal(
         `The provided payment amount (${
-          minAmount - 1
-        }) is too small for the currency type "${currencyType}"; it must be above ${minAmount}!`
+          minAmountAllowed - 1
+        }) is too small for the currency type "${currencyType}"; it must be above ${minAmountAllowed}!`
       );
       expect(status).to.equal(400);
       expect(statusText).to.equal("Bad Request");
@@ -706,15 +704,11 @@ describe("Caching behavior tests", () => {
     await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/price/${currencyType}/${
-            currencyType === "usd"
-              ? 10000_00
-              : Math.round(
-                  (10000_00 / expectedArPrices.arweave.usd) *
-                    // @ts-expect-error
-                    expectedArPrices.arweave[currencyType]
-                )
-          }`
+          `/v1/price/${currencyType}/${Math.round(
+            (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
+              // @ts-expect-error
+              expectedArPrices.arweave[currencyType]
+          )}`
         )
       )
     );
@@ -723,15 +717,11 @@ describe("Caching behavior tests", () => {
     await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/price/${currencyType}/${
-            currencyType === "usd"
-              ? 10_00
-              : Math.round(
-                  (10_00 / expectedArPrices.arweave.usd) *
-                    // @ts-expect-error
-                    expectedArPrices.arweave[currencyType]
-                )
-          }`
+          `/v1/price/${currencyType}/${Math.round(
+            (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
+              // @ts-expect-error
+              expectedArPrices.arweave[currencyType]
+          )}`
         )
       )
     );
