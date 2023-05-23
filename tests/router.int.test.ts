@@ -377,13 +377,11 @@ describe("Router tests", () => {
     const maxPriceResponses = await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
-            Math.round(
-              (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
-                // @ts-expect-error
-                expectedArPrices.arweave[currencyType]
-            ) + 1
-          }`
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${Math.round(
+            (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
+              // @ts-expect-error
+              expectedArPrices.arweave[currencyType]
+          )}`
         )
       )
     );
