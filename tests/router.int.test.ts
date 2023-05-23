@@ -368,6 +368,46 @@ describe("Router tests", () => {
     expect(statusText).to.equal("Bad Gateway");
   });
 
+  it("GET /top-up returns 200 for max and min payment amounts for each currency", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+
+    // Get maximum price for each supported currency concurrently
+    const maxPriceResponses = await Promise.all(
+      supportedPaymentCurrencyTypes.map((currencyType) =>
+        axios.get(
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
+            Math.round(
+              (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
+                // @ts-expect-error
+                expectedArPrices.arweave[currencyType]
+            ) + 1
+          }`
+        )
+      )
+    );
+    for (const { status } of maxPriceResponses) {
+      expect(status).to.equal(200);
+    }
+
+    // Get minimum price for each supported currency concurrently
+    const minPriceResponses = await Promise.all(
+      supportedPaymentCurrencyTypes.map((currencyType) =>
+        axios.get(
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${Math.round(
+            (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
+              // @ts-expect-error
+              expectedArPrices.arweave[currencyType]
+          )}`
+        )
+      )
+    );
+    for (const { status } of minPriceResponses) {
+      expect(status).to.equal(200);
+    }
+  });
+
   it("GET /top-up returns 400 for a payment amount too large in each supported currency", async () => {
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave
