@@ -1,5 +1,6 @@
 import { expect } from "chai";
 
+import { paymentAmountLimits } from "../constants";
 import {
   InvalidPaymentAmount,
   UnsupportedCurrencyType,
@@ -11,14 +12,23 @@ describe("Payment class", () => {
   describe("constructor", () => {
     it("constructs a Payment without error when provided each supported currency type", () => {
       for (const curr of supportedPaymentCurrencyTypes) {
-        expect(() => new Payment({ amount: 1, type: curr })).to.not.throw(
-          Error
-        );
-        expect(() => new Payment({ amount: 60.0, type: curr })).to.not.throw(
-          Error
-        );
         expect(
-          () => new Payment({ amount: Number.MAX_SAFE_INTEGER, type: curr })
+          () =>
+            new Payment({
+              amount: paymentAmountLimits[curr].min * 10,
+              type: curr,
+            })
+        ).to.not.throw(Error);
+        expect(
+          () =>
+            new Payment({
+              amount: paymentAmountLimits[curr].min * 100,
+              type: curr,
+            })
+        ).to.not.throw(Error);
+        expect(
+          () =>
+            new Payment({ amount: paymentAmountLimits[curr].max, type: curr })
         ).to.not.throw(Error);
       }
     });
@@ -78,14 +88,14 @@ describe("Payment class", () => {
 
   describe("winstonCreditAmountForARPrice method", () => {
     it("returns the expected amount for a two decimal currency", () => {
-      const payment = new Payment({ amount: 831, type: "usd" });
+      const payment = new Payment({ amount: 8310, type: "usd" });
 
       // Retrieved from `curl https://api.coingecko.com/api/v3/simple/price\?ids\=arweave\&vs_currencies\=usd` on 04-19-2023
       const pricePerAr = 8.31;
 
       expect(
         payment.winstonCreditAmountForARPrice(pricePerAr, 0).toString()
-      ).to.equal("1000000000000");
+      ).to.equal("10000000000000");
     });
 
     it("returns the expected amount for a two decimal currency when reduced by a fee", () => {
@@ -100,14 +110,14 @@ describe("Payment class", () => {
     });
 
     it("returns the expected amount for a zero decimal currency", () => {
-      const payment = new Payment({ amount: 1119, type: "jpy" });
+      const payment = new Payment({ amount: 11190, type: "jpy" });
 
       // Retrieved from `curl https://api.coingecko.com/api/v3/simple/price\?ids\=arweave\&vs_currencies\=jpy` on 04-19-2023
       const pricePerAr = 1119.26;
 
       expect(
         payment.winstonCreditAmountForARPrice(pricePerAr, 0).toString()
-      ).to.equal("999767703661");
+      ).to.equal("9997677036613");
     });
   });
 });

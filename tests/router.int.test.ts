@@ -11,9 +11,7 @@ import Stripe from "stripe";
 import { createAxiosInstance } from "../src/axiosClient";
 import {
   TEST_PRIVATE_ROUTE_SECRET,
-  maxJPYPaymentAmount,
-  maxUSDPaymentAmount,
-  minUSDPaymentAmount,
+  paymentAmountLimits,
 } from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
@@ -378,15 +376,7 @@ describe("Router tests", () => {
     const maxPriceResponses = await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
-            currencyType === "jpy"
-              ? maxJPYPaymentAmount
-              : Math.round(
-                  (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
-                    // @ts-expect-error
-                    expectedArPrices.arweave[currencyType]
-                )
-          }`
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${paymentAmountLimits[currencyType].max}`
         )
       )
     );
@@ -398,11 +388,7 @@ describe("Router tests", () => {
     const minPriceResponses = await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${Math.round(
-            (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
-              // @ts-expect-error
-              expectedArPrices.arweave[currencyType]
-          )}`
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${paymentAmountLimits[currencyType].min}`
         )
       )
     );
@@ -417,14 +403,7 @@ describe("Router tests", () => {
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const maxAmountAllowed =
-        currencyType === "jpy"
-          ? maxJPYPaymentAmount
-          : Math.round(
-              (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
-                // @ts-expect-error
-                expectedArPrices.arweave[currencyType]
-            );
+      const maxAmountAllowed = paymentAmountLimits[currencyType].max;
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
@@ -448,11 +427,7 @@ describe("Router tests", () => {
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const minAmountAllowed = Math.round(
-        (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
-          // @ts-expect-error
-          expectedArPrices.arweave[currencyType]
-      );
+      const minAmountAllowed = paymentAmountLimits[currencyType].min;
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
@@ -617,12 +592,13 @@ describe("Router tests", () => {
     expect(status).to.equal(403);
   });
 
-  it("GET /currencies returns status 200 and the expected list of currencies", async () => {
+  it("GET /currencies returns status 200 and the expected list of currencies and limits", async () => {
     const { status, statusText, data } = await axios.get(`/v1/currencies`);
 
     expect(data.supportedCurrencies).to.deep.equal(
       supportedPaymentCurrencyTypes
     );
+    expect(data.limits).to.deep.equal(paymentAmountLimits);
     expect(statusText).to.equal("OK");
     expect(status).to.equal(200);
   });
@@ -760,11 +736,7 @@ describe("Caching behavior tests", () => {
     await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/price/${currencyType}/${Math.round(
-            (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
-              // @ts-expect-error
-              expectedArPrices.arweave[currencyType]
-          )}`
+          `/v1/price/${currencyType}/${paymentAmountLimits[currencyType].max}`
         )
       )
     );
@@ -773,36 +745,14 @@ describe("Caching behavior tests", () => {
     await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/price/${currencyType}/${Math.round(
-            (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
-              // @ts-expect-error
-              expectedArPrices.arweave[currencyType]
-          )}`
-        )
-      )
-    );
-
-    // Get random price for each supported currency concurrently
-    await Promise.all(
-      supportedPaymentCurrencyTypes.map((currencyType) =>
-        axios.get(
-          `/v1/price/${currencyType}/${
-            currencyType === "usd"
-              ? Math.floor(Math.random() * (9999 - 11 + 1)) + 11
-              : Math.round(
-                  ((Math.floor(Math.random() * (9999 - 11 + 1)) + 11) /
-                    expectedArPrices.arweave.usd) *
-                    // @ts-expect-error
-                    expectedArPrices.arweave[currencyType]
-                )
-          }`
+          `/v1/price/${currencyType}/${paymentAmountLimits[currencyType].min}`
         )
       )
     );
 
     // We expect the pricing service spy to be called 10 times and thrice for each supported currencies
     expect(pricingSpy.callCount).to.equal(
-      10 + supportedPaymentCurrencyTypes.length * 3
+      10 + supportedPaymentCurrencyTypes.length * 2
     );
 
     // But the CoinGecko oracle is only called the one time
