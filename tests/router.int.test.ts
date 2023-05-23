@@ -417,11 +417,14 @@ describe("Router tests", () => {
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const maxAmountAllowed = Math.round(
-        (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
-          // @ts-expect-error
-          expectedArPrices.arweave[currencyType]
-      );
+      const maxAmountAllowed =
+        currencyType === "jpy"
+          ? maxJPYPaymentAmount
+          : Math.round(
+              (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
+                // @ts-expect-error
+                expectedArPrices.arweave[currencyType]
+            );
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
