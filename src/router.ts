@@ -4,6 +4,7 @@ import * as promClient from "prom-client";
 
 import { verifySignature } from "./middleware/verifySignature";
 import { balanceRoute } from "./routes/balance";
+import { currenciesRoute } from "./routes/currencies";
 import { priceRoutes } from "./routes/priceRoutes";
 import { refundBalance } from "./routes/refundBalance";
 import { reserveBalance } from "./routes/reserveBalance";
@@ -26,6 +27,8 @@ router.get("/v1/top-up/:method/:address/:currency/:amount", topUp);
 router.post("/v1/stripe-webhook", stripeRoute);
 
 router.get("/v1/balance", verifySignature, balanceRoute);
+
+router.get("/v1/currencies", currenciesRoute);
 
 router.get("/v1/reserve-balance/:walletAddress/:byteCount", reserveBalance);
 

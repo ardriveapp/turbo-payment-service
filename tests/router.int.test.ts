@@ -616,6 +616,16 @@ describe("Router tests", () => {
     expect(statusText).to.equal("User not found");
     expect(status).to.equal(403);
   });
+
+  it("GET /currencies returns status 200 and the expected list of currencies", async () => {
+    const { status, statusText, data } = await axios.get(`/v1/currencies`);
+
+    expect(data.supportedCurrencies).to.deep.equal(
+      supportedPaymentCurrencyTypes
+    );
+    expect(statusText).to.equal("OK");
+    expect(status).to.equal(200);
+  });
 });
 
 describe("with a stubbed stripe instance", () => {
