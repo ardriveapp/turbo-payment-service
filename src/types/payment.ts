@@ -24,14 +24,9 @@ interface PaymentConstructorParams {
 function isSupportedCurrency(
   curr: string
 ): curr is SupportedPaymentCurrencyTypes {
-  if (
-    !supportedPaymentCurrencyTypes.includes(
-      curr as SupportedPaymentCurrencyTypes
-    )
-  ) {
-    return false;
-  }
-  return true;
+  return supportedPaymentCurrencyTypes.includes(
+    curr as SupportedPaymentCurrencyTypes
+  );
 }
 
 export class Payment {
