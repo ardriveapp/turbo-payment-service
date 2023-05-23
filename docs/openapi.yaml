@@ -296,3 +296,22 @@ paths:
               schema:
                 type: string
                 default: "Fiat Oracle Unavailable"
+
+  /currencies:
+    get:
+      summary: Get Supported Currencies
+      description: Returns the current list of currency types supported by this service
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supportedCurrencies:
+                    type: array
+                    example: ["usd", "jpy"]
+                    items:
+                      type: string
