@@ -9,7 +9,12 @@ import { spy, stub } from "sinon";
 import Stripe from "stripe";
 
 import { createAxiosInstance } from "../src/axiosClient";
-import { TEST_PRIVATE_ROUTE_SECRET } from "../src/constants";
+import {
+  TEST_PRIVATE_ROUTE_SECRET,
+  maxJPYPaymentAmount,
+  maxUSDPaymentAmount,
+  minUSDPaymentAmount,
+} from "../src/constants";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
 import {
@@ -364,31 +369,73 @@ describe("Router tests", () => {
     expect(statusText).to.equal("Bad Gateway");
   });
 
+  it("GET /top-up returns 200 for max and min payment amounts for each currency", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+
+    // Get maximum price for each supported currency concurrently
+    const maxPriceResponses = await Promise.all(
+      supportedPaymentCurrencyTypes.map((currencyType) =>
+        axios.get(
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
+            currencyType === "jpy"
+              ? maxJPYPaymentAmount
+              : Math.round(
+                  (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
+                    // @ts-expect-error
+                    expectedArPrices.arweave[currencyType]
+                )
+          }`
+        )
+      )
+    );
+    for (const res of maxPriceResponses) {
+      expect(res.status).to.equal(200);
+    }
+
+    // Get minimum price for each supported currency concurrently
+    const minPriceResponses = await Promise.all(
+      supportedPaymentCurrencyTypes.map((currencyType) =>
+        axios.get(
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${Math.round(
+            (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
+              // @ts-expect-error
+              expectedArPrices.arweave[currencyType]
+          )}`
+        )
+      )
+    );
+    for (const { status } of minPriceResponses) {
+      expect(status).to.equal(200);
+    }
+  });
+
   it("GET /top-up returns 400 for a payment amount too large in each supported currency", async () => {
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const maxAmount =
-        currencyType === "usd"
-          ? 10000_00
+      const maxAmountAllowed =
+        currencyType === "jpy"
+          ? maxJPYPaymentAmount
           : Math.round(
-              (10000_00 / expectedArPrices.arweave.usd) *
+              (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
                 // @ts-expect-error
                 expectedArPrices.arweave[currencyType]
             );
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
-          maxAmount + 1
+          maxAmountAllowed + 1
         }`
       );
 
       expect(data).to.equal(
         `The provided payment amount (${
-          maxAmount + 1
-        }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmount}!`
+          maxAmountAllowed + 1
+        }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmountAllowed}!`
       );
       expect(status).to.equal(400);
       expect(statusText).to.equal("Bad Request");
@@ -401,25 +448,22 @@ describe("Router tests", () => {
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const minAmount =
-        currencyType === "usd"
-          ? 10_00
-          : Math.round(
-              (10_00 / expectedArPrices.arweave.usd) *
-                // @ts-expect-error
-                expectedArPrices.arweave[currencyType]
-            );
+      const minAmountAllowed = Math.round(
+        (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
+          // @ts-expect-error
+          expectedArPrices.arweave[currencyType]
+      );
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
-          minAmount - 1
+          minAmountAllowed - 1
         }`
       );
 
       expect(data).to.equal(
         `The provided payment amount (${
-          minAmount - 1
-        }) is too small for the currency type "${currencyType}"; it must be above ${minAmount}!`
+          minAmountAllowed - 1
+        }) is too small for the currency type "${currencyType}"; it must be above ${minAmountAllowed}!`
       );
       expect(status).to.equal(400);
       expect(statusText).to.equal("Bad Request");
@@ -706,15 +750,11 @@ describe("Caching behavior tests", () => {
     await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/price/${currencyType}/${
-            currencyType === "usd"
-              ? 10000_00
-              : Math.round(
-                  (10000_00 / expectedArPrices.arweave.usd) *
-                    // @ts-expect-error
-                    expectedArPrices.arweave[currencyType]
-                )
-          }`
+          `/v1/price/${currencyType}/${Math.round(
+            (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
+              // @ts-expect-error
+              expectedArPrices.arweave[currencyType]
+          )}`
         )
       )
     );
@@ -723,15 +763,11 @@ describe("Caching behavior tests", () => {
     await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/price/${currencyType}/${
-            currencyType === "usd"
-              ? 10_00
-              : Math.round(
-                  (10_00 / expectedArPrices.arweave.usd) *
-                    // @ts-expect-error
-                    expectedArPrices.arweave[currencyType]
-                )
-          }`
+          `/v1/price/${currencyType}/${Math.round(
+            (minUSDPaymentAmount / expectedArPrices.arweave.usd) *
+              // @ts-expect-error
+              expectedArPrices.arweave[currencyType]
+          )}`
         )
       )
     );
