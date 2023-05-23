@@ -21,16 +21,56 @@ export const turboFeePercentageAsADecimal = 0.2;
 // cspell:disable
 export const electronicallySuppliedServicesTaxCode = "txcd_10000000"; //cspell:disable
 
-/** Min, max, and suggested payment amounts for the payment service */
+/** Min, maximumPaymentAmount, and suggestedPaymentAmountsested payment amounts for the payment service */
 export const paymentAmountLimits = {
-  usd: { min: 10_00, max: 10_000_00, sugg: [25_00, 50_00, 100_00] },
-  brl: { min: 50_00, max: 50_000_00, sugg: [125_00, 250_00, 500_00] },
-  hkd: { min: 100_00, max: 100_000_00, sugg: [200_00, 400_00, 800_00] },
-  jpy: { min: 1_500, max: 1_500_000, sugg: [3_500, 6_500, 15_000] },
-  cad: { min: 10_00, max: 15_000_00, sugg: [25_00, 50_00, 100_00] },
-  gbp: { min: 10_00, max: 10_000_00, sugg: [20_00, 40_00, 80_00] },
-  eur: { min: 10_00, max: 10_000_00, sugg: [25_00, 50_00, 100_00] },
-  sgd: { min: 15_00, max: 15_000_00, sugg: [25_00, 75_00, 150_00] },
-  aud: { min: 15_00, max: 15_000_00, sugg: [25_00, 75_00, 150_00] },
-  inr: { min: 1000_00, max: 900_000_00, sugg: [2000_00, 4000_00, 8000_00] },
+  usd: {
+    minimumPaymentAmount: 10_00,
+    maximumPaymentAmount: 10_000_00,
+    suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+  },
+  brl: {
+    minimumPaymentAmount: 50_00,
+    maximumPaymentAmount: 50_000_00,
+    suggestedPaymentAmounts: [125_00, 250_00, 500_00],
+  },
+  hkd: {
+    minimumPaymentAmount: 100_00,
+    maximumPaymentAmount: 100_000_00,
+    suggestedPaymentAmounts: [200_00, 400_00, 800_00],
+  },
+  jpy: {
+    minimumPaymentAmount: 1_500,
+    maximumPaymentAmount: 1_500_000,
+    suggestedPaymentAmounts: [3_500, 6_500, 15_000],
+  },
+  cad: {
+    minimumPaymentAmount: 10_00,
+    maximumPaymentAmount: 15_000_00,
+    suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+  },
+  gbp: {
+    minimumPaymentAmount: 10_00,
+    maximumPaymentAmount: 10_000_00,
+    suggestedPaymentAmounts: [20_00, 40_00, 80_00],
+  },
+  eur: {
+    minimumPaymentAmount: 10_00,
+    maximumPaymentAmount: 10_000_00,
+    suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+  },
+  sgd: {
+    minimumPaymentAmount: 15_00,
+    maximumPaymentAmount: 15_000_00,
+    suggestedPaymentAmounts: [25_00, 75_00, 150_00],
+  },
+  aud: {
+    minimumPaymentAmount: 15_00,
+    maximumPaymentAmount: 15_000_00,
+    suggestedPaymentAmounts: [25_00, 75_00, 150_00],
+  },
+  inr: {
+    minimumPaymentAmount: 1000_00,
+    maximumPaymentAmount: 900_000_00,
+    suggestedPaymentAmounts: [2000_00, 4000_00, 8000_00],
+  },
 };

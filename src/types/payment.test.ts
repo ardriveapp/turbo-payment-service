@@ -15,20 +15,23 @@ describe("Payment class", () => {
         expect(
           () =>
             new Payment({
-              amount: paymentAmountLimits[curr].min * 10,
+              amount: paymentAmountLimits[curr].minimumPaymentAmount * 10,
               type: curr,
             })
         ).to.not.throw(Error);
         expect(
           () =>
             new Payment({
-              amount: paymentAmountLimits[curr].min * 100,
+              amount: paymentAmountLimits[curr].minimumPaymentAmount * 100,
               type: curr,
             })
         ).to.not.throw(Error);
         expect(
           () =>
-            new Payment({ amount: paymentAmountLimits[curr].max, type: curr })
+            new Payment({
+              amount: paymentAmountLimits[curr].maximumPaymentAmount,
+              type: curr,
+            })
         ).to.not.throw(Error);
       }
     });

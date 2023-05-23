@@ -376,7 +376,7 @@ describe("Router tests", () => {
     const maxPriceResponses = await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${paymentAmountLimits[currencyType].max}`
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${paymentAmountLimits[currencyType].maximumPaymentAmount}`
         )
       )
     );
@@ -388,7 +388,7 @@ describe("Router tests", () => {
     const minPriceResponses = await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${paymentAmountLimits[currencyType].min}`
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${paymentAmountLimits[currencyType].minimumPaymentAmount}`
         )
       )
     );
@@ -403,7 +403,8 @@ describe("Router tests", () => {
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const maxAmountAllowed = paymentAmountLimits[currencyType].max;
+      const maxAmountAllowed =
+        paymentAmountLimits[currencyType].maximumPaymentAmount;
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
@@ -427,7 +428,8 @@ describe("Router tests", () => {
     );
 
     for (const currencyType of supportedPaymentCurrencyTypes) {
-      const minAmountAllowed = paymentAmountLimits[currencyType].min;
+      const minAmountAllowed =
+        paymentAmountLimits[currencyType].minimumPaymentAmount;
 
       const { data, status, statusText } = await axios.get(
         `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
@@ -736,7 +738,7 @@ describe("Caching behavior tests", () => {
     await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/price/${currencyType}/${paymentAmountLimits[currencyType].max}`
+          `/v1/price/${currencyType}/${paymentAmountLimits[currencyType].maximumPaymentAmount}`
         )
       )
     );
@@ -745,7 +747,7 @@ describe("Caching behavior tests", () => {
     await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/price/${currencyType}/${paymentAmountLimits[currencyType].min}`
+          `/v1/price/${currencyType}/${paymentAmountLimits[currencyType].minimumPaymentAmount}`
         )
       )
     );

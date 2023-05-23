@@ -321,8 +321,8 @@ paths:
                       {
                         usd:
                           {
-                            min: 1000,
-                            max: 1000000,
-                            sugg: [2500, 5000, 10000],
+                            minimumPaymentAmount: 1000,
+                            maximumPaymentAmount: 1000000,
+                            suggestedPaymentAmounts: [2500, 5000, 10000],
                           },
                       }

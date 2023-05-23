@@ -49,12 +49,12 @@ export class Payment {
       throw new InvalidPaymentAmount(amount);
     }
 
-    const maxAmountAllowed = paymentAmountLimits[type].max;
+    const maxAmountAllowed = paymentAmountLimits[type].maximumPaymentAmount;
     if (amount > maxAmountAllowed) {
       throw new PaymentAmountTooLarge(amount, type, maxAmountAllowed);
     }
 
-    const minAmountAllowed = paymentAmountLimits[type].min;
+    const minAmountAllowed = paymentAmountLimits[type].minimumPaymentAmount;
     if (amount < minAmountAllowed) {
       throw new PaymentAmountTooSmall(amount, type, minAmountAllowed);
     }
