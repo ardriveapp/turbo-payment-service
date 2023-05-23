@@ -1,4 +1,5 @@
 import {
+  maxJPYPaymentAmount,
   maxUSDPaymentAmount,
   minUSDPaymentAmount,
   turboFeePercentageAsADecimal,
@@ -53,6 +54,13 @@ export class TurboPricingService implements PricingService {
 
       const convertFromUSDLimit = (amount: number) =>
         Math.round((amount / usdPriceOfOneAR) * fiatPriceOfOneAR);
+
+      if (payment.type === "jpy") {
+        return {
+          minAmount: convertFromUSDLimit(minUSDPaymentAmount),
+          maxAmount: maxJPYPaymentAmount,
+        };
+      }
 
       return {
         minAmount: convertFromUSDLimit(minUSDPaymentAmount),

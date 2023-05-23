@@ -11,6 +11,7 @@ import Stripe from "stripe";
 import { createAxiosInstance } from "../src/axiosClient";
 import {
   TEST_PRIVATE_ROUTE_SECRET,
+  maxJPYPaymentAmount,
   maxUSDPaymentAmount,
   minUSDPaymentAmount,
 } from "../src/constants";
@@ -377,16 +378,20 @@ describe("Router tests", () => {
     const maxPriceResponses = await Promise.all(
       supportedPaymentCurrencyTypes.map((currencyType) =>
         axios.get(
-          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${Math.round(
-            (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
-              // @ts-expect-error
-              expectedArPrices.arweave[currencyType]
-          )}`
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
+            currencyType === "jpy"
+              ? maxJPYPaymentAmount
+              : Math.round(
+                  (maxUSDPaymentAmount / expectedArPrices.arweave.usd) *
+                    // @ts-expect-error
+                    expectedArPrices.arweave[currencyType]
+                )
+          }`
         )
       )
     );
-    for (const { status } of maxPriceResponses) {
-      expect(status).to.equal(200);
+    for (const res of maxPriceResponses) {
+      expect(res.status).to.equal(200);
     }
 
     // Get minimum price for each supported currency concurrently

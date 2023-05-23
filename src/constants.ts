@@ -23,3 +23,4 @@ export const electronicallySuppliedServicesTaxCode = "txcd_10000000"; //cspell:d
 
 export const minUSDPaymentAmount = 10_00; // 10.00 USD
 export const maxUSDPaymentAmount = 10_000_00; // 10,000.00 USD
+export const maxJPYPaymentAmount = 99_999_999;
