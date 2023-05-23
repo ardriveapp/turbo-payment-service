@@ -315,3 +315,14 @@ paths:
                     example: ["usd", "jpy"]
                     items:
                       type: string
+                  limits:
+                    type: object
+                    example:
+                      {
+                        usd:
+                          {
+                            min: 1000,
+                            max: 1000000,
+                            sugg: [2500, 5000, 10000],
+                          },
+                      }
