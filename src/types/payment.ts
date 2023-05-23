@@ -1,12 +1,16 @@
 import BigNumber from "bignumber.js";
 
+import { paymentAmountLimits } from "../constants";
 import { CurrencyType, PaymentAmount } from "../database/dbTypes";
 import {
   InvalidPaymentAmount,
+  PaymentAmountTooLarge,
+  PaymentAmountTooSmall,
   UnsupportedCurrencyType,
 } from "../database/errors";
 import { WC } from "./arc";
 import {
+  SupportedPaymentCurrencyTypes,
   supportedPaymentCurrencyTypes,
   zeroDecimalCurrencyTypes,
 } from "./supportedCurrencies";
@@ -17,6 +21,19 @@ interface PaymentConstructorParams {
   type: CurrencyType;
 }
 
+function isSupportedCurrency(
+  curr: string
+): curr is SupportedPaymentCurrencyTypes {
+  if (
+    !supportedPaymentCurrencyTypes.includes(
+      curr as SupportedPaymentCurrencyTypes
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export class Payment {
   public readonly amount: PaymentAmount;
   public readonly type: CurrencyType;
@@ -25,7 +42,7 @@ export class Payment {
     amount = Number(amount);
     type = type.toLowerCase();
 
-    if (!supportedPaymentCurrencyTypes.includes(type)) {
+    if (!isSupportedCurrency(type)) {
       throw new UnsupportedCurrencyType(type);
     }
 
@@ -35,6 +52,16 @@ export class Payment {
       amount > Number.MAX_SAFE_INTEGER
     ) {
       throw new InvalidPaymentAmount(amount);
+    }
+
+    const maxAmountAllowed = paymentAmountLimits[type].max;
+    if (amount > maxAmountAllowed) {
+      throw new PaymentAmountTooLarge(amount, type, maxAmountAllowed);
+    }
+
+    const minAmountAllowed = paymentAmountLimits[type].min;
+    if (amount < minAmountAllowed) {
+      throw new PaymentAmountTooSmall(amount, type, minAmountAllowed);
     }
 
     this.amount = amount;

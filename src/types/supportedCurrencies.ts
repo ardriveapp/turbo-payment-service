@@ -10,7 +10,9 @@ export const supportedPaymentCurrencyTypes = [
   "sgd",
   "aud",
   "inr",
-];
+] as const;
+export type SupportedPaymentCurrencyTypes =
+  (typeof supportedPaymentCurrencyTypes)[number];
 
 // Note: We will support these zero decimal currencies on MVP: [ 'jpy' ]
 export const zeroDecimalCurrencyTypes = [

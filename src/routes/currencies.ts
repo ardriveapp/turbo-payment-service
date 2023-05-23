@@ -1,5 +1,6 @@
 import { Next } from "koa";
 
+import { paymentAmountLimits } from "../constants";
 import { KoaContext } from "../server";
 import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
 
@@ -8,7 +9,10 @@ export async function currenciesRoute(ctx: KoaContext, next: Next) {
 
   logger.info("Currencies requested");
 
-  ctx.body = { supportedCurrencies: supportedPaymentCurrencyTypes };
+  ctx.body = {
+    supportedCurrencies: supportedPaymentCurrencyTypes,
+    limits: paymentAmountLimits,
+  };
   ctx.status = 200;
 
   return next;

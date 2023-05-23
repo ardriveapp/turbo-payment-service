@@ -1,13 +1,4 @@
-import {
-  maxJPYPaymentAmount,
-  maxUSDPaymentAmount,
-  minUSDPaymentAmount,
-  turboFeePercentageAsADecimal,
-} from "../constants";
-import {
-  PaymentAmountTooLarge,
-  PaymentAmountTooSmall,
-} from "../database/errors";
+import { turboFeePercentageAsADecimal } from "../constants";
 import { Payment } from "../types/payment";
 import { ByteCount, WC, Winston } from "../types/types";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
@@ -16,7 +7,6 @@ import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle"
 
 export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
-  assertMinAndMaxPayment: (payment: Payment) => Promise<void>;
   getWCForBytes: (bytes: ByteCount) => Promise<WC>;
 }
 
@@ -35,45 +25,6 @@ export class TurboPricingService implements PricingService {
       bytesToWinstonOracle ?? new ReadThroughBytesToWinstonOracle({});
     this.arweaveToFiatOracle =
       arweaveToFiatOracle ?? new ReadThroughArweaveToFiatOracle({});
-  }
-
-  public async assertMinAndMaxPayment(payment: Payment): Promise<void> {
-    const fiatPriceOfOneAR =
-      await this.arweaveToFiatOracle.getFiatPriceForOneAR(payment.type);
-
-    const { minAmount, maxAmount } = await (async () => {
-      if (payment.type === "usd") {
-        return {
-          minAmount: minUSDPaymentAmount,
-          maxAmount: maxUSDPaymentAmount,
-        };
-      }
-
-      const usdPriceOfOneAR =
-        await this.arweaveToFiatOracle.getFiatPriceForOneAR("usd");
-
-      const convertFromUSDLimit = (amount: number) =>
-        Math.round((amount / usdPriceOfOneAR) * fiatPriceOfOneAR);
-
-      if (payment.type === "jpy") {
-        return {
-          minAmount: convertFromUSDLimit(minUSDPaymentAmount),
-          maxAmount: maxJPYPaymentAmount,
-        };
-      }
-
-      return {
-        minAmount: convertFromUSDLimit(minUSDPaymentAmount),
-        maxAmount: convertFromUSDLimit(maxUSDPaymentAmount),
-      };
-    })();
-
-    if (payment.amount < minAmount) {
-      throw new PaymentAmountTooSmall(payment, minAmount);
-    }
-    if (payment.amount > maxAmount) {
-      throw new PaymentAmountTooLarge(payment, maxAmount);
-    }
   }
 
   public async getWCForPayment(payment: Payment): Promise<Winston> {

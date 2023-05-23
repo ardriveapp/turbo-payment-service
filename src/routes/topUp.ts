@@ -42,8 +42,6 @@ export async function topUp(ctx: KoaContext, next: Next) {
       amount,
       type: currency,
     });
-
-    await pricingService.assertMinAndMaxPayment(payment);
   } catch (error) {
     if (error instanceof PaymentValidationError) {
       ctx.response.status = 400;
