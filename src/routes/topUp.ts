@@ -3,6 +3,7 @@ import { Next } from "koa";
 import Stripe from "stripe";
 
 import {
+  CurrencyLimitations,
   electronicallySuppliedServicesTaxCode,
   paymentIntentTopUpMethod,
   topUpMethods,
@@ -36,11 +37,23 @@ export async function topUp(ctx: KoaContext, next: Next) {
     return next;
   }
 
+  let currencyLimitations: CurrencyLimitations;
+
+  try {
+    currencyLimitations = await pricingService.getCurrencyLimitations();
+  } catch (error) {
+    logger.error(error);
+    ctx.response.status = 502;
+    ctx.body = "Fiat Oracle Unavailable";
+    return next;
+  }
+
   let payment: Payment;
   try {
     payment = new Payment({
       amount,
       type: currency,
+      currencyLimitations,
     });
   } catch (error) {
     if (error instanceof PaymentValidationError) {

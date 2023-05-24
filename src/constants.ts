@@ -22,7 +22,7 @@ export const turboFeePercentageAsADecimal = 0.2;
 export const electronicallySuppliedServicesTaxCode = "txcd_10000000"; //cspell:disable
 
 /** Min, maximumPaymentAmount, and suggestedPaymentAmountsested payment amounts for the payment service */
-export const paymentAmountLimits = {
+export const paymentAmountLimits: CurrencyLimitations = {
   usd: {
     minimumPaymentAmount: 10_00,
     maximumPaymentAmount: 10_000_00,
@@ -74,3 +74,10 @@ export const paymentAmountLimits = {
     suggestedPaymentAmounts: [2000_00, 4000_00, 8000_00],
   },
 };
+export interface CurrencyLimitation {
+  minimumPaymentAmount: number;
+  maximumPaymentAmount: number;
+  suggestedPaymentAmounts: [number, number, number];
+}
+
+export type CurrencyLimitations = Record<string, CurrencyLimitation>;
