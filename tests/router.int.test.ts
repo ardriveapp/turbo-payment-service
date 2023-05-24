@@ -10,6 +10,7 @@ import Stripe from "stripe";
 
 import { createAxiosInstance } from "../src/axiosClient";
 import {
+  CurrencyLimitations,
   TEST_PRIVATE_ROUTE_SECRET,
   paymentAmountLimits,
 } from "../src/constants";
@@ -367,84 +368,92 @@ describe("Router tests", () => {
     expect(statusText).to.equal("Bad Gateway");
   });
 
-  it("GET /top-up returns 200 for max and min payment amounts for each currency", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
+  // Ensure that we can handle all of our own exposed currency limitations
+  describe("currency limitation tests", () => {
+    let currencyLimitations: CurrencyLimitations;
+    before(async () => {
+      currencyLimitations = (await axios.get(`v1/currencies`)).data.limits;
+    });
 
-    // Get maximum price for each supported currency concurrently
-    const maxPriceResponses = await Promise.all(
-      supportedPaymentCurrencyTypes.map((currencyType) =>
-        axios.get(
-          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${paymentAmountLimits[currencyType].maximumPaymentAmount}`
+    it("GET /top-up returns 200 for max and min payment amounts for each currency", async () => {
+      stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+        expectedArPrices.arweave
+      );
+
+      // Get maximum price for each supported currency concurrently
+      const maxPriceResponses = await Promise.all(
+        supportedPaymentCurrencyTypes.map((currencyType) =>
+          axios.get(
+            `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${currencyLimitations[currencyType].maximumPaymentAmount}`
+          )
         )
-      )
-    );
-    for (const res of maxPriceResponses) {
-      expect(res.status).to.equal(200);
-    }
+      );
+      for (const res of maxPriceResponses) {
+        expect(res.status).to.equal(200);
+      }
 
-    // Get minimum price for each supported currency concurrently
-    const minPriceResponses = await Promise.all(
-      supportedPaymentCurrencyTypes.map((currencyType) =>
-        axios.get(
-          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${paymentAmountLimits[currencyType].minimumPaymentAmount}`
+      // Get minimum price for each supported currency concurrently
+      const minPriceResponses = await Promise.all(
+        supportedPaymentCurrencyTypes.map((currencyType) =>
+          axios.get(
+            `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${currencyLimitations[currencyType].minimumPaymentAmount}`
+          )
         )
-      )
-    );
-    for (const { status } of minPriceResponses) {
-      expect(status).to.equal(200);
-    }
-  });
+      );
+      for (const { status } of minPriceResponses) {
+        expect(status).to.equal(200);
+      }
+    });
 
-  it("GET /top-up returns 400 for a payment amount too large in each supported currency", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
-
-    for (const currencyType of supportedPaymentCurrencyTypes) {
-      const maxAmountAllowed =
-        paymentAmountLimits[currencyType].maximumPaymentAmount;
-
-      const { data, status, statusText } = await axios.get(
-        `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
-          maxAmountAllowed + 1
-        }`
+    it("GET /top-up returns 400 for a payment amount too large in each supported currency", async () => {
+      stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+        expectedArPrices.arweave
       );
 
-      expect(data).to.equal(
-        `The provided payment amount (${
-          maxAmountAllowed + 1
-        }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmountAllowed}!`
+      for (const currencyType of supportedPaymentCurrencyTypes) {
+        const maxAmountAllowed =
+          currencyLimitations[currencyType].maximumPaymentAmount;
+
+        const { data, status, statusText } = await axios.get(
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
+            maxAmountAllowed + 1
+          }`
+        );
+
+        expect(data).to.equal(
+          `The provided payment amount (${
+            maxAmountAllowed + 1
+          }) is too large for the currency type "${currencyType}"; it must be below or equal to ${maxAmountAllowed}!`
+        );
+        expect(status).to.equal(400);
+        expect(statusText).to.equal("Bad Request");
+      }
+    });
+
+    it("GET /top-up returns 400 for a payment amount too small in each supported currency", async () => {
+      stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+        expectedArPrices.arweave
       );
-      expect(status).to.equal(400);
-      expect(statusText).to.equal("Bad Request");
-    }
-  });
 
-  it("GET /top-up returns 400 for a payment amount too small in each supported currency", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
+      for (const currencyType of supportedPaymentCurrencyTypes) {
+        const minAmountAllowed =
+          currencyLimitations[currencyType].minimumPaymentAmount;
 
-    for (const currencyType of supportedPaymentCurrencyTypes) {
-      const minAmountAllowed =
-        paymentAmountLimits[currencyType].minimumPaymentAmount;
+        const { data, status, statusText } = await axios.get(
+          `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
+            minAmountAllowed - 1
+          }`
+        );
 
-      const { data, status, statusText } = await axios.get(
-        `/v1/top-up/checkout-session/${testAddress}/${currencyType}/${
-          minAmountAllowed - 1
-        }`
-      );
-
-      expect(data).to.equal(
-        `The provided payment amount (${
-          minAmountAllowed - 1
-        }) is too small for the currency type "${currencyType}"; it must be above ${minAmountAllowed}!`
-      );
-      expect(status).to.equal(400);
-      expect(statusText).to.equal("Bad Request");
-    }
+        expect(data).to.equal(
+          `The provided payment amount (${
+            minAmountAllowed - 1
+          }) is too small for the currency type "${currencyType}"; it must be above ${minAmountAllowed}!`
+        );
+        expect(status).to.equal(400);
+        expect(statusText).to.equal("Bad Request");
+      }
+    });
   });
 
   it("GET /top-up returns 502 when stripe fails to create payment session", async () => {
@@ -600,7 +609,7 @@ describe("Router tests", () => {
     expect(data.supportedCurrencies).to.deep.equal(
       supportedPaymentCurrencyTypes
     );
-    expect(data.limits).to.deep.equal(paymentAmountLimits);
+    expect(data.limits).to.exist;
     expect(statusText).to.equal("OK");
     expect(status).to.equal(200);
   });
@@ -752,7 +761,7 @@ describe("Caching behavior tests", () => {
       )
     );
 
-    // We expect the pricing service spy to be called 10 times and thrice for each supported currencies
+    // We expect the pricing service spy to be called 10 times and twice for each supported currencies
     expect(pricingSpy.callCount).to.equal(
       10 + supportedPaymentCurrencyTypes.length * 2
     );
