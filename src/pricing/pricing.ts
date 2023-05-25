@@ -60,7 +60,7 @@ export class TurboPricingService implements PricingService {
   }
 
   private countDigits(number: number): number {
-    const numberString = Math.abs(+number.toFixed()).toString();
+    const numberString = number.toFixed();
     return numberString.length;
   }
 
