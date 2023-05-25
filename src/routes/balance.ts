@@ -1,11 +1,10 @@
 import { Next } from "koa";
 
 import { UserNotFoundWarning } from "../database/errors";
-import logger from "../logger";
 import { KoaContext } from "../server";
 
 export async function balanceRoute(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
   const { paymentDatabase } = ctx.state;
 
   const walletAddress = ctx.state.walletAddress;
@@ -21,6 +20,7 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
   try {
     const balance = await paymentDatabase.getBalance(walletAddress);
     ctx.body = balance.toString();
+    logger.info("Balance found!", { balance, walletAddress });
   } catch (error) {
     if (error instanceof UserNotFoundWarning) {
       logger.info(error.message);

@@ -5,7 +5,7 @@ interface ReadThroughPromiseCacheParams<K, V> {
   /**
    * @example
     readThroughFunction = () => {
-        // try elasticcache
+        // try elastic cache
         if hit, return it
         else try fiatOracle
         return myArweaveToFiatOracle.getFiatPerOneAR();
@@ -34,13 +34,13 @@ export class ReadThroughPromiseCache<K, V> {
 
     const valuePromise = this.readThroughFunction(key);
 
-    valuePromise.catch((err) => {
-      logger.error(`Error getting value for key ${key}`, err);
+    valuePromise.catch(() => {
+      logger.error(`Error getting value for key ${key}`);
       this.cache.remove(key);
-      throw err;
     });
 
-    this.cache.put(key, valuePromise);
+    void this.cache.put(key, valuePromise);
+
     return valuePromise;
   }
 }

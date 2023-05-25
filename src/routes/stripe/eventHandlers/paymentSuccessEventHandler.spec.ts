@@ -122,7 +122,7 @@ describe("handlePaymentSuccessEvent", () => {
     expect(stripeRefundSpy.calledOnce).to.be.true;
   });
 
-  it("should attempt to refund the payment with Stripe if payment amount is mismatched", async () => {
+  it("should attempt to refund the payment with Stripe if payment amount is below the quoted amount", async () => {
     await dbTestHelper.insertStubTopUpQuote({
       top_up_quote_id: "this is wrong payment amount",
       currency_type: "usd",
@@ -139,5 +139,58 @@ describe("handlePaymentSuccessEvent", () => {
     await handlePaymentSuccessEvent(paymentIntent, db, stripe);
 
     expect(stripeRefundSpy.calledOnce).to.be.true;
+  });
+
+  it("should process the payment and create the receipt if payment amount is above the quoted amount", async () => {
+    const paymentWithTaxTopUpQuoteId =
+      "this is a payment with state sales tax like from NJ";
+
+    await dbTestHelper.insertStubTopUpQuote({
+      top_up_quote_id: paymentWithTaxTopUpQuoteId,
+      currency_type: "usd",
+      payment_amount: "10100",
+    });
+
+    const stripeRefundSpy = stub(stripe.refunds, "create").resolves();
+    const paymentIntent = paymentIntentStub({
+      topUpQuoteId: paymentWithTaxTopUpQuoteId,
+      currency: "usd",
+      amount: 10731,
+    });
+
+    await handlePaymentSuccessEvent(paymentIntent, db, stripe);
+
+    const paymentReceiptDbResults = await db["knex"]<PaymentReceiptDBResult>(
+      tableNames.paymentReceipt
+    ).where({
+      top_up_quote_id: paymentWithTaxTopUpQuoteId,
+    });
+    expect(paymentReceiptDbResults).to.have.length(1);
+
+    const {
+      payment_amount,
+      currency_type,
+      destination_address,
+      destination_address_type,
+      payment_provider,
+      payment_receipt_date,
+      payment_receipt_id,
+      top_up_quote_id,
+      winston_credit_amount,
+    } = paymentReceiptDbResults[0];
+
+    expect(payment_amount).to.equal("10100");
+    expect(currency_type).to.equal("usd");
+    expect(destination_address).to.equal(
+      "1234567890123456789012345678901231234567890"
+    );
+    expect(destination_address_type).to.equal("arweave");
+    expect(payment_provider).to.equal("stripe");
+    expect(payment_receipt_date).to.exist;
+    expect(payment_receipt_id).to.exist;
+    expect(top_up_quote_id).to.equal(paymentWithTaxTopUpQuoteId);
+    expect(winston_credit_amount).to.equal("1337");
+
+    expect(stripeRefundSpy.calledOnce).to.be.false;
   });
 });

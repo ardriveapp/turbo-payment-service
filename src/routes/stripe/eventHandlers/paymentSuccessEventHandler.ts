@@ -28,7 +28,6 @@ export async function handlePaymentSuccessEvent(
 
     logger.info("Creating payment receipt...", loggerObject);
 
-    // TODO: Return new balance and winston credited here for logging and metrics in PE-3562
     await paymentDatabase.createPaymentReceipt({
       paymentReceiptId,
       paymentAmount: pi.amount,
@@ -44,7 +43,19 @@ export async function handlePaymentSuccessEvent(
     logger.error("❌ Payment receipt creation has failed!", loggerObject);
     logger.error(error);
 
-    await refundPayment(stripe, pi.id, loggerObject);
+    if (
+      topUpQuoteId &&
+      (await paymentDatabase.checkForExistingPaymentByTopUpQuoteId(
+        topUpQuoteId
+      ))
+    ) {
+      logger.error(
+        "This top up quote ID exists in another state in the database!",
+        loggerObject
+      );
+    } else {
+      await refundPayment(stripe, pi.id, loggerObject);
+    }
   }
 }
 

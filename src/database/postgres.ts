@@ -17,6 +17,7 @@ import {
   CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
+  FailedTopUpQuoteDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
   PromotionalInfo,
@@ -99,7 +100,7 @@ export class PostgresDatabase implements Database {
 
   public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {
     const promoInfo = (await this.getUser(userAddress)).promotionalInfo;
-    logger.info("promo info:", { type: typeof promoInfo, promoInfo });
+    this.log.info("promo info:", { type: typeof promoInfo, promoInfo });
     return promoInfo;
   }
 
@@ -161,7 +162,7 @@ export class PostgresDatabase implements Database {
         );
       }
 
-      if (+payment_amount !== paymentAmount || currencyType !== currency_type) {
+      if (paymentAmount < +payment_amount || currencyType !== currency_type) {
         throw Error(
           `Amount from top up quote (${payment_amount} ${currency_type}) does not match the amount paid on the payment receipt (${paymentAmount} ${currencyType})!`
         );
@@ -188,7 +189,11 @@ export class PostgresDatabase implements Database {
         })
       )[0];
       if (destinationUser === undefined) {
-        // No user exists, create new user with balance
+        this.log.info("No existing user was found; creating new user...", {
+          userAddress: destination_address,
+          newBalance: winston_credit_amount,
+          paymentReceipt,
+        });
         await knexTransaction<UserDBResult>(tableNames.user).insert({
           user_address: destination_address,
           user_address_type: destination_address_type,
@@ -202,6 +207,13 @@ export class PostgresDatabase implements Database {
         const newBalance = currentBalance.plus(
           new Winston(winston_credit_amount)
         );
+
+        this.log.info("Incrementing balance...", {
+          userAddress: destination_address,
+          currentBalance,
+          newBalance,
+          paymentReceipt,
+        });
         await knexTransaction<UserDBResult>(tableNames.user)
           .where({
             user_address: destination_address,
@@ -365,6 +377,36 @@ export class PostgresDatabase implements Database {
           user_address: userAddress,
         })
         .update({ winston_credit_balance: newBalance.toString() });
+    });
+  }
+
+  public async checkForExistingPaymentByTopUpQuoteId(
+    top_up_quote_id: string
+  ): Promise<boolean> {
+    return this.knex.transaction(async (knexTransaction) => {
+      const [
+        paymentReceiptResult,
+        chargebackReceiptResult,
+        failedTopUpQuoteReceiptResult,
+      ] = await Promise.all([
+        knexTransaction<PaymentReceiptDBResult>(
+          tableNames.paymentReceipt
+        ).where({ top_up_quote_id }),
+        knexTransaction<ChargebackReceiptDBResult>(
+          tableNames.chargebackReceipt
+        ).where({
+          top_up_quote_id,
+        }),
+        knexTransaction<FailedTopUpQuoteDBResult>(
+          tableNames.failedTopUpQuote
+        ).where({ top_up_quote_id }),
+      ]);
+      return (
+        !!paymentReceiptResult.length ||
+        !!chargebackReceiptResult.length ||
+        !!failedTopUpQuoteReceiptResult.length ||
+        false
+      );
     });
   }
 }

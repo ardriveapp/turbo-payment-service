@@ -5,15 +5,23 @@
   "editor.formatOnSaveMode": "file",
   "typescript.preferences.importModuleSpecifier": "relative",
   "cSpell.words": [
+    "abcdefghijklmnopqrxtuvwxyz",
+    "alexsasharegan",
     "ario",
     "bignumber",
+    "capturable",
     "chargeback",
     "Hodler",
     "knexfile",
+    "livemode",
     "nvmrc",
+    "openapi",
     "Readables",
     "sats",
+    "sslmode",
+    "trivago",
     "typecheck",
+    "uncategorized",
     "winstons"
   ],
   "search.exclude": {

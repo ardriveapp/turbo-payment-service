@@ -58,18 +58,18 @@ describe("Payment class", () => {
         "The provided payment amount (123456789.456123) is invalid; it must be a positive non-decimal integer!"
       );
       expect(
-        () => new Payment({ amount: Number.MAX_SAFE_INTEGER + 1, type: "clp" })
+        () => new Payment({ amount: Number.MAX_SAFE_INTEGER + 1, type: "aud" })
       ).to.throw(
         InvalidPaymentAmount,
         "The provided payment amount (9007199254740992) is invalid; it must be a positive non-decimal integer!"
       );
       expect(
-        () => new Payment({ amount: Number.POSITIVE_INFINITY, type: "vnd" })
+        () => new Payment({ amount: Number.POSITIVE_INFINITY, type: "sgd" })
       ).to.throw(
         InvalidPaymentAmount,
         "The provided payment amount (Infinity) is invalid; it must be a positive non-decimal integer!"
       );
-      expect(() => new Payment({ amount: NaN, type: "krw" })).to.throw(
+      expect(() => new Payment({ amount: NaN, type: "inr" })).to.throw(
         InvalidPaymentAmount,
         "The provided payment amount (NaN) is invalid; it must be a positive non-decimal integer!"
       );

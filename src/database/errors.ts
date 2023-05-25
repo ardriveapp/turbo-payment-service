@@ -1,3 +1,4 @@
+import { Payment } from "../types/payment";
 import { CurrencyType, PaymentAmount, UserAddress } from "./dbTypes";
 
 export class UserNotFoundWarning extends Error {
@@ -14,7 +15,9 @@ export class InsufficientBalance extends Error {
   }
 }
 
-export class UnsupportedCurrencyType extends Error {
+export abstract class PaymentValidationError extends Error {}
+
+export class UnsupportedCurrencyType extends PaymentValidationError {
   constructor(currencyType: CurrencyType) {
     super(
       `The currency type '${currencyType}' is currently not supported by this API!`
@@ -23,7 +26,7 @@ export class UnsupportedCurrencyType extends Error {
   }
 }
 
-export class InvalidPaymentAmount extends Error {
+export class InvalidPaymentAmount extends PaymentValidationError {
   constructor(paymentAmount: PaymentAmount) {
     super(
       `The provided payment amount (${paymentAmount}) is invalid; it must be a positive non-decimal integer!`
@@ -32,6 +35,20 @@ export class InvalidPaymentAmount extends Error {
   }
 }
 
-export type PaymentValidationErrors =
-  | UnsupportedCurrencyType
-  | InvalidPaymentAmount;
+export class PaymentAmountTooSmall extends PaymentValidationError {
+  constructor(payment: Payment, minimumAllowedAmount: PaymentAmount) {
+    super(
+      `The provided payment amount (${payment.amount}) is too small for the currency type "${payment.type}"; it must be above ${minimumAllowedAmount}!`
+    );
+    this.name = "PaymentAmountTooSmall";
+  }
+}
+
+export class PaymentAmountTooLarge extends PaymentValidationError {
+  constructor(payment: Payment, maximumAllowedAmount: PaymentAmount) {
+    super(
+      `The provided payment amount (${payment.amount}) is too large for the currency type "${payment.type}"; it must be below or equal to ${maximumAllowedAmount}!`
+    );
+    this.name = "PaymentAmountTooLarge";
+  }
+}

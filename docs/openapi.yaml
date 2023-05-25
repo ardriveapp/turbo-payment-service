@@ -1,0 +1,317 @@
+openapi: 3.0.0
+info:
+  title: Payment Service
+  version: 0.1.0
+
+servers:
+  - url: /v1
+
+components:
+  schemas:
+    ByteCount:
+      type: integer
+      description: A positive integer representing a byte count of data items
+      pattern: "^[0-9]+$"
+      example: 5242880
+
+    BaseCredits:
+      type: string
+      description: A big number string representing an amount of base credits. One credit is equivalent to 1,000,000,000,000 base credits
+      example: "332824926"
+
+    CurrencyType:
+      type: string
+      description: Currency type for a given payment amount
+      example: usd
+
+    PaymentAmount:
+      type: integer
+      description: Payment amount in a given currency's smallest unit value. For example, $10 USD is 1000
+      example: 1000
+
+    SignatureHeader:
+      type: string
+      description: The signature value derived from signing the request's data concatenated with the provided nonce using the private key from the provided public key
+
+    NonceHeader:
+      type: string
+      description: The nonce value concatenated with the request's data when deriving the provided the signature
+
+    PublicKeyHeader:
+      type: string
+      description: The public key from the private key used to derive the provided signature
+
+    TopUpQuote:
+      type: object
+      description: A copy of the top up quote that was saved to the service's database
+      properties:
+        topUpQuoteId:
+          type: string
+          example: caa8b54a-eb5e-4134-8ae2-a3946a428ec7
+        destinationAddress:
+          type: string
+          example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+        destinationAddressType:
+          type: string
+          example: arweave
+        paymentAmount:
+          type: integer
+          example: 1000
+        currencyType:
+          type: string
+          example: usd
+        winstonCreditAmount:
+          type: string
+          example: 1000000000
+        quoteExpirationDate:
+          type: string
+          example: 2023-05-17T21:46:38.404Z
+        paymentProvider:
+          type: string
+          example: stripe
+
+    PaymentSession:
+      type: object
+      description: The full payment-intent or checkout-session from a payment provider
+      properties:
+        id:
+          type: string
+          description: The payment provider's given ID for this payment intent # cspell:disable
+          example: cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy # cspell:enable
+        client_secret:
+          type: string
+          description: Available on the payment-intent top up flow, this is the client secret that must be provided in order to confirm the payment intent with a payment method # cspell:disable
+          example: cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl # cspell:enable
+        url:
+          type: string
+          description: Available on a checkout-session top up flow, this is the URL in which to fulfill the quote
+          example: https://checkout.stripe.com/c/pay/cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl
+
+paths:
+  # Credits Price for ByteCount of Data Items
+  /price/bytes/{byteCount}:
+    get:
+      summary: Get Amount of Credits for Byte Count
+      description: Returns the current amount of base credits it will cost to upload a given byte count worth of data items
+
+      parameters:
+        - name: byteCount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/ByteCount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                "$ref": "#/components/schemas/BaseCredits"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Invalid byte count"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Pricing Oracle Unavailable"
+
+  # Credits for payment endpoint
+  /price/{type}/{amount}:
+    get:
+      summary: Get Credits for Payment Type and Amount
+      description: Returns the current amount of base credits this service will quote for a given payment type and amount
+
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/CurrencyType"
+        - name: amount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/PaymentAmount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                "$ref": "#/components/schemas/BaseCredits"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Payment Amount is Invalid"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Fiat Oracle Unavailable"
+
+  # Balance endpoint
+  /balance:
+    parameters:
+      - name: x-signature
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/SignatureHeader"
+
+      - name: x-nonce
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/NonceHeader"
+
+      - name: x-public-key
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/PublicKeyHeader"
+
+    get:
+      summary: Get Current Balance of Credits
+      description: Use a signed request or a previously obtained JWT to get the the signing wallet's current service balance in base credits
+
+      responses:
+        "200":
+          description: OK
+          content:
+            text/plain:
+              schema:
+                "$ref": "#/components/schemas/BaseCredits"
+
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Invalid signature or missing required headers"
+
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "User Not Found"
+
+        "503":
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Cloud Database Unavailable"
+
+  /top-up/{method}/{address}/{currency}/{amount}:
+    get:
+      summary: Get Top Up Quote for Credits
+      description: Get a top up quote and payment session for a given method (payment-intent or checkout-session), destination address, currency type, and payment amount
+
+      parameters:
+        - name: method
+          in: path
+          required: true
+          schema:
+            type: string
+            example: checkout-session
+
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Destination wallet address
+
+        - name: currency
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/CurrencyType"
+
+        - name: amount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/PaymentAmount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paymentSession:
+                    allOf:
+                      - "$ref": "#/components/schemas/PaymentSession"
+                  topUpQuote:
+                    allOf:
+                      - "$ref": "#/components/schemas/TopUpQuote"
+
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Destination address is not a valid Arweave native address!"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Payment Amount is Invalid!"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Fiat Oracle Unavailable"
+
+  /currencies:
+    get:
+      summary: Get Supported Currencies
+      description: Returns the current list of currency types supported by this service
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supportedCurrencies:
+                    type: array
+                    example: ["usd", "jpy"]
+                    items:
+                      type: string

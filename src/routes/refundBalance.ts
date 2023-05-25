@@ -1,18 +1,18 @@
 import { Next } from "koa";
 
 import { UserNotFoundWarning } from "../database/errors";
-import logger from "../logger";
 import { KoaContext } from "../server";
 import { Winston } from "../types/winston";
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
-  logger.child({ path: ctx.path });
+  const logger = ctx.state.logger;
 
   const { paymentDatabase } = ctx.state;
 
   if (!ctx.request.headers.authorization || !ctx.state.user) {
     ctx.response.status = 401;
     ctx.body = "Unauthorized";
+    logger.error("GET Refund balance route with no AUTHORIZATION!");
     return next;
   }
 
@@ -22,6 +22,9 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
   if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
     ctx.response.status = 403;
     ctx.body = "Missing parameters";
+    logger.error("GET Refund balance route with missing parameters!", {
+      params: ctx.params,
+    });
     return next;
   } else {
     try {
@@ -30,6 +33,9 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     } catch (error) {
       ctx.response.status = 403;
       ctx.body = "Invalid parameters";
+      logger.error("GET Refund balance route with invalid parameters!", {
+        params: ctx.params,
+      });
       return next;
     }
   }
@@ -54,6 +60,10 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     if (error instanceof UserNotFoundWarning) {
       ctx.response.status = 403;
       ctx.response.message = "User not found";
+      logger.info(error.message, {
+        walletAddressToRefund,
+        winstonCreditsToRefund,
+      });
       return next;
     }
     ctx.response.status = 502;

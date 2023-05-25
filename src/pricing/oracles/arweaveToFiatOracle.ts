@@ -1,43 +1,58 @@
-import { AxiosInstance } from "axios";
-
-import {
-  CreateAxiosInstanceParams,
-  createAxiosInstance,
-} from "../../axiosClient";
+import { createAxiosInstance } from "../../axiosClient";
 import { CacheParams } from "../../cache/promiseCache";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
+import { supportedPaymentCurrencyTypes } from "../../types/supportedCurrencies";
+
+interface CoinGeckoResponse {
+  [currencyType: string]: number;
+}
+
+const coinGeckoUrl =
+  process.env.COINGECKO_API_URL ?? "https://api.coingecko.com/api/v3/";
+
+/** Type guard thats checks that each supported payment currency type exists on response */
+function isCoinGeckoResponse(response: unknown): response is CoinGeckoResponse {
+  for (const curr of supportedPaymentCurrencyTypes) {
+    if (typeof (response as CoinGeckoResponse)[curr] !== "number") {
+      return false;
+    }
+  }
+  return true;
+}
 
 export interface ArweaveToFiatOracle {
-  getFiatPriceForOneAR: (fiat: string) => Promise<number>;
+  getFiatPricesForOneAR: () => Promise<CoinGeckoResponse>;
 }
 
 export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
-  private readonly axiosInstance: AxiosInstance;
+  constructor(private readonly axiosInstance = createAxiosInstance({})) {}
 
-  constructor(axiosInstanceParams?: CreateAxiosInstanceParams) {
-    this.axiosInstance = createAxiosInstance(axiosInstanceParams ?? {});
-  }
+  public async getFiatPricesForOneAR(): Promise<CoinGeckoResponse> {
+    const currencyTypesString = supportedPaymentCurrencyTypes
+      .toString()
+      .replace("'", "");
 
-  async getFiatPriceForOneAR(fiat: string): Promise<number> {
-    fiat = fiat.toLowerCase();
-
-    const url = `https://api.coingecko.com/api/v3/simple/price?ids=arweave&vs_currencies=${fiat}`;
-    logger.info(`Getting AR price in ${fiat} from Coingecko API URL: ${url}`);
-
+    const url = `${coinGeckoUrl}simple/price?ids=arweave&vs_currencies=${currencyTypesString}`;
     try {
-      const result = await this.axiosInstance.get(url);
-      if (result.data.arweave[fiat]) {
-        const fiatPriceOfOneAR = result.data.arweave[fiat];
-        return Number(fiatPriceOfOneAR);
-      } else {
-        throw new Error(result.data);
+      logger.info(`Getting AR prices from Coingecko`, { url });
+      const { data } = await this.axiosInstance.get(url);
+
+      const coinGeckoResponse = data.arweave;
+
+      if (!isCoinGeckoResponse(coinGeckoResponse)) {
+        const errorMsg = "Unexpected response shape from coin gecko!";
+        logger.error(errorMsg, {
+          responseData: data,
+          url,
+        });
+        throw Error(errorMsg);
       }
+
+      return coinGeckoResponse;
     } catch (error) {
-      logger.error(
-        `Error getting AR price in ${fiat} from Coingecko API URL: ${url}`,
-        error
-      );
+      logger.error(`Error getting AR price in from Coingecko`, { url });
+      logger.error(error);
       throw error;
     }
   }
@@ -46,14 +61,9 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
 export class ReadThroughArweaveToFiatOracle {
   private readonly oracle: ArweaveToFiatOracle;
   private readonly readThroughPromiseCache: ReadThroughPromiseCache<
-    string,
-    number
+    "arweave",
+    CoinGeckoResponse
   >;
-
-  private getFiatPriceForOneARFromOracle = async (fiat: string) => {
-    //TODO Get from elasticache first
-    return this.oracle.getFiatPriceForOneAR(fiat);
-  };
 
   constructor({
     oracle,
@@ -65,12 +75,14 @@ export class ReadThroughArweaveToFiatOracle {
     this.oracle = oracle ?? new CoingeckoArweaveToFiatOracle();
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
       cacheParams: cacheParams ?? { cacheCapacity: 10 },
-      readThroughFunction: this.getFiatPriceForOneARFromOracle,
+      readThroughFunction: () =>
+        // TODO: Get from service level cache before oracle (elasticache)
+        this.oracle.getFiatPricesForOneAR(),
     });
   }
 
   async getFiatPriceForOneAR(fiat: string): Promise<number> {
-    const cachedValue = this.readThroughPromiseCache.get(fiat);
-    return cachedValue;
+    const cachedValue = await this.readThroughPromiseCache.get("arweave");
+    return cachedValue[fiat];
   }
 }
