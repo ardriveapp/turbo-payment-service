@@ -67,23 +67,6 @@ export class TurboPricingService implements PricingService {
     return this.countDigits(amount) <= maxStripeDigits;
   }
 
-  private roundToPosition(
-    value: number,
-    roundingMode: "CEIL" | "FLOOR" | "ROUND" = "ROUND"
-  ): number {
-    const multiplier = Math.pow(10, this.countDigits(value) - 2);
-
-    switch (roundingMode) {
-      case "CEIL":
-        return Math.ceil(value / multiplier) * multiplier;
-      case "FLOOR":
-        return Math.floor(value / multiplier) * multiplier;
-      case "ROUND":
-      default:
-        return Math.round(value / multiplier) * multiplier;
-    }
-  }
-
   private async getDynamicCurrencyLimitation(
     curr: string,
     {
@@ -104,15 +87,19 @@ export class TurboPricingService implements PricingService {
           : usdPriceOfOneAR)) *
       currencyPriceOfOneAr;
 
-    const dynamicMinimum = this.roundToPosition(
-      convertFromUSDLimit(paymentAmountLimits.usd.minimumPaymentAmount),
-      "CEIL"
-    );
+    const multiplier = (val: number) => Math.pow(10, this.countDigits(val) - 2);
 
-    const dynamicMaximum = this.roundToPosition(
-      convertFromUSDLimit(paymentAmountLimits.usd.maximumPaymentAmount),
-      "FLOOR"
+    const rawMin = convertFromUSDLimit(
+      paymentAmountLimits.usd.minimumPaymentAmount
     );
+    const dynamicMinimum =
+      Math.ceil(rawMin / multiplier(rawMin)) * multiplier(rawMin);
+
+    const rawMax = convertFromUSDLimit(
+      paymentAmountLimits.usd.maximumPaymentAmount
+    );
+    const dynamicMaximum =
+      Math.floor(rawMax / multiplier(rawMax)) * multiplier(rawMax);
 
     const minimumPaymentAmount = this.isWithinTenPercent(
       dynamicMinimum,
@@ -132,8 +119,10 @@ export class TurboPricingService implements PricingService {
 
     const dynamicSuggested = [
       minimumPaymentAmount,
-      Math.round(minimumPaymentAmount * 2 * 100) / 100,
-      Math.round(minimumPaymentAmount * 4 * 100) / 100,
+      Math.round(minimumPaymentAmount * 2 * multiplier(minimumPaymentAmount)) /
+        multiplier(minimumPaymentAmount),
+      Math.round(minimumPaymentAmount * 4 * multiplier(minimumPaymentAmount)) /
+        multiplier(minimumPaymentAmount),
     ] as const;
 
     const suggestedPaymentAmounts = this.isBetweenRange(
