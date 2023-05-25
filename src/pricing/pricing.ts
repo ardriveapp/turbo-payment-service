@@ -50,7 +50,11 @@ export class TurboPricingService implements PricingService {
     return percentageDifference <= 10;
   }
 
-  private isBetweenRange(values: number[], min: number, max: number): boolean {
+  private isBetweenRange(
+    values: readonly [number, number, number],
+    min: number,
+    max: number
+  ): boolean {
     for (const val of values) {
       if (val < min && val > max) {
         return false;
@@ -115,8 +119,6 @@ export class TurboPricingService implements PricingService {
       "FLOOR"
     );
 
-    logger.debug("Dynamic Prices:", { curr, dynamicMinimum, dynamicMaximum });
-
     const minimumPaymentAmount = this.isWithinTenPercent(
       dynamicMinimum,
       currMin
@@ -133,17 +135,26 @@ export class TurboPricingService implements PricingService {
       ? dynamicMaximum
       : maxStripeAmount;
 
+    const dynamicSuggested = [
+      minimumPaymentAmount,
+      Math.round(minimumPaymentAmount * 2 * 100) / 100,
+      Math.round(minimumPaymentAmount * 4 * 100) / 100,
+    ] as const;
+
     const suggestedPaymentAmounts = this.isBetweenRange(
       currSuggested,
       minimumPaymentAmount,
       maximumPaymentAmount
     )
       ? currSuggested
-      : ([
-          minimumPaymentAmount,
-          Math.round(minimumPaymentAmount * 2 * 100) / 100,
-          Math.round(minimumPaymentAmount * 4 * 100) / 100,
-        ] as [number, number, number]);
+      : dynamicSuggested;
+
+    logger.debug("Dynamic Prices:", {
+      curr,
+      dynamicMinimum,
+      dynamicMaximum,
+      dynamicSuggested,
+    });
 
     return {
       maximumPaymentAmount,

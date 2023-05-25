@@ -79,7 +79,7 @@ export const paymentAmountLimits: CurrencyLimitations = {
 export interface CurrencyLimitation {
   minimumPaymentAmount: number;
   maximumPaymentAmount: number;
-  suggestedPaymentAmounts: [number, number, number];
+  suggestedPaymentAmounts: readonly [number, number, number];
 }
 
 export type CurrencyLimitations = Record<
