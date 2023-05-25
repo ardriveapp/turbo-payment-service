@@ -55,12 +55,7 @@ export class TurboPricingService implements PricingService {
     min: number,
     max: number
   ): boolean {
-    for (const val of values) {
-      if (val < min && val > max) {
-        return false;
-      }
-    }
-    return true;
+    return values.every((val) => val >= min && val <= max);
   }
 
   private countDigits(number: number): number {
