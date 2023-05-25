@@ -6,7 +6,10 @@ import {
 } from "../constants";
 import logger from "../logger";
 import { Payment } from "../types/payment";
-import { zeroDecimalCurrencyTypes } from "../types/supportedCurrencies";
+import {
+  SupportedPaymentCurrencyTypes,
+  zeroDecimalCurrencyTypes,
+} from "../types/supportedCurrencies";
 import { ByteCount, WC, Winston } from "../types/types";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
@@ -154,19 +157,20 @@ export class TurboPricingService implements PricingService {
       "usd"
     );
 
-    const limits: CurrencyLimitations = {};
+    const limits: Partial<CurrencyLimitations> = {};
 
     await Promise.all(
       Object.entries(paymentAmountLimits).map(async ([curr, currLimits]) => {
-        limits[curr] = await this.getDynamicCurrencyLimitation(
-          curr,
-          currLimits,
-          usdPriceOfOneAR
-        );
+        limits[curr as SupportedPaymentCurrencyTypes] =
+          await this.getDynamicCurrencyLimitation(
+            curr,
+            currLimits,
+            usdPriceOfOneAR
+          );
       })
     );
 
-    return limits;
+    return limits as CurrencyLimitations;
   }
 
   public async getWCForPayment(payment: Payment): Promise<Winston> {

@@ -1,3 +1,5 @@
+import { SupportedPaymentCurrencyTypes } from "./types/supportedCurrencies";
+
 export const isTestEnv = process.env.NODE_ENV === "test";
 
 const testEnvPort = 1235;
@@ -80,4 +82,7 @@ export interface CurrencyLimitation {
   suggestedPaymentAmounts: [number, number, number];
 }
 
-export type CurrencyLimitations = Record<string, CurrencyLimitation>;
+export type CurrencyLimitations = Record<
+  SupportedPaymentCurrencyTypes,
+  CurrencyLimitation
+>;
