@@ -14,10 +14,13 @@ components:
       pattern: "^[0-9]+$"
       example: 5242880
 
-    BaseCredits:
-      type: string
-      description: A big number string representing an amount of base credits. One credit is equivalent to 1,000,000,000,000 base credits
-      example: "332824926"
+    CreditResponse:
+      type: object
+      properties:
+        credits:
+          type: string
+          description: A big number string representing an amount of base credits. One credit is equivalent to 1,000,000,000,000 base credits
+          example: "332824926"
 
     CurrencyType:
       type: string
@@ -105,9 +108,9 @@ paths:
         "200":
           description: OK
           content:
-            text/plain:
+            application/json:
               schema:
-                "$ref": "#/components/schemas/BaseCredits"
+                "$ref": "#/components/schemas/CreditResponse"
 
         "400":
           description: Bad Request
@@ -147,9 +150,9 @@ paths:
         "200":
           description: OK
           content:
-            text/plain:
+            application/json:
               schema:
-                "$ref": "#/components/schemas/BaseCredits"
+                "$ref": "#/components/schemas/CreditResponse"
 
         "400":
           description: Bad Request
@@ -197,9 +200,9 @@ paths:
         "200":
           description: OK
           content:
-            text/plain:
+            application/json:
               schema:
-                "$ref": "#/components/schemas/BaseCredits"
+                "$ref": "#/components/schemas/CreditResponse"
 
         "403":
           description: Forbidden
