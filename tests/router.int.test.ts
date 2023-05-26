@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 import Arweave from "arweave/node/common";
 import axiosPackage from "axios";
-import MockAdapter from "axios-mock-adapter";
 import { expect } from "chai";
 import { Server } from "http";
 import { sign } from "jsonwebtoken";
@@ -63,7 +62,6 @@ describe("Router tests", () => {
 
   let stripe: Stripe;
 
-  let mock: MockAdapter;
   before(async () => {
     await loadSecretsToEnv();
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -73,16 +71,8 @@ describe("Router tests", () => {
     server = await createServer({ pricingService, paymentDatabase, stripe });
   });
 
-  beforeEach(() => {
-    mock = new MockAdapter(axios, { onNoMatch: "passthrough" });
-  });
-
   after(() => {
     closeServer();
-  });
-
-  afterEach(() => {
-    mock.restore();
   });
 
   it("GET /health returns 'OK' in the body, a 200 status, and the correct content-length", async () => {
@@ -97,16 +87,15 @@ describe("Router tests", () => {
   });
 
   it("GET /price/bytes", async () => {
-    mock.onGet("arweave.net/price/1024").reply(200, "100");
+    stub(pricingService, "getWCForBytes").resolves(new Winston("1234567890"));
 
     const { status, statusText, data } = await axios.get(
       `/v1/price/bytes/1024`
     );
-    const arcPrice = Number(data);
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(arcPrice).to.be.a("number");
+    expect(+new Winston(data.credits)).to.equal(1234567890);
   });
 
   it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
@@ -162,7 +151,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data)).to.equal(1139601139601);
+    expect(+new Winston(data.credits)).to.equal(1139601139601);
   });
 
   it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
@@ -207,7 +196,7 @@ describe("Router tests", () => {
       headers: await signedRequestHeadersFromJwk(testWallet, "123"),
     });
 
-    const balance = Number(data);
+    const balance = Number(data.credits);
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
