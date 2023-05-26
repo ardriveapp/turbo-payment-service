@@ -33,7 +33,7 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
       winstonCreditAmount,
     });
 
-    ctx.body = winstonCreditAmount;
+    ctx.body = { credits: winstonCreditAmount.toString() };
     ctx.response.status = 200;
   } catch (error: unknown) {
     if (
