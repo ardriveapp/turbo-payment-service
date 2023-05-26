@@ -101,11 +101,10 @@ describe("Router tests", () => {
     const { status, statusText, data } = await axios.get(
       `/v1/price/bytes/1024`
     );
-    const arcPrice = Number(data);
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(arcPrice).to.be.a("number");
+    expect(+new Winston(data.credits)).to.equal(196048453);
   });
 
   it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
@@ -161,7 +160,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data)).to.equal(1139601139601);
+    expect(+new Winston(data.credits)).to.equal(1139601139601);
   });
 
   it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
@@ -206,7 +205,7 @@ describe("Router tests", () => {
       headers: await signedRequestHeadersFromJwk(testWallet, "123"),
     });
 
-    const balance = Number(data);
+    const balance = Number(data.credits);
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
