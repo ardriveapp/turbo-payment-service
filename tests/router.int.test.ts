@@ -87,9 +87,7 @@ describe("Router tests", () => {
   });
 
   it("GET /price/bytes", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
+    stub(pricingService, "getWCForBytes").resolves(new Winston("1234567890"));
 
     const { status, statusText, data } = await axios.get(
       `/v1/price/bytes/1024`
@@ -97,7 +95,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data.credits)).to.equal(196162899);
+    expect(+new Winston(data.credits)).to.equal(1234567890);
   });
 
   it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
