@@ -17,9 +17,9 @@ components:
     CreditResponse:
       type: object
       properties:
-        credits:
+        winc:
           type: string
-          description: A big number string representing an amount of base credits. One credit is equivalent to 1,000,000,000,000 base credits
+          description: A big number string representing an amount of credits in winc. One credit is equivalent to 1,000,000,000,000 winc
           example: "332824926"
 
     CurrencyType:
@@ -91,11 +91,11 @@ components:
           example: https://checkout.stripe.com/c/pay/cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl
 
 paths:
-  # Credits Price for ByteCount of Data Items
+  # winc Price for ByteCount of Data Items
   /price/bytes/{byteCount}:
     get:
-      summary: Get Amount of Credits for Byte Count
-      description: Returns the current amount of base credits it will cost to upload a given byte count worth of data items
+      summary: Get Amount of Credits in winc for Byte Count
+      description: Returns the current amount of winc it will cost to upload a given byte count worth of data items
 
       parameters:
         - name: byteCount
@@ -128,11 +128,11 @@ paths:
                 type: string
                 default: "Pricing Oracle Unavailable"
 
-  # Credits for payment endpoint
+  # winc for payment endpoint
   /price/{type}/{amount}:
     get:
-      summary: Get Credits for Payment Type and Amount
-      description: Returns the current amount of base credits this service will quote for a given payment type and amount
+      summary: Get winc for Payment Type and Amount
+      description: Returns the current amount of winc this service will quote for a given payment type and amount
 
       parameters:
         - name: type
@@ -193,8 +193,8 @@ paths:
           "$ref": "#/components/schemas/PublicKeyHeader"
 
     get:
-      summary: Get Current Balance of Credits
-      description: Use a signed request or a previously obtained JWT to get the the signing wallet's current service balance in base credits
+      summary: Get Current Balance of winc
+      description: Use a signed request or a previously obtained JWT to get the the signing wallet's current service balance in winc
 
       responses:
         "200":

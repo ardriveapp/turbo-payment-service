@@ -95,7 +95,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data.credits)).to.equal(1234567890);
+    expect(+new Winston(data.winc)).to.equal(1234567890);
   });
 
   it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
@@ -151,7 +151,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data.credits)).to.equal(1139601139601);
+    expect(+new Winston(data.winc)).to.equal(1139601139601);
   });
 
   it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
@@ -196,7 +196,7 @@ describe("Router tests", () => {
       headers: await signedRequestHeadersFromJwk(testWallet, "123"),
     });
 
-    const balance = Number(data.credits);
+    const balance = Number(data.winc);
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
