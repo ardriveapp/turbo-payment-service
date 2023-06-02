@@ -8,8 +8,18 @@ export async function currenciesRoute(ctx: KoaContext, next: Next) {
 
   logger.info("Currencies requested");
 
-  ctx.body = { supportedCurrencies: supportedPaymentCurrencyTypes };
-  ctx.status = 200;
+  try {
+    const limits = await ctx.state.pricingService.getCurrencyLimitations();
+
+    ctx.body = {
+      supportedCurrencies: supportedPaymentCurrencyTypes,
+      limits,
+    };
+    ctx.status = 200;
+  } catch (error) {
+    ctx.body = "Fiat Oracle Unavailable";
+    ctx.status = 502;
+  }
 
   return next;
 }
