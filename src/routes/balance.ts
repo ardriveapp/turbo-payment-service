@@ -19,7 +19,7 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
 
   try {
     const balance = await paymentDatabase.getBalance(walletAddress);
-    ctx.body = balance.toString();
+    ctx.body = { winc: balance.toString() };
     logger.info("Balance found!", { balance, walletAddress });
   } catch (error) {
     if (error instanceof UserNotFoundWarning) {
