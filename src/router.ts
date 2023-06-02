@@ -2,7 +2,7 @@ import { Next } from "koa";
 import Router from "koa-router";
 import * as promClient from "prom-client";
 
-import { verifySignature } from "./middleware/verifySignature";
+import { verifySignature } from "./middleware";
 import { balanceRoute } from "./routes/balance";
 import { currenciesRoute } from "./routes/currencies";
 import { priceRoutes } from "./routes/priceRoutes";
