@@ -145,7 +145,7 @@ describe("Router tests", () => {
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave
     );
-    const { status, statusText, data } = await axios.get(`/v1/price/USD/1000`);
+    const { status, statusText, data } = await axios.get(`/v1/price/USD/100`);
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
