@@ -145,12 +145,12 @@ describe("Router tests", () => {
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave
     );
-    const { status, statusText, data } = await axios.get(`/v1/price/USD/1000`);
+    const { status, statusText, data } = await axios.get(`/v1/price/USD/100`);
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data.winc)).to.equal(1139601139601);
+    expect(+new Winston(data.winc)).to.equal(113960113960);
   });
 
   it("GET /price/:currency/:value returns 400 for invalid currency", async () => {

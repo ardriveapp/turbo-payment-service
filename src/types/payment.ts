@@ -1,6 +1,6 @@
 import BigNumber from "bignumber.js";
 
-import { CurrencyLimitations, paymentAmountLimits } from "../constants";
+import { CurrencyLimitations } from "../constants";
 import { CurrencyType, PaymentAmount } from "../database/dbTypes";
 import {
   InvalidPaymentAmount,
@@ -37,7 +37,7 @@ export class Payment {
   constructor({
     amount,
     type,
-    currencyLimitations = paymentAmountLimits,
+    currencyLimitations = undefined,
   }: PaymentConstructorParams) {
     amount = Number(amount);
     type = type.toLowerCase();
@@ -54,14 +54,16 @@ export class Payment {
       throw new InvalidPaymentAmount(amount);
     }
 
-    const maxAmountAllowed = currencyLimitations[type].maximumPaymentAmount;
-    if (amount > maxAmountAllowed) {
-      throw new PaymentAmountTooLarge(amount, type, maxAmountAllowed);
-    }
+    if (currencyLimitations) {
+      const maxAmountAllowed = currencyLimitations[type].maximumPaymentAmount;
+      if (amount > maxAmountAllowed) {
+        throw new PaymentAmountTooLarge(amount, type, maxAmountAllowed);
+      }
 
-    const minAmountAllowed = currencyLimitations[type].minimumPaymentAmount;
-    if (amount < minAmountAllowed) {
-      throw new PaymentAmountTooSmall(amount, type, minAmountAllowed);
+      const minAmountAllowed = currencyLimitations[type].minimumPaymentAmount;
+      if (amount < minAmountAllowed) {
+        throw new PaymentAmountTooSmall(amount, type, minAmountAllowed);
+      }
     }
 
     this.amount = amount;

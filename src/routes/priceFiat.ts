@@ -1,10 +1,6 @@
 import { Next } from "koa";
 
-import {
-  PaymentAmountTooLarge,
-  PaymentAmountTooSmall,
-  PaymentValidationError,
-} from "../database/errors";
+import { PaymentValidationError } from "../database/errors";
 import { KoaContext } from "../server";
 import { Payment } from "../types/payment";
 
@@ -35,18 +31,10 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
 
     ctx.body = { winc: winstonCreditAmount.toString() };
     ctx.response.status = 200;
-  } catch (error: unknown) {
-    if (
-      error instanceof PaymentAmountTooLarge ||
-      error instanceof PaymentAmountTooSmall
-    ) {
-      ctx.response.status = 400;
-      ctx.body = error.message;
-      logger.info(error.message);
-    } else {
-      ctx.response.status = 502;
-      ctx.body = "Fiat Oracle Unavailable";
-    }
+  } catch (error) {
+    logger.error("Failed to get price for payment!", { payment }, error);
+    ctx.response.status = 502;
+    ctx.body = "Fiat Oracle Unavailable";
   }
 
   return next;
