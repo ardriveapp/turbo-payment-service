@@ -1,5 +1,5 @@
 import cors from "@koa/cors";
-import Koa, { DefaultState, ParameterizedContext } from "koa";
+import Koa, { DefaultState, Next, ParameterizedContext } from "koa";
 import jwt from "koa-jwt";
 import Stripe from "stripe";
 import { Logger } from "winston";
@@ -9,7 +9,7 @@ import { TEST_PRIVATE_ROUTE_SECRET, defaultPort } from "./constants";
 import { PostgresDatabase } from "./database/postgres";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
-import { loggerMiddleware } from "./middleware/logger";
+import { architectureMiddleware, loggerMiddleware } from "./middleware";
 import { TurboPricingService } from "./pricing/pricing";
 import router from "./router";
 import { loadSecretsToEnv } from "./utils/loadSecretsToEnv";
@@ -55,21 +55,13 @@ export async function createServer(
   const stripe =
     arch.stripe ?? new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2022-11-15" });
 
-  function attachArchToKoaContext(ctx: KoaContext): void {
-    ctx.state.paymentDatabase = paymentDatabase;
-    ctx.state.pricingService = pricingService;
-    ctx.state.stripe = stripe;
-  }
-
-  app.use(async (ctx: KoaContext, next) => {
-    attachArchToKoaContext(ctx);
-
-    try {
-      await next();
-    } catch (err) {
-      logger.error(err);
-    }
-  });
+  app.use((ctx: KoaContext, next: Next) =>
+    architectureMiddleware(ctx, next, {
+      pricingService,
+      paymentDatabase,
+      stripe,
+    })
+  );
 
   app.use(router.routes());
 
