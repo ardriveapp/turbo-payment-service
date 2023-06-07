@@ -1,7 +1,11 @@
 import { Next } from "koa";
 
 import { KoaContext } from "../server";
-import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
+import {
+  SupportedPaymentCurrencyTypes,
+  supportedPaymentCurrencyTypes,
+  zeroDecimalCurrencyTypes,
+} from "../types/supportedCurrencies";
 
 export async function currenciesRoute(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
@@ -10,6 +14,11 @@ export async function currenciesRoute(ctx: KoaContext, next: Next) {
 
   try {
     const limits = await ctx.state.pricingService.getCurrencyLimitations();
+
+    for (const currency in limits) {
+      limits[currency as SupportedPaymentCurrencyTypes].zeroDecimalCurrency =
+        zeroDecimalCurrencyTypes.includes(currency);
+    }
 
     ctx.body = {
       supportedCurrencies: supportedPaymentCurrencyTypes,

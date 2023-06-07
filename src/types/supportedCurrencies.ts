@@ -1,15 +1,15 @@
 // We will support these currencies on MVP
 export const supportedPaymentCurrencyTypes = [
-  "usd",
-  "brl",
-  "hkd",
-  "jpy",
-  "cad",
-  "gbp",
-  "eur",
-  "sgd",
   "aud",
+  "brl",
+  "cad",
+  "eur",
+  "gbp",
+  "hkd",
   "inr",
+  "jpy",
+  "sgd",
+  "usd",
 ] as const;
 export type SupportedPaymentCurrencyTypes =
   (typeof supportedPaymentCurrencyTypes)[number];
