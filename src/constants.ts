@@ -77,11 +77,19 @@ export const paymentAmountLimits: CurrencyLimitations = {
   },
 };
 export interface CurrencyLimitation {
-  zeroDecimalCurrency?: boolean;
   minimumPaymentAmount: number;
   maximumPaymentAmount: number;
   suggestedPaymentAmounts: readonly [number, number, number];
 }
+
+export interface ExposedCurrencyLimitation extends CurrencyLimitation {
+  zeroDecimalCurrency?: boolean;
+}
+
+export type ExposedCurrencyLimitations = Record<
+  SupportedPaymentCurrencyTypes,
+  ExposedCurrencyLimitation
+>;
 
 export type CurrencyLimitations = Record<
   SupportedPaymentCurrencyTypes,
