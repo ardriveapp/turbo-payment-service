@@ -14,17 +14,23 @@ export async function currenciesRoute(ctx: KoaContext, next: Next) {
   logger.info("Currencies requested");
 
   try {
-    const limits: ExposedCurrencyLimitations =
-      await ctx.state.pricingService.getCurrencyLimitations();
+    const limits = await ctx.state.pricingService.getCurrencyLimitations();
 
-    for (const currency in limits) {
-      limits[currency as SupportedPaymentCurrencyTypes].zeroDecimalCurrency =
-        zeroDecimalCurrencyTypes.includes(currency);
-    }
+    const exposedLimits: ExposedCurrencyLimitations = Object.entries(
+      limits
+    ).reduce((acc, [curr, limitation]) => {
+      acc[curr as SupportedPaymentCurrencyTypes] = {
+        ...limitation,
+        zeroDecimalCurrency: zeroDecimalCurrencyTypes.includes(
+          curr as SupportedPaymentCurrencyTypes
+        ),
+      };
+      return acc;
+    }, {} as ExposedCurrencyLimitations);
 
     ctx.body = {
       supportedCurrencies: supportedPaymentCurrencyTypes,
-      limits,
+      limits: exposedLimits,
     };
     ctx.status = 200;
   } catch (error) {

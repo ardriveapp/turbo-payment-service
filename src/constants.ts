@@ -83,7 +83,7 @@ export interface CurrencyLimitation {
 }
 
 export interface ExposedCurrencyLimitation extends CurrencyLimitation {
-  zeroDecimalCurrency?: boolean;
+  zeroDecimalCurrency: boolean;
 }
 
 export type ExposedCurrencyLimitations = Record<
