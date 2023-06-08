@@ -25,29 +25,24 @@ export const electronicallySuppliedServicesTaxCode = "txcd_10000000"; //cspell:d
 
 /** Min, maximumPaymentAmount, and suggestedPaymentAmountsested payment amounts for the payment service */
 export const paymentAmountLimits: CurrencyLimitations = {
-  usd: {
-    minimumPaymentAmount: 10_00,
-    maximumPaymentAmount: 10_000_00,
-    suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+  aud: {
+    minimumPaymentAmount: 15_00,
+    maximumPaymentAmount: 15_000_00,
+    suggestedPaymentAmounts: [25_00, 75_00, 150_00],
   },
   brl: {
     minimumPaymentAmount: 50_00,
     maximumPaymentAmount: 50_000_00,
     suggestedPaymentAmounts: [125_00, 250_00, 500_00],
   },
-  hkd: {
-    minimumPaymentAmount: 100_00,
-    maximumPaymentAmount: 100_000_00,
-    suggestedPaymentAmounts: [200_00, 400_00, 800_00],
-  },
-  jpy: {
-    minimumPaymentAmount: 1_500,
-    maximumPaymentAmount: 1_500_000,
-    suggestedPaymentAmounts: [3_500, 6_500, 15_000],
-  },
   cad: {
     minimumPaymentAmount: 10_00,
     maximumPaymentAmount: 15_000_00,
+    suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+  },
+  eur: {
+    minimumPaymentAmount: 10_00,
+    maximumPaymentAmount: 10_000_00,
     suggestedPaymentAmounts: [25_00, 50_00, 100_00],
   },
   gbp: {
@@ -55,25 +50,30 @@ export const paymentAmountLimits: CurrencyLimitations = {
     maximumPaymentAmount: 10_000_00,
     suggestedPaymentAmounts: [20_00, 40_00, 80_00],
   },
-  eur: {
-    minimumPaymentAmount: 10_00,
-    maximumPaymentAmount: 10_000_00,
-    suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+  hkd: {
+    minimumPaymentAmount: 100_00,
+    maximumPaymentAmount: 100_000_00,
+    suggestedPaymentAmounts: [200_00, 400_00, 800_00],
+  },
+  inr: {
+    minimumPaymentAmount: 1000_00,
+    maximumPaymentAmount: 900_000_00,
+    suggestedPaymentAmounts: [2000_00, 4000_00, 8000_00],
+  },
+  jpy: {
+    minimumPaymentAmount: 1_500,
+    maximumPaymentAmount: 1_500_000,
+    suggestedPaymentAmounts: [3_500, 6_500, 15_000],
   },
   sgd: {
     minimumPaymentAmount: 15_00,
     maximumPaymentAmount: 15_000_00,
     suggestedPaymentAmounts: [25_00, 75_00, 150_00],
   },
-  aud: {
-    minimumPaymentAmount: 15_00,
-    maximumPaymentAmount: 15_000_00,
-    suggestedPaymentAmounts: [25_00, 75_00, 150_00],
-  },
-  inr: {
-    minimumPaymentAmount: 1000_00,
-    maximumPaymentAmount: 900_000_00,
-    suggestedPaymentAmounts: [2000_00, 4000_00, 8000_00],
+  usd: {
+    minimumPaymentAmount: 10_00,
+    maximumPaymentAmount: 10_000_00,
+    suggestedPaymentAmounts: [25_00, 50_00, 100_00],
   },
 };
 export interface CurrencyLimitation {
@@ -81,6 +81,15 @@ export interface CurrencyLimitation {
   maximumPaymentAmount: number;
   suggestedPaymentAmounts: readonly [number, number, number];
 }
+
+export interface ExposedCurrencyLimitation extends CurrencyLimitation {
+  zeroDecimalCurrency: boolean;
+}
+
+export type ExposedCurrencyLimitations = Record<
+  SupportedPaymentCurrencyTypes,
+  ExposedCurrencyLimitation
+>;
 
 export type CurrencyLimitations = Record<
   SupportedPaymentCurrencyTypes,
