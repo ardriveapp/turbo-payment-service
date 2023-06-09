@@ -9,6 +9,7 @@ import {
   topUpMethods,
 } from "../constants";
 import { PaymentValidationError } from "../database/errors";
+import { MetricRegistry } from "../metricRegistry";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
@@ -150,6 +151,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
   } catch (error) {
     ctx.response.status = 502;
     ctx.body = `Error creating stripe payment session with method: ${method}!`;
+    MetricRegistry.stripeSessionCreationErrorCounter.inc();
     logger.error(error);
     return next;
   }
