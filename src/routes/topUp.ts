@@ -82,8 +82,8 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
   const oneSecondMs = 1000;
   const oneMinuteMs = oneSecondMs * 60;
-  const fiveMinutesMs = oneMinuteMs * 5;
-  const fiveMinutesFromNow = new Date(Date.now() + fiveMinutesMs).toISOString();
+  const tenMinutesMs = oneMinuteMs * 10;
+  const tenMinutesFromNow = new Date(Date.now() + tenMinutesMs).toISOString();
 
   const topUpQuote = {
     topUpQuoteId: randomUUID(),
@@ -92,7 +92,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     winstonCreditAmount,
     destinationAddress,
     currencyType: payment.type,
-    quoteExpirationDate: fiveMinutesFromNow,
+    quoteExpirationDate: tenMinutesFromNow,
     paymentProvider: "stripe",
   };
   // Take all of topUpQuote to stripeMetadata except paymentProvider
