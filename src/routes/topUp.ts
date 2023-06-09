@@ -120,7 +120,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
         success_url: "https://app.ardrive.io",
         cancel_url: "https://app.ardrive.io",
         currency: payment.type,
-        automatic_tax: { enabled: true },
+        automatic_tax: {
+          enabled: !!process.env.ENABLE_AUTO_STRIPE_TAX || false,
+        },
         payment_method_types: ["card"],
         line_items: [
           {
