@@ -41,5 +41,15 @@ Developers can alternatively use `yarn start:watch` to run the app in developmen
 To build the container,
 
 ```shell
-docker build --build-arg NODE_VERSION=$(cat .nvmrc |cut -c2-8) .
+docker build --build-arg NODE_VERSION=$(cat .nvmrc |cut -c2-8) --build-arg NODE_VERSION_SHORT=$(cat .nvmrc |cut -c2-3) .
+```
+
+### Docker Compose
+
+Runs this service and a connected postgres database
+
+Steps:
+
+```shell
+docker compose up
 ```

@@ -1,0 +1,35 @@
+version: "3"
+
+services:
+  payment-service:
+    build:
+      context: .
+      args:
+        NODE_VERSION: ${NODE_VERSION:-18.16.0}
+        NODE_VERSION_SHORT: ${NODE_VERSION_SHORT:-18}
+    env_file: .env
+    environment:
+      NODE_ENV: ${NODE_ENV:-test}
+      DB_HOST: 127.0.0.1
+      DB_PORT: 5433
+      DB_PASSWORD: postgres
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+    ports:
+      - "1235:1235"
+    depends_on:
+      - payment-service-pg
+
+  payment-service-pg:
+    image: postgres:13.8
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - payment-service-data:/var/lib/postgresql/data
+
+volumes:
+  payment-service-data:

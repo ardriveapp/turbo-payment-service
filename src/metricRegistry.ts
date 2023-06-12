@@ -23,6 +23,11 @@ export class MetricRegistry {
     help: "payment_intent_succeeded",
   });
 
+  public static stripeSessionCreationErrorCounter = new promClient.Counter({
+    name: "stripe_session_creation_error",
+    help: "stripe_session_creation_error",
+  });
+
   public static uncaughtExceptionCounter = new promClient.Counter({
     name: "uncaught_exceptions_total",
     help: "Count of uncaught exceptions",
@@ -36,6 +41,9 @@ export class MetricRegistry {
     this.registry.registerMetric(MetricRegistry.paymentSuccessCounter);
     this.registry.registerMetric(MetricRegistry.topUpsCounter);
     this.registry.registerMetric(MetricRegistry.uncaughtExceptionCounter);
+    this.registry.registerMetric(
+      MetricRegistry.stripeSessionCreationErrorCounter
+    );
   }
 
   public static getInstance(): MetricRegistry {

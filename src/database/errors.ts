@@ -1,4 +1,3 @@
-import { Payment } from "../types/payment";
 import { CurrencyType, PaymentAmount, UserAddress } from "./dbTypes";
 
 export class UserNotFoundWarning extends Error {
@@ -36,18 +35,26 @@ export class InvalidPaymentAmount extends PaymentValidationError {
 }
 
 export class PaymentAmountTooSmall extends PaymentValidationError {
-  constructor(payment: Payment, minimumAllowedAmount: PaymentAmount) {
+  constructor(
+    paymentAmount: PaymentAmount,
+    currencyType: CurrencyType,
+    minimumAllowedAmount: PaymentAmount
+  ) {
     super(
-      `The provided payment amount (${payment.amount}) is too small for the currency type "${payment.type}"; it must be above ${minimumAllowedAmount}!`
+      `The provided payment amount (${paymentAmount}) is too small for the currency type "${currencyType}"; it must be above ${minimumAllowedAmount}!`
     );
     this.name = "PaymentAmountTooSmall";
   }
 }
 
 export class PaymentAmountTooLarge extends PaymentValidationError {
-  constructor(payment: Payment, maximumAllowedAmount: PaymentAmount) {
+  constructor(
+    paymentAmount: PaymentAmount,
+    currencyType: CurrencyType,
+    maximumAllowedAmount: PaymentAmount
+  ) {
     super(
-      `The provided payment amount (${payment.amount}) is too large for the currency type "${payment.type}"; it must be below or equal to ${maximumAllowedAmount}!`
+      `The provided payment amount (${paymentAmount}) is too large for the currency type "${currencyType}"; it must be below or equal to ${maximumAllowedAmount}!`
     );
     this.name = "PaymentAmountTooLarge";
   }

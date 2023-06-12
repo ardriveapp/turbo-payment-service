@@ -39,8 +39,6 @@ describe("ReadThroughArweaveToFiatOracle", () => {
 
       for (const curr of supportedPaymentCurrencyTypes) {
         const arPrice = await readThroughOracle.getFiatPriceForOneAR(curr);
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
         expect(arPrice).to.equal(expectedArPrices.arweave[curr]);
       }
     });

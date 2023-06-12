@@ -3,11 +3,13 @@ import { Next } from "koa";
 import Stripe from "stripe";
 
 import {
+  CurrencyLimitations,
   electronicallySuppliedServicesTaxCode,
   paymentIntentTopUpMethod,
   topUpMethods,
 } from "../constants";
 import { PaymentValidationError } from "../database/errors";
+import { MetricRegistry } from "../metricRegistry";
 import { KoaContext } from "../server";
 import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
@@ -36,14 +38,24 @@ export async function topUp(ctx: KoaContext, next: Next) {
     return next;
   }
 
+  let currencyLimitations: CurrencyLimitations;
+
+  try {
+    currencyLimitations = await pricingService.getCurrencyLimitations();
+  } catch (error) {
+    logger.error(error);
+    ctx.response.status = 502;
+    ctx.body = "Fiat Oracle Unavailable";
+    return next;
+  }
+
   let payment: Payment;
   try {
     payment = new Payment({
       amount,
       type: currency,
+      currencyLimitations,
     });
-
-    await pricingService.assertMinAndMaxPayment(payment);
   } catch (error) {
     if (error instanceof PaymentValidationError) {
       ctx.response.status = 400;
@@ -109,7 +121,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
         success_url: "https://app.ardrive.io",
         cancel_url: "https://app.ardrive.io",
         currency: payment.type,
-        automatic_tax: { enabled: true },
+        automatic_tax: {
+          enabled: !!process.env.ENABLE_AUTO_STRIPE_TAX || false,
+        },
         payment_method_types: ["card"],
         line_items: [
           {
@@ -137,6 +151,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
   } catch (error) {
     ctx.response.status = 502;
     ctx.body = `Error creating stripe payment session with method: ${method}!`;
+    MetricRegistry.stripeSessionCreationErrorCounter.inc();
     logger.error(error);
     return next;
   }

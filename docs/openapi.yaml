@@ -318,3 +318,22 @@ paths:
                     example: ["usd", "jpy"]
                     items:
                       type: string
+                  limits:
+                    type: object
+                    example:
+                      {
+                        usd:
+                          {
+                            minimumPaymentAmount: 1000,
+                            maximumPaymentAmount: 1000000,
+                            suggestedPaymentAmounts: [2500, 5000, 10000],
+                            zeroDecimalCurrency: false,
+                          },
+                        jpy:
+                          {
+                            minimumPaymentAmount: 1500,
+                            maximumPaymentAmount: 1500000,
+                            suggestedPaymentAmounts: [3500, 6500, 15000],
+                            zeroDecimalCurrency: true,
+                          },
+                      }
