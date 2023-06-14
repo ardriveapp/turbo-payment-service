@@ -12,7 +12,13 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
   if (!ctx.request.headers.authorization || !ctx.state.user) {
     ctx.response.status = 401;
     ctx.body = "Unauthorized";
-    logger.error("GET Reserve balance route with no AUTHORIZATION!");
+    logger.error(
+      "Unable to reserve balance. No authorization or user provided.",
+      {
+        user: ctx.state.user,
+        headers: ctx.request.headers,
+      }
+    );
     return next;
   }
 
