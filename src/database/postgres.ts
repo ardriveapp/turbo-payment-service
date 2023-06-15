@@ -27,7 +27,7 @@ import {
   UserDBResult,
 } from "./dbTypes";
 import { InsufficientBalance, UserNotFoundWarning } from "./errors";
-import * as knexConfig from "./knexfile";
+import { getWriterConfig } from "./knexConfig";
 
 export class PostgresDatabase implements Database {
   private log: winston.Logger;
@@ -37,7 +37,7 @@ export class PostgresDatabase implements Database {
     this.log = logger.child({ class: this.constructor.name });
 
     /** Knex instance connected to a PostgreSQL database */
-    const pg = knexConstructor(knexConfig);
+    const pg = knexConstructor(getWriterConfig());
 
     this.knex = knex ?? pg;
   }
