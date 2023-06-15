@@ -2,6 +2,15 @@
 // @ts-ignore
 import KnexDialect from "knex/lib/dialects/postgres";
 
+const baseConfig = {
+  client: KnexDialect,
+  version: "13.8",
+  migrations: {
+    tableName: "knex_migrations",
+    directory: "../../migrations",
+  },
+};
+
 function getDbConnection(host: string) {
   /** PostgreSQL port for test environment  */
   const testEnvPort = 54320;
@@ -22,13 +31,8 @@ export function getWriterConfig() {
   const dbHost =
     process.env.DB_WRITER_ENDPOINT || process.env.DB_HOST || "127.0.0.1";
   return {
-    client: KnexDialect,
-    version: "13.8",
+    ...baseConfig,
     connection: getDbConnection(dbHost),
-    migrations: {
-      tableName: "knex_migrations",
-      directory: "../../migrations",
-    },
   };
 }
 
@@ -39,7 +43,7 @@ export function getReaderConfig() {
     process.env.DB_HOST ||
     "127.0.0.1";
   return {
-    ...getWriterConfig(),
+    ...baseConfig,
     connection: getDbConnection(dbHost),
   };
 }
