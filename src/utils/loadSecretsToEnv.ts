@@ -9,6 +9,7 @@ const stripeWebhookSecretName = "stripe-webhook-secret";
 const stripeSecretKeyName = "stripe-secret-key";
 const privateRouteSecretName = "private-route-secret";
 const jwtSecretName = "jwt-secret";
+const dbPasswordSecretName = "payment-db-password";
 
 export async function loadSecretsToEnv() {
   try {
@@ -44,5 +45,8 @@ export async function loadSecretsToEnv() {
   ).SecretString;
   process.env.JWT_SECRET ??= (
     await client.send(getSecretValueCommand(jwtSecretName))
+  ).SecretString;
+  process.env.DB_PASSWORD ??= (
+    await client.send(getSecretValueCommand(dbPasswordSecretName))
   ).SecretString;
 }
