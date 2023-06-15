@@ -1,4 +1,4 @@
-import knex, { Knex } from "knex";
+import knexConstructor, { Knex } from "knex";
 import winston from "winston";
 
 import logger from "../logger";
@@ -27,15 +27,19 @@ import {
   UserDBResult,
 } from "./dbTypes";
 import { InsufficientBalance, UserNotFoundWarning } from "./errors";
-import * as knexConfig from "./knexfile";
+import { getWriterConfig } from "./knexConfig";
 
-/** Knex instance connected to a PostgreSQL database */
-const pg = knex(knexConfig);
 export class PostgresDatabase implements Database {
   private log: winston.Logger;
+  private knex: Knex;
 
-  constructor(private readonly knex: Knex = pg) {
+  constructor(knex?: Knex) {
     this.log = logger.child({ class: this.constructor.name });
+
+    /** Knex instance connected to a PostgreSQL database */
+    const pg = knexConstructor(getWriterConfig());
+
+    this.knex = knex ?? pg;
   }
 
   public async createTopUpQuote(
