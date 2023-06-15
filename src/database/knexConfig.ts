@@ -28,7 +28,8 @@ function getDbConnection(host: string) {
 }
 
 export function getWriterConfig() {
-  const dbHost = process.env.DB_WRITER_ENDPOINT || "127.0.0.1";
+  const dbHost =
+    process.env.DB_WRITER_ENDPOINT || process.env.DB_HOST || "127.0.0.1";
   return {
     ...baseConfig,
     connection: getDbConnection(dbHost),
@@ -39,6 +40,7 @@ export function getReaderConfig() {
   const dbHost =
     process.env.DB_READER_ENDPOINT ||
     process.env.DB_WRITER_ENDPOINT ||
+    process.env.DB_HOST ||
     "127.0.0.1";
   return {
     ...baseConfig,
