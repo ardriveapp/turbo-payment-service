@@ -5,10 +5,8 @@ import crypto, { KeyLike, randomUUID } from "crypto";
 import {
   JWKInterface,
   jwkInterfaceToPrivateKey,
-  jwkInterfaceToPublicKey,
 } from "../../src/types/jwkTypes";
 import { toB64Url } from "../../src/utils/base64";
-import { publicKeyToHeader } from "../../tests/helpers/testHelpers";
 
 export async function signData(
   privateKey: KeyLike,
@@ -37,7 +35,7 @@ export async function signedRequestHeadersFromJwk(
   const signature = await signData(jwkInterfaceToPrivateKey(jwk), data + nonce);
 
   return {
-    "x-public-key": publicKeyToHeader(jwkInterfaceToPublicKey(jwk)),
+    "x-public-key": jwk.n,
     "x-nonce": nonce,
     "x-signature": toB64Url(Buffer.from(signature)),
   };
