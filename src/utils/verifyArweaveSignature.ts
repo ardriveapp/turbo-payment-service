@@ -1,13 +1,16 @@
 import Arweave from "arweave/node/common.js";
 import { stringToBuffer } from "arweave/node/lib/utils";
 
+import { PublicKeyString } from "../types/types";
+
 export interface VerifySignatureParams {
-  publicKey: string;
+  publicKey: PublicKeyString;
   signature: Uint8Array;
   additionalData?: string;
   nonce: string;
 }
 
+// TODO: turn this into a class/factory function that can validate a data signature of other wallets (ETH, SOL)
 export async function verifyArweaveSignature({
   publicKey,
   signature,
