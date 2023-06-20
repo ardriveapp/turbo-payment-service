@@ -1,16 +1,24 @@
 import { b64UrlToBuffer } from "arweave/node/lib/utils";
 import { Buffer } from "buffer";
-import { createHash } from "crypto";
+import { KeyObject, createHash, createPublicKey } from "crypto";
 
-import { RSAModulusString } from "../types/types";
-import { toB64Url } from "./base64";
+import { fromB64UrlToBuffer, toB64Url } from "./base64";
 
-// TODO: create a factory that returns address for various wallet types (Arweave, ETH, SOL)
-export async function arweaveRSAModulusToAddress(
-  modulus: RSAModulusString
-): Promise<string> {
+export async function publicKeyToAddress(key: KeyObject): Promise<string> {
   const hash = createHash("sha256");
-  hash.update(b64UrlToBuffer(modulus));
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  hash.update(b64UrlToBuffer(key.export({ format: "jwk" }).n!));
   const result = new Uint8Array(hash.digest());
   return toB64Url(Buffer.from(result));
+}
+
+export function headerToPublicKey(b64UrlHeader: string): KeyObject {
+  const jwk = JSON.parse(fromB64UrlToBuffer(b64UrlHeader).toString());
+  return createPublicKey({
+    key: {
+      ...jwk,
+      kty: "RSA",
+    },
+    format: "jwk",
+  });
 }

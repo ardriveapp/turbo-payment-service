@@ -1,50 +1,37 @@
 import jwt from "jsonwebtoken";
 import { Context, Next } from "koa";
-import winston from "winston";
 
+import logger from "../logger";
 import { fromB64UrlToBuffer } from "../utils/base64";
-import { arweaveRSAModulusToAddress } from "../utils/jwkUtils";
+import { headerToPublicKey, publicKeyToAddress } from "../utils/jwkUtils";
 import { verifyArweaveSignature } from "../utils/verifyArweaveSignature";
 
 // You should use a secure and secret key for JWT token generation
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 export async function verifySignature(ctx: Context, next: Next): Promise<void> {
-  const signature = ctx.request.headers["x-signature"] as string;
-  const publicKey = ctx.request.headers["x-public-key"] as string;
-  const nonce = ctx.request.headers["x-nonce"] as string;
-  const logger = (ctx.state.logger as winston.Logger).child({
-    signature,
-    publicKey,
-    nonce,
-  });
-
   try {
-    if (!signature || !publicKey || !nonce) {
+    const signature = ctx.request.headers["x-signature"];
+    const publicKeyHeader = ctx.request.headers["x-public-key"] as string;
+    const nonce = ctx.request.headers["x-nonce"];
+    if (!signature || !publicKeyHeader || !nonce) {
       logger.info("Missing signature, public key or nonce");
       return next();
     }
-    logger.info("Verifying arweave signature");
-
-    // TODO: use a factory that verifies, validates and returns address of provided x-public-key-header
+    const publicKey = headerToPublicKey(publicKeyHeader);
     const isVerified = await verifyArweaveSignature({
       publicKey,
-      signature: fromB64UrlToBuffer(signature),
+      signature: fromB64UrlToBuffer(signature as string),
       additionalData: Object.keys(ctx.request.query).length
         ? JSON.stringify(ctx.request.query)
         : undefined,
-      nonce: nonce,
+      nonce: nonce as string,
     });
-
-    logger.info("Signature verification result computed.", { isVerified });
-
     if (isVerified) {
       // Attach wallet address for the next middleware
-      ctx.state.walletAddress = await arweaveRSAModulusToAddress(publicKey);
+      ctx.state.walletAddress = await publicKeyToAddress(publicKey);
       // Generate a JWT token for subsequent requests
-      logger.info("Generating JWT token for wallet.", {
-        wallet: ctx.state.walletAddress,
-      });
+      logger.info("Generating JWT token for ", ctx.state.walletAddress);
       const token = jwt.sign(
         { walletAddress: ctx.state.walletAddress },
         JWT_SECRET,
