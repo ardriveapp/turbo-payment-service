@@ -1,9 +1,8 @@
-import Arweave from "arweave/node/common";
-import { stringToBuffer } from "arweave/node/lib/utils";
 import { JWKInterface } from "arweave/node/lib/wallet";
 import { expect } from "chai";
 import { ParsedUrlQuery } from "querystring";
 
+import { signData } from "../../tests/helpers/signData";
 import { testWallet } from "../../tests/helpers/testHelpers";
 import { fromB64UrlToBuffer } from "./base64";
 import { verifyArweaveSignature } from "./verifyArweaveSignature";
@@ -15,10 +14,7 @@ describe("verifyArweaveSignature", () => {
     const nonce =
       "should pass for a valid signature without query parameters nonce";
     const dataToSign = nonce;
-    const signature = await Arweave.crypto.sign(
-      wallet,
-      stringToBuffer(dataToSign)
-    );
+    const signature = await signData(wallet, dataToSign);
     const { n: publicKey } = wallet;
 
     const isVerified = await verifyArweaveSignature({
@@ -41,10 +37,7 @@ describe("verifyArweaveSignature", () => {
     const additionalData = JSON.stringify(query);
     const { n: publicKey } = wallet;
 
-    const signature = await Arweave.crypto.sign(
-      wallet,
-      stringToBuffer(additionalData + nonce)
-    );
+    const signature = await signData(wallet, additionalData + nonce);
 
     const isVerified = await verifyArweaveSignature({
       publicKey,
