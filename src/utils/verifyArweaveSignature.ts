@@ -1,12 +1,16 @@
-import crypto, { KeyObject } from "crypto";
+import Arweave from "arweave/node/common.js";
+import { stringToBuffer } from "arweave/node/lib/utils";
+
+import { PublicKeyString } from "../types/types";
 
 export interface VerifySignatureParams {
-  publicKey: KeyObject;
+  publicKey: PublicKeyString;
   signature: Uint8Array;
   additionalData?: string;
   nonce: string;
 }
 
+// TODO: turn this into a class/factory function that can validate a data signature of other wallets (ETH, SOL)
 export async function verifyArweaveSignature({
   publicKey,
   signature,
@@ -14,21 +18,7 @@ export async function verifyArweaveSignature({
   nonce,
 }: VerifySignatureParams): Promise<boolean> {
   const dataToVerify = additionalData ? additionalData + nonce : nonce;
-  const pem = (publicKey as unknown as crypto.KeyObject).export({
-    format: "pem",
-    type: "pkcs1",
-  });
-  const verifier = crypto.createVerify("sha256");
-  verifier.update(dataToVerify);
-
-  const isVerified = verifier.verify(
-    {
-      key: pem,
-      padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
-      saltLength: 0,
-    },
-    signature
-  );
-
+  const data = stringToBuffer(dataToVerify);
+  const isVerified = await Arweave.crypto.verify(publicKey, data, signature);
   return isVerified;
 }
