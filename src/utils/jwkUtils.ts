@@ -4,10 +4,9 @@ import { KeyObject, createHash, createPublicKey } from "crypto";
 
 import { fromB64UrlToBuffer, toB64Url } from "./base64";
 
-export async function publicKeyToAddress(key: KeyObject): Promise<string> {
+export async function publicKeyToAddress(publicKey: string): Promise<string> {
   const hash = createHash("sha256");
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  hash.update(b64UrlToBuffer(key.export({ format: "jwk" }).n!));
+  hash.update(b64UrlToBuffer(publicKey));
   const result = new Uint8Array(hash.digest());
   return toB64Url(Buffer.from(result));
 }
