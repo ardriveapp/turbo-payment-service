@@ -1,10 +1,10 @@
-import { Base64String } from "../types/types";
+import { Base64URLString } from "../types/types";
 
-export function fromB64UrlToBuffer(input: Base64String): Buffer {
-  return Buffer.from(input, "base64");
+export function fromB64UrlToBuffer(input: Base64URLString): Buffer {
+  return Buffer.from(input, "base64url");
 }
 
-export function toB64Url(buffer: Buffer): Base64String {
+export function toB64Url(buffer: Buffer): Base64URLString {
   return buffer.toString("base64url");
 }
 
