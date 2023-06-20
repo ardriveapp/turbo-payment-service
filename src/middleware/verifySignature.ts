@@ -1,7 +1,6 @@
 import jwt from "jsonwebtoken";
 import { Context, Next } from "koa";
 
-import logger from "../logger";
 import { fromB64UrlToBuffer } from "../utils/base64";
 import { publicKeyToAddress } from "../utils/jwkUtils";
 import { verifyArweaveSignature } from "../utils/verifyArweaveSignature";
@@ -10,20 +9,21 @@ import { verifyArweaveSignature } from "../utils/verifyArweaveSignature";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 export async function verifySignature(ctx: Context, next: Next): Promise<void> {
-  try {
-    const signature = ctx.request.headers["x-signature"] as string;
-    const publicKey = ctx.request.headers["x-public-key"] as string;
-    const nonce = ctx.request.headers["x-nonce"] as string;
+  const signature = ctx.request.headers["x-signature"] as string;
+  const publicKey = ctx.request.headers["x-public-key"] as string;
+  const nonce = ctx.request.headers["x-nonce"] as string;
+  const logger = ctx.state.logger.childLogger({
+    signature,
+    publicKey,
+    nonce,
+  });
 
+  try {
     if (!signature || !publicKey || !nonce) {
       logger.info("Missing signature, public key or nonce");
       return next();
     }
-    logger.info("Verifying arweave signature", {
-      signature,
-      publicKey,
-      nonce,
-    });
+    logger.info("Verifying arweave signature");
 
     const isVerified = await verifyArweaveSignature({
       publicKey,
@@ -41,7 +41,9 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
       // Attach wallet address for the next middleware
       ctx.state.walletAddress = await publicKeyToAddress(publicKey);
       // Generate a JWT token for subsequent requests
-      logger.info("Generating JWT token for ", ctx.state.walletAddress);
+      logger.info("Generating JWT token for wallet.", {
+        wallet: ctx.state.walletAddress,
+      });
       const token = jwt.sign(
         { walletAddress: ctx.state.walletAddress },
         JWT_SECRET,

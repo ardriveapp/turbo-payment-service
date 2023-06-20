@@ -1,5 +1,5 @@
 import Arweave from "arweave/node/common.js";
-import { stringToBuffer } from "arweave/node/lib/utils.js";
+import { stringToBuffer } from "arweave/node/lib/utils";
 
 export interface VerifySignatureParams {
   publicKey: string;
@@ -16,8 +16,6 @@ export async function verifyArweaveSignature({
 }: VerifySignatureParams): Promise<boolean> {
   const dataToVerify = additionalData ? additionalData + nonce : nonce;
   const data = stringToBuffer(dataToVerify);
-
   const isVerified = await Arweave.crypto.verify(publicKey, data, signature);
-
   return isVerified;
 }
