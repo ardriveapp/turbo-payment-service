@@ -7,11 +7,10 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-18.16.0}
         NODE_VERSION_SHORT: ${NODE_VERSION_SHORT:-18}
-    env_file: .env
     environment:
       NODE_ENV: ${NODE_ENV:-test}
-      DB_HOST: 127.0.0.1
-      DB_PORT: 5433
+      DB_HOST: payment-service-pg
+      DB_PORT: 5432
       DB_PASSWORD: postgres
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
@@ -27,9 +26,25 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - payment-service-data:/var/lib/postgresql/data
+
+  test-runner:
+    build:
+      context: .
+      dockerfile: tests/Dockerfile.integration
+      args:
+        NODE_VERSION: ${NODE_VERSION:-18.16.0}
+    environment:
+      DB_HOST: payment-service-pg
+      DB_PASSWORD: postgres
+      DB_PORT: 5432
+      NODE_ENV: ${NODE_ENV:-test}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+    depends_on:
+      - payment-service-pg
 
 volumes:
   payment-service-data:

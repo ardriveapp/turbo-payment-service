@@ -1,12 +1,9 @@
 "use-strict";
 
-process.env.NODE_ENV = "test";
-
 // Mocha configuration file
 // Reference for options: https://github.com/mochajs/mocha/blob/master/example/config/.mocharc.js
 module.exports = {
   extension: ["ts"],
-  spec: ["tests/**/*.test.ts", "src/**/*.test.ts"],
   require: ["ts-node/register/transpile-only", "tests/testSetup.ts"],
   timeout: "3000",
   parallel: true,

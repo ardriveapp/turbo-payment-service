@@ -25,7 +25,7 @@ With a compatible system, follow these steps to start the upload service:
 
 - `yarn`
 - `yarn build`
-- `yarn db:up && yarn db:migrate:latest`
+- `yarn db:up`
 - `yarn start`
 
 Developers can alternatively use `yarn start:watch` to run the app in development mode with hot reloading provided by `nodemon`
@@ -51,5 +51,5 @@ Runs this service and a connected postgres database
 Steps:
 
 ```shell
-docker compose up
+yarn start:docker
 ```
