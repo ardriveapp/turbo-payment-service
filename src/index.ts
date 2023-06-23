@@ -1,4 +1,8 @@
+import logger from "./logger";
 import { createServer } from "./server";
 
 // Here is our server 🙌
-void createServer({});
+createServer({}).catch((e) => {
+  logger.error(`Existing with error: ${e}`);
+  process.exit(1);
+});

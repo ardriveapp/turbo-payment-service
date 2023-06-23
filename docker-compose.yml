@@ -7,15 +7,18 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-18.16.0}
         NODE_VERSION_SHORT: ${NODE_VERSION_SHORT:-18}
+    env_file: .env
     environment:
       NODE_ENV: ${NODE_ENV:-test}
       DB_HOST: payment-service-pg
       DB_PORT: 5432
       DB_PASSWORD: postgres
+      PORT: ${PORT:-1235}
+      DISABLE_LOGS: ${DISABLE_LOGS:-false}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
     ports:
-      - "1235:1235"
+      - "${PORT:-1235}:${PORT:-1235}"
     depends_on:
       - payment-service-pg
 
