@@ -7,7 +7,6 @@ services:
       args:
         NODE_VERSION: ${NODE_VERSION:-18.16.0}
         NODE_VERSION_SHORT: ${NODE_VERSION_SHORT:-18}
-    env_file: .env
     environment:
       NODE_ENV: ${NODE_ENV:-test}
       DB_HOST: payment-service-pg
