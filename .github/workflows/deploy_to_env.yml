@@ -52,7 +52,7 @@ jobs:
         id: generate-appspec
         run: |
           CONTAINER=${{ inputs.CONTAINER_NAME }}
-          AFTER_ALLOW_TEST_TRAFFIC_HOOK=$(aws lambda get-function --function-name ${{ env.BLACKBOX_TEST_LAMBDA_NAME }} | jq '. | .Configuration.FunctionArn' | tr -d '"')
+          AFTER_ALLOW_TEST_TRAFFIC_HOOK=$(aws lambda get-function --function-name payment-tests-lambda | jq '. | .Configuration.FunctionArn' | tr -d '"')
           jq --arg AFTER_ALLOW_TEST_TRAFFIC_HOOK $AFTER_ALLOW_TEST_TRAFFIC_HOOK --arg CONTAINER $CONTAINER '.Resources[0].TargetService.Properties.LoadBalancerInfo.ContainerName = $CONTAINER | .Hooks[0].AfterAllowTestTraffic = $AFTER_ALLOW_TEST_TRAFFIC_HOOK' appspec.json | jq . > appspec_deploy.json
 
       - name: Download task definitions
