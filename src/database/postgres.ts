@@ -28,18 +28,22 @@ import {
 } from "./dbTypes";
 import { InsufficientBalance, UserNotFoundWarning } from "./errors";
 import { getWriterConfig } from "./knexConfig";
+import { getReaderConfig } from "./knexConfig";
 
 export class PostgresDatabase implements Database {
   private log: winston.Logger;
-  private knex: Knex;
+  private knexWriter: Knex;
+  private knexReader: Knex;
 
-  constructor(knex?: Knex) {
+  constructor(knexWriter?: Knex, knexReader?: Knex) {
     this.log = logger.child({ class: this.constructor.name });
 
     /** Knex instance connected to a PostgreSQL database */
-    const pg = knexConstructor(getWriterConfig());
+    const pgWriter = knexConstructor(getWriterConfig());
+    const pgReader = knexConstructor(getReaderConfig());
 
-    this.knex = knex ?? pg;
+    this.knexWriter = knexWriter ?? pgWriter;
+    this.knexReader = knexReader ?? pgReader;
   }
 
   public async createTopUpQuote(
@@ -60,7 +64,7 @@ export class PostgresDatabase implements Database {
       winstonCreditAmount,
     } = topUpQuote;
 
-    await this.knex<TopUpQuoteDBResult>(tableNames.topUpQuote).insert({
+    await this.knexWriter<TopUpQuoteDBResult>(tableNames.topUpQuote).insert({
       payment_amount: paymentAmount.toString(),
       currency_type: currencyType,
       destination_address: destinationAddress,
@@ -73,7 +77,7 @@ export class PostgresDatabase implements Database {
   }
 
   public async getTopUpQuote(topUpQuoteId: string): Promise<TopUpQuote> {
-    const topUpQuoteDbResult = await this.knex<TopUpQuoteDBResult>(
+    const topUpQuoteDbResult = await this.knexReader<TopUpQuoteDBResult>(
       tableNames.topUpQuote
     ).where({
       [columnNames.topUpQuoteId]: topUpQuoteId,
@@ -91,7 +95,7 @@ export class PostgresDatabase implements Database {
     userAddress: string,
     promoInfo: PromotionalInfo
   ): Promise<void> {
-    await this.knex.transaction(async (knexTransaction) => {
+    await this.knexWriter.transaction(async (knexTransaction) => {
       await this.getUser(userAddress, knexTransaction);
 
       await knexTransaction<UserDBResult>(tableNames.user)
@@ -110,7 +114,7 @@ export class PostgresDatabase implements Database {
 
   public async getUser(
     userAddress: string,
-    knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
+    knexTransaction: Knex.Transaction = this.knexReader as Knex.Transaction
   ): Promise<User> {
     const userDbResult = await knexTransaction<UserDBResult>(
       tableNames.user
@@ -139,7 +143,7 @@ export class PostgresDatabase implements Database {
     const { topUpQuoteId, paymentReceiptId, paymentAmount, currencyType } =
       paymentReceipt;
 
-    await this.knex.transaction(async (knexTransaction) => {
+    await this.knexWriter.transaction(async (knexTransaction) => {
       const topUpQuoteDbResults = await knexTransaction<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       ).where({
@@ -229,7 +233,7 @@ export class PostgresDatabase implements Database {
 
   public async getPaymentReceipt(
     paymentReceiptId: string,
-    knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
+    knexTransaction: Knex.Transaction = this.knexReader as Knex.Transaction
   ): Promise<PaymentReceipt> {
     return this.getPaymentReceiptWhere(
       { [columnNames.paymentReceiptId]: paymentReceiptId },
@@ -239,7 +243,7 @@ export class PostgresDatabase implements Database {
 
   private async getPaymentReceiptByTopUpQuoteId(
     topUpQuoteId: string,
-    knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
+    knexTransaction: Knex.Transaction = this.knexReader as Knex.Transaction
   ): Promise<PaymentReceipt> {
     return this.getPaymentReceiptWhere(
       { [columnNames.topUpQuoteId]: topUpQuoteId },
@@ -249,7 +253,7 @@ export class PostgresDatabase implements Database {
 
   private async getPaymentReceiptWhere(
     where: Partial<PaymentReceiptDBResult>,
-    knexTransaction: Knex.Transaction = this.knex as Knex.Transaction
+    knexTransaction: Knex.Transaction = this.knexReader as Knex.Transaction
   ): Promise<PaymentReceipt> {
     const paymentReceiptDbResults =
       await knexTransaction<PaymentReceiptDBResult>(
@@ -276,7 +280,7 @@ export class PostgresDatabase implements Database {
       topUpQuoteId,
     });
 
-    await this.knex.transaction(async (knexTransaction) => {
+    await this.knexWriter.transaction(async (knexTransaction) => {
       // This will throw if payment receipt does not exist
       const { destinationAddress, paymentReceiptId, winstonCreditAmount } =
         await this.getPaymentReceiptByTopUpQuoteId(
@@ -328,7 +332,7 @@ export class PostgresDatabase implements Database {
     chargebackReceiptId: string
   ): Promise<ChargebackReceipt> {
     const chargebackReceiptDbResult =
-      await this.knex<ChargebackReceiptDBResult>(
+      await this.knexReader<ChargebackReceiptDBResult>(
         tableNames.chargebackReceipt
       ).where({
         [columnNames.chargebackReceiptId]: chargebackReceiptId,
@@ -346,7 +350,7 @@ export class PostgresDatabase implements Database {
     userAddress: string,
     winstonCreditAmount: Winston
   ): Promise<void> {
-    await this.knex.transaction(async (knexTransaction) => {
+    await this.knexWriter.transaction(async (knexTransaction) => {
       const user = await this.getUser(userAddress, knexTransaction);
 
       const currentWinstonBalance = user.winstonCreditBalance;
@@ -370,7 +374,7 @@ export class PostgresDatabase implements Database {
     userAddress: string,
     winstonCreditAmount: Winston
   ): Promise<void> {
-    await this.knex.transaction(async (knexTransaction) => {
+    await this.knexWriter.transaction(async (knexTransaction) => {
       const user = await this.getUser(userAddress, knexTransaction);
 
       const currentWinstonBalance = user.winstonCreditBalance;
@@ -387,7 +391,7 @@ export class PostgresDatabase implements Database {
   public async checkForExistingPaymentByTopUpQuoteId(
     top_up_quote_id: string
   ): Promise<boolean> {
-    return this.knex.transaction(async (knexTransaction) => {
+    return this.knexReader.transaction(async (knexTransaction) => {
       const [
         paymentReceiptResult,
         chargebackReceiptResult,
