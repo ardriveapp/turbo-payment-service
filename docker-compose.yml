@@ -42,6 +42,7 @@ services:
       DB_HOST: payment-service-pg
       DB_PASSWORD: postgres
       DB_PORT: 5432
+      PORT: ${PORT:-1235}
       NODE_ENV: ${NODE_ENV:-test}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
