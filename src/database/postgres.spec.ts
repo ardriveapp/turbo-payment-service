@@ -35,7 +35,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("creates the expected top up quote in the database", async () => {
-      const topUpQuote = await db["knex"]<TopUpQuoteDBResult>(
+      const topUpQuote = await db["knexWriter"]<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       ).where({ top_up_quote_id: "Unique Identifier" });
       expect(topUpQuote.length).to.equal(1);
@@ -142,7 +142,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("creates the expected payment_receipt in the database entity", async () => {
-      const paymentReceipt = await db["knex"]<PaymentReceiptDBResult>(
+      const paymentReceipt = await db["knexWriter"]<PaymentReceiptDBResult>(
         tableNames.paymentReceipt
       ).where({ payment_receipt_id: "Unique Identifier" });
       expect(paymentReceipt.length).to.equal(1);
@@ -171,7 +171,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("creates the expected new user when an existing user address cannot be found", async () => {
-      const user = await db["knex"]<UserDBResult>(tableNames.user).where({
+      const user = await db["knexWriter"]<UserDBResult>(tableNames.user).where({
         user_address: newUserAddress,
       });
       expect(user.length).to.equal(1);
@@ -190,7 +190,9 @@ describe("PostgresDatabase class", () => {
     });
 
     it("increments existing user's balance as expected", async () => {
-      const oldUser = await db["knex"]<UserDBResult>(tableNames.user).where({
+      const oldUser = await db["knexWriter"]<UserDBResult>(
+        tableNames.user
+      ).where({
         user_address: oldUserAddress,
       });
       expect(oldUser.length).to.equal(1);
@@ -201,7 +203,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("deletes the top_up_quotes as expected", async () => {
-      const topUpQuoteDbResults = await db["knex"]<TopUpQuoteDBResult>(
+      const topUpQuoteDbResults = await db["knexWriter"]<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       );
       const topUpIds = topUpQuoteDbResults.map((r) => r.top_up_quote_id);
@@ -232,7 +234,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knex"](tableNames.paymentReceipt).where({
+          await db["knexWriter"](tableNames.paymentReceipt).where({
             payment_receipt_id: "This is fine",
           })
         ).length
@@ -264,7 +266,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knex"](tableNames.paymentReceipt).where({
+          await db["knexWriter"](tableNames.paymentReceipt).where({
             payment_receipt_id: "This is a string",
           })
         ).length
@@ -285,7 +287,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knex"](tableNames.paymentReceipt).where({
+          await db["knexWriter"](tableNames.paymentReceipt).where({
             payment_receipt_id: "This is fine",
           })
         ).length
@@ -349,9 +351,11 @@ describe("PostgresDatabase class", () => {
     });
 
     it("creates the expected chargeback receipt in the database", async () => {
-      const chargebackReceipt = await db["knex"]<ChargebackReceiptDBResult>(
-        tableNames.chargebackReceipt
-      ).where({ chargeback_receipt_id: "A great Unique Identifier" });
+      const chargebackReceipt = await db[
+        "knexWriter"
+      ]<ChargebackReceiptDBResult>(tableNames.chargebackReceipt).where({
+        chargeback_receipt_id: "A great Unique Identifier",
+      });
       expect(chargebackReceipt.length).to.equal(1);
 
       const {
@@ -380,14 +384,18 @@ describe("PostgresDatabase class", () => {
     });
 
     it("deletes the payment_receipt entity", async () => {
-      const paymentReceiptDbResults = await db["knex"]<PaymentReceiptDBResult>(
-        tableNames.paymentReceipt
-      ).where({ payment_receipt_id: naughtyPaymentId });
+      const paymentReceiptDbResults = await db[
+        "knexWriter"
+      ]<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
+        payment_receipt_id: naughtyPaymentId,
+      });
       expect(paymentReceiptDbResults.length).to.equal(0);
     });
 
     it("decrements user's balance as expected", async () => {
-      const oldUser = await db["knex"]<UserDBResult>(tableNames.user).where({
+      const oldUser = await db["knexWriter"]<UserDBResult>(
+        tableNames.user
+      ).where({
         user_address: naughtyUserAddress,
       });
       expect(oldUser.length).to.equal(1);
@@ -409,7 +417,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knex"](tableNames.chargebackReceipt).where({
+          await db["knexWriter"](tableNames.chargebackReceipt).where({
             chargeback_receipt_id: "Great value",
           })
         ).length
@@ -439,7 +447,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knex"](tableNames.chargebackReceipt).where({
+          await db["knexWriter"](tableNames.chargebackReceipt).where({
             chargeback_receipt_id: "Great value",
           })
         ).length

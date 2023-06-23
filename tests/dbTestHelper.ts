@@ -84,7 +84,7 @@ export class DbTestHelper {
   constructor(public readonly db: PostgresDatabase) {}
 
   private get knex(): Knex {
-    return this.db["knex"];
+    return this.db["knexWriter"];
   }
 
   public async insertStubUser(insertParams: StubUserParams): Promise<void> {
