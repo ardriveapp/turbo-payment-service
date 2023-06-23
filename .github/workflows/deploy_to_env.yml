@@ -3,16 +3,7 @@ name: Deploy
 on:
   workflow_call:
     inputs:
-      ACCOUNT_ID:
-        required: true
-        type: string
-      AWS_REGION:
-        required: true
-        type: string
-      ENVIRONMENT:
-        required: true
-        type: string
-      ECR_IMAGE:
+      IMAGE_NAME:
         required: true
         type: string
       SERVICE_NAME:
@@ -24,37 +15,44 @@ on:
       CONTAINER_NAME:
         required: true
         type: string
-      INFRA_ACCOUNT_ID:
+      ENVIRONMENT:
         required: true
         type: string
     secrets:
-      KEY_ID:
+      AWS_ACCOUNT_ID:
         required: true
-      ACCESS_KEY:
+      AWS_REGION:
+        required: true
+      AWS_ACCOUNT_ID_INFRA:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
         required: true
 
 jobs:
   configure-and-deploy:
     # TODO: MOVE TO self-hosted and WAIT FOR DEPLOYMENTS TO FINISH
     runs-on: ubuntu-latest
+    environment: ${{ inputs.ENVIRONMENT }}
     steps:
       - uses: actions/checkout@v3
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-region: ${{ inputs.AWS_REGION }}
-          aws-access-key-id: ${{ secrets.KEY_ID }}
-          aws-secret-access-key: ${{ secrets.ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           role-skip-session-tagging: true
-          role-to-assume: arn:aws:iam::${{ inputs.ACCOUNT_ID }}:role/DeploymentRole
-          role-external-id: arn:aws:iam::${{ inputs.INFRA_ACCOUNT_ID }}:role/DeploymentRole
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/DeploymentRole
+          role-external-id: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID_INFRA }}:role/DeploymentRole
           role-duration-seconds: 1800 # deploys may take up to 20 mins
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Set AppSpec Hooks from template
         id: generate-appspec
         run: |
           CONTAINER=${{ inputs.CONTAINER_NAME }}
-          AFTER_ALLOW_TEST_TRAFFIC_HOOK=$(aws lambda get-function --function-name payment-tests-lambda | jq '. | .Configuration.FunctionArn' | tr -d '"')
+          AFTER_ALLOW_TEST_TRAFFIC_HOOK=$(aws lambda get-function --function-name ${{ env.BLACKBOX_TEST_LAMBDA_NAME }} | jq '. | .Configuration.FunctionArn' | tr -d '"')
           jq --arg AFTER_ALLOW_TEST_TRAFFIC_HOOK $AFTER_ALLOW_TEST_TRAFFIC_HOOK --arg CONTAINER $CONTAINER '.Resources[0].TargetService.Properties.LoadBalancerInfo.ContainerName = $CONTAINER | .Hooks[0].AfterAllowTestTraffic = $AFTER_ALLOW_TEST_TRAFFIC_HOOK' appspec.json | jq . > appspec_deploy.json
 
       - name: Download task definitions
@@ -67,7 +65,7 @@ jobs:
         with:
           task-definition: task-definition.json
           container-name: ${{ inputs.CONTAINER_NAME }}
-          image: ${{ inputs.ECR_IMAGE }}
+          image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ inputs.IMAGE_NAME }}
 
       - name: Check and wait for any active deployments to finish
         id: check-active-deployments
