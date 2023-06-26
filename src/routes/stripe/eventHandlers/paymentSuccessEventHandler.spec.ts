@@ -12,6 +12,7 @@ import { handlePaymentSuccessEvent } from "./paymentSuccessEventHandler";
 describe("handlePaymentSuccessEvent", () => {
   const db = new PostgresDatabase();
   const dbTestHelper = new DbTestHelper(db);
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
     apiVersion: "2022-11-15",
   });
@@ -35,9 +36,9 @@ describe("handlePaymentSuccessEvent", () => {
   });
 
   it("should process payment and create receipt if top up quote exists", async () => {
-    const paymentReceiptDbResults = await db["knex"]<PaymentReceiptDBResult>(
-      tableNames.paymentReceipt
-    ).where({
+    const paymentReceiptDbResults = await db[
+      "knexWriter"
+    ]<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
       top_up_quote_id: paymentSuccessTopUpQuoteId,
     });
     expect(paymentReceiptDbResults).to.have.length(1);
@@ -160,9 +161,9 @@ describe("handlePaymentSuccessEvent", () => {
 
     await handlePaymentSuccessEvent(paymentIntent, db, stripe);
 
-    const paymentReceiptDbResults = await db["knex"]<PaymentReceiptDBResult>(
-      tableNames.paymentReceipt
-    ).where({
+    const paymentReceiptDbResults = await db[
+      "knexWriter"
+    ]<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
       top_up_quote_id: paymentWithTaxTopUpQuoteId,
     });
     expect(paymentReceiptDbResults).to.have.length(1);

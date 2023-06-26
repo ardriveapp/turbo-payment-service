@@ -37,7 +37,7 @@ describe("handleDisputeCreatedEvent", () => {
   });
 
   it("should capture the dispute created event, decrement the user's balance, and create a chargeback receipt", async () => {
-    const chargebackReceipt = await db["knex"]<ChargebackReceiptDBResult>(
+    const chargebackReceipt = await db["knexWriter"]<ChargebackReceiptDBResult>(
       tableNames.chargebackReceipt
     ).where({ payment_receipt_id: disputeEventPaymentReceiptId });
     expect(chargebackReceipt.length).to.equal(1);
@@ -66,7 +66,7 @@ describe("handleDisputeCreatedEvent", () => {
     expect(winston_credit_amount).to.equal("50");
     expect(chargeback_reason).to.equal("fraudulent");
 
-    const user = await db["knex"]<UserDBResult>(tableNames.user).where({
+    const user = await db["knexWriter"]<UserDBResult>(tableNames.user).where({
       user_address: disputeEventUserAddress,
     });
 

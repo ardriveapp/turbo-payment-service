@@ -42,7 +42,7 @@ components:
 
     PublicKeyHeader:
       type: string
-      description: The public key from the private key used to derive the provided signature
+      description: The "modulus" of the JWK used to create the signature header
 
     TopUpQuote:
       type: object
