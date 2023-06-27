@@ -1,5 +1,6 @@
 import { Next } from "koa";
 
+import { oneMinuteInSeconds } from "../constants";
 import { PaymentValidationError } from "../database/errors";
 import { KoaContext } from "../server";
 import { Payment } from "../types/payment";
@@ -30,6 +31,7 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
     });
 
     ctx.body = { winc: winstonCreditAmount.toString() };
+    ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.response.status = 200;
   } catch (error) {
     logger.error("Failed to get price for payment!", { payment }, error);
