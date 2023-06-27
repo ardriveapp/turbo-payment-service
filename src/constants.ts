@@ -96,7 +96,7 @@ export type CurrencyLimitations = Record<
   CurrencyLimitation
 >;
 
-export const recognizedCountries: string[] = [
+export const recognizedCountries = [
   "Afghanistan",
   "Albania",
   "Algeria",
@@ -289,4 +289,4 @@ export const recognizedCountries: string[] = [
   "Yemen",
   "Zambia",
   "Zimbabwe",
-];
+] as const;
