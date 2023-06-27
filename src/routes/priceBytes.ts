@@ -1,5 +1,6 @@
 import { Next } from "koa";
 
+import { oneMinuteInSeconds } from "../constants";
 import { KoaContext } from "../server";
 import { ByteCount } from "../types/types";
 
@@ -31,6 +32,7 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
   try {
     const price = await pricingService.getWCForBytes(bytes);
     ctx.response.status = 200;
+    ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = { winc: price.toString() };
     logger.info("Price found for byte count!", { price, bytesValue });
   } catch (error) {
