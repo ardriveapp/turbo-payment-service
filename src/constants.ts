@@ -291,4 +291,4 @@ export const recognizedCountries = [
   "Zimbabwe",
 ] as const;
 
-export const ONE_HOUR_IN_SECONDS = 3600;
+export const oneHourInSeconds = 3600;
