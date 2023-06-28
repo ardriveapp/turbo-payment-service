@@ -136,6 +136,19 @@ describe("Router tests", () => {
     expect(data).to.equal("Fiat Oracle Unavailable");
   });
 
+  it("GET /rates returns the correct response", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").callsFake(
+      (currency): Promise<CoinGeckoResponse> => {
+        return Promise.resolve(expectedArPrices[currency]);
+      }
+    );
+    const { data, status, statusText } = await axios.get(`/v1/rates`);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+    expect(data).to.equal("Fiat Oracle Unavailable");
+  });
+
   it("GET /price/:currency/:value", async () => {
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave

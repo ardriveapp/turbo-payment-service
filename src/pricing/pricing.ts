@@ -4,6 +4,7 @@ import {
   paymentAmountLimits,
   turboFeePercentageAsADecimal,
 } from "../constants";
+import { CurrencyType } from "../database/dbTypes";
 import logger from "../logger";
 import { Payment } from "../types/payment";
 import {
@@ -18,6 +19,7 @@ import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle"
 export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
+  getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
   getWCForBytes: (bytes: ByteCount) => Promise<WC>;
 }
 
@@ -166,6 +168,10 @@ export class TurboPricingService implements PricingService {
     );
 
     return limits as CurrencyLimitations;
+  }
+
+  public async getFiatPriceForOneAR(currency: CurrencyType): Promise<number> {
+    return await this.arweaveToFiatOracle.getFiatPriceForOneAR(currency);
   }
 
   public async getWCForPayment(payment: Payment): Promise<Winston> {
