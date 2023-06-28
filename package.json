@@ -13,7 +13,7 @@
     "test": "yarn test:unit; yarn test:integration",
     "test:unit": "nyc mocha --spec='src/**/*.test.ts'",
     "test:integration": "nyc mocha --spec='tests/**/*.test.ts'",
-    "test:integration:local": "yarn db:up && yarn test:integration $*; yarn db:down",
+    "test:integration:local": "yarn db:up && yarn test:integration $* ; yarn db:down",
     "test:docker": "docker compose up test-runner --exit-code-from test-runner --build",
     "ci": "yarn build && yarn test:docker",
     "build": "yarn clean && tsc --project ./tsconfig.prod.json",
@@ -23,7 +23,7 @@
     "start:watch": "yarn nodemon -r ./src/index.ts",
     "start:docker": "docker compose up payment-service --build",
     "db:up": "docker compose up payment-service-pg -d && yarn db:migrate:latest",
-    "db:down": "docker compose down && docker volume rm payment-service_payment-service-data",
+    "db:down": "docker compose down ; docker volume rm payment-service_payment-service-data",
     "db:migrate:latest": "yarn knex migrate:latest --knexfile \"src/database/knexfile.ts\""
   },
   "devDependencies": {

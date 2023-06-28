@@ -62,5 +62,6 @@ Unit and integration tests can be run locally or via docker. For either, you can
 ### Integration Tests
 
 - `yarn test:integration:local` - runs the integration tests locally against postgres docker container
-- `yarn test:integration:local -g "Router"` - runs a targeted test suite against postgres docker container
+- `yarn test:integration:local -g "Router"` - runs a targeted integration tests against postgres docker container
+  - `watch -n 30 'yarn test:integration:local -g "Router'` - runs targeted integration test suite on an interval (helpful when actively writing tests)
 - `yarn test:docker` - runs integration tests (and unit tests) in an isolated docker container
