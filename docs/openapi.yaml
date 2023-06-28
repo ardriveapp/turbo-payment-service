@@ -337,3 +337,19 @@ paths:
                             zeroDecimalCurrency: true,
                           },
                       }
+
+  /countries:
+    get:
+      summary: Get Supported Countries
+      description: Returns the current list of currency types supported by this service
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                example: ["United Kingdom", "United States"]
+                items:
+                  type: string
