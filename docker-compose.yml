@@ -12,12 +12,12 @@ services:
       DB_HOST: payment-service-pg
       DB_PORT: 5432
       DB_PASSWORD: postgres
-      PORT: ${PORT:-1235}
+      PORT: ${PORT:-3000}
       DISABLE_LOGS: ${DISABLE_LOGS:-false}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
     ports:
-      - "${PORT:-1235}:${PORT:-1235}"
+      - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
       - payment-service-pg
 

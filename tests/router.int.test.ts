@@ -48,8 +48,7 @@ const axios = axiosPackage.create({
   baseURL: localTestUrl,
   validateStatus: () => true,
 });
-// cspell:disable
-const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:enable
+const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:disable-line
 
 describe("Router tests", () => {
   let server: Server;
@@ -63,7 +62,7 @@ describe("Router tests", () => {
 
   before(async () => {
     await loadSecretsToEnv();
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    // eslint-disable-next-line
     stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2022-11-15",
     });

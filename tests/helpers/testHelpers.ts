@@ -3,7 +3,7 @@ import { Knex } from "knex";
 
 import { JWKInterface } from "../../src/types/jwkTypes";
 
-const port = process.env.PORT ?? 1235;
+const port = process.env.PORT ?? 1234;
 export const localTestUrl = `http://localhost:${port}`;
 
 interface expectAsyncErrorThrowParams {
