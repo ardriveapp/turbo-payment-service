@@ -1,5 +1,4 @@
 import { expect } from "chai";
-import { randomUUID } from "crypto";
 
 import { toB64Url } from "../../src/utils/base64";
 import {
