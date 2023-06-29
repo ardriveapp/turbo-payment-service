@@ -1,6 +1,6 @@
 import { Next } from "koa";
 
-import { ExposedCurrencyLimitations } from "../constants";
+import { ExposedCurrencyLimitations, oneHourInSeconds } from "../constants";
 import { KoaContext } from "../server";
 import {
   SupportedPaymentCurrencyTypes,
@@ -33,6 +33,7 @@ export async function currenciesRoute(ctx: KoaContext, next: Next) {
       limits: exposedLimits,
     };
     ctx.status = 200;
+    ctx.set("Cache-Control", `max-age=${oneHourInSeconds}`);
   } catch (error) {
     ctx.body = "Fiat Oracle Unavailable";
     ctx.status = 502;

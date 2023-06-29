@@ -2,6 +2,7 @@ import {
   GetSecretValueCommand,
   SecretsManagerClient,
 } from "@aws-sdk/client-secrets-manager";
+import { config } from "dotenv";
 
 import logger from "../logger";
 
@@ -13,8 +14,7 @@ const dbPasswordSecretName = "payment-db-password";
 
 export async function loadSecretsToEnv() {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    require("dotenv").config();
+    config();
   } catch (error) {
     logger.error("Error loading .env file", error);
     return;

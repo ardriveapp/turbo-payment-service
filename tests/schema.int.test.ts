@@ -1,10 +1,10 @@
 import { expect } from "chai";
 import Knex from "knex";
 
-import { expectedColumnInfo } from "../../tests/helpers/testExpectations";
-import { listTables } from "../../tests/helpers/testHelpers";
-import * as knexConfig from "./knexfile";
-import { Schema } from "./schema";
+import * as knexConfig from "../src/database/knexfile";
+import { Schema } from "../src/database/schema";
+import { expectedColumnInfo } from "./helpers/testExpectations";
+import { listTables } from "./helpers/testHelpers";
 
 /** Knex instance connected to a PostgreSQL database */
 const knex = Knex(knexConfig);
@@ -17,10 +17,8 @@ describe("Schema class", () => {
     // Run a new schema create after the rollback test so database will be as expected for integration tests
     await Schema.create(knex);
 
-    // Run integration tests after schema tests to avoid race conditions in the test env database
-    require("./postgres.spec");
-    require("../routes/stripe/eventHandlers/disputeCreatedEventHandler.spec");
-    require("../routes/stripe/eventHandlers/paymentSuccessEventHandler.spec");
+    // Run these tests that depend on db after schema tests
+    require("./postgres.int.spec");
   });
 
   it("after running latest knex migrations with knex CLI from docker-test.sh, all expected tables exists", async () => {
