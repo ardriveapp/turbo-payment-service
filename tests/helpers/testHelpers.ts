@@ -1,7 +1,16 @@
+import axiosPackage from "axios";
 import { expect } from "chai";
 import { Knex } from "knex";
 
+import { createAxiosInstance } from "../../src/axiosClient";
+import { PostgresDatabase } from "../../src/database/postgres";
+import {
+  CoingeckoArweaveToFiatOracle,
+  ReadThroughArweaveToFiatOracle,
+} from "../../src/pricing/oracles/arweaveToFiatOracle";
+import { TurboPricingService } from "../../src/pricing/pricing";
 import { JWKInterface } from "../../src/types/jwkTypes";
+import { DbTestHelper } from "../dbTestHelper";
 
 const port = process.env.PORT ?? 1234;
 export const localTestUrl = `http://localhost:${port}`;
@@ -73,3 +82,19 @@ export const testWallet: JWKInterface = {
   dq: "EESORt_-Nty1howIEXpbSuvTWXMGSnkXuwAMh4zDR6jhRUB5Gyfgz_3JQW1Xd93Vr3mqg_ul2uehb5sd_VTnGFCCco1MlcV13NL7AJntwRc-furD3LdXr9Vu6mhlO25uPPrBI58tT4iC_QZD7891NMgRT4uUWqbK0w4xd4CvGAYpWPd77TOuShFYCRWuFSCM8VQe_Vi8aYBtIlQezDl36mYlyvAWpMTftqsGk9VKzZG4wwLoy24gx6Ou94_3Rlvd2OctlMCAtLfFokwupoCeKDeqZywBIuJleUavFZeQLF7GQZB7MznO5DT6XQTq26u1p9hCnqiQT0maTvXaLFycwQ",
   qi: "Fthoo6f2f_oaLSu3jtqXqpQpc2H1w1Ns0XxtyD6fi_wW2r3toXaD6Mz0B3eoz-pH6yCmqbquGO3Vt46U6QHAz44oAXKadpV11QfZdjxrc6jqQ-4wUlqvkaOZrCidKL3t7iYqS6x3Ob1vk4MeaOX62r0FgGJ7TLAJeH1csmH9tFbgMt0Q3hgNf6vMZZ0R1nuRS-vjEqW-SbjH2GDfBTiRjP-LjnA-AvZA-aAJvl8odD0RuY8c66krzd1gS8svN4Nhxrgcdc-LB2bVCP0TiuJtP56XaqHZgxk7pmQivCk7SFjOaiISmAksXqk82GNZKoQQnKHyXU9b-YbZKRYD1SUaCw",
 };
+
+export const paymentDatabase = new PostgresDatabase();
+export const dbTestHelper = new DbTestHelper(paymentDatabase);
+export const coinGeckoAxios = createAxiosInstance({
+  config: { validateStatus: () => true },
+});
+export const coinGeckoOracle = new CoingeckoArweaveToFiatOracle(coinGeckoAxios);
+export const arweaveToFiatOracle = new ReadThroughArweaveToFiatOracle({
+  oracle: coinGeckoOracle,
+});
+export const pricingService = new TurboPricingService({ arweaveToFiatOracle });
+export const axios = axiosPackage.create({
+  baseURL: localTestUrl,
+  validateStatus: () => true,
+});
+export const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:disable-line

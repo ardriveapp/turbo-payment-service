@@ -1,18 +1,22 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 import Arweave from "arweave/node/common";
-import axiosPackage from "axios";
 import { expect } from "chai";
 import { Server } from "http";
 import { sign } from "jsonwebtoken";
 import { spy, stub } from "sinon";
 import Stripe from "stripe";
 
-import { createAxiosInstance } from "../src/axiosClient";
 import {
   CurrencyLimitations,
   TEST_PRIVATE_ROUTE_SECRET,
   paymentAmountLimits,
 } from "../src/constants";
+import { tableNames } from "../src/database/dbConstants";
+import {
+  ChargebackReceiptDBResult,
+  PaymentReceiptDBResult,
+  UserDBResult,
+} from "../src/database/dbTypes.js";
 import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
 import {
@@ -32,23 +36,16 @@ import {
   paymentIntentStub,
 } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
-import { localTestUrl, testWallet } from "./helpers/testHelpers";
-
-const paymentDatabase = new PostgresDatabase();
-const dbTestHelper = new DbTestHelper(paymentDatabase);
-const coinGeckoAxios = createAxiosInstance({
-  config: { validateStatus: () => true },
-});
-const coinGeckoOracle = new CoingeckoArweaveToFiatOracle(coinGeckoAxios);
-const arweaveToFiatOracle = new ReadThroughArweaveToFiatOracle({
-  oracle: coinGeckoOracle,
-});
-const pricingService = new TurboPricingService({ arweaveToFiatOracle });
-const axios = axiosPackage.create({
-  baseURL: localTestUrl,
-  validateStatus: () => true,
-});
-const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:disable-line
+import {
+  axios,
+  coinGeckoAxios,
+  coinGeckoOracle,
+  dbTestHelper,
+  paymentDatabase,
+  pricingService,
+  testAddress,
+  testWallet,
+} from "./helpers/testHelpers";
 
 describe("Router tests", () => {
   let server: Server;
@@ -613,7 +610,8 @@ describe("with a stubbed stripe instance", () => {
     logger.info("Server closed!");
   }
   before(async () => {
-    server = await createServer({ stripe });
+    process.env.DISABLE_LOGS = "false";
+    server = await createServer({ stripe, paymentDatabase });
   });
 
   after(() => {
@@ -621,59 +619,151 @@ describe("with a stubbed stripe instance", () => {
   });
 
   // We expect to return 200 OK on all stripe webhook events we handle regardless of how we handle the event
-  it("POST /stripe-webhook returns 200 for valid stripe events", async () => {
-    const dbTestHelper = new DbTestHelper(new PostgresDatabase());
+  it("POST /stripe-webhook returns 200 for valid stripe dispute event", async () => {
+    const disputeEventPaymentReceiptId = "A Payment Receipt Id to Dispute 👊🏻";
+    const disputeEventUserAddress = "User Address to Dispute 🤺";
+    const topUpQuoteId = "0x1234567890";
+    const dispute = chargeDisputeStub({
+      metadata: {
+        destinationAddress: disputeEventUserAddress,
+        topUpQuoteId: topUpQuoteId,
+      },
+    });
+
+    // Insert payment receipt and user that dispute event depends on
+    await dbTestHelper.insertStubUser({
+      user_address: disputeEventUserAddress,
+      winston_credit_balance: "1000",
+    });
+    await dbTestHelper.insertStubPaymentReceipt({
+      payment_receipt_id: disputeEventPaymentReceiptId,
+      winston_credit_amount: "50",
+      top_up_quote_id: topUpQuoteId,
+      destination_address: disputeEventUserAddress,
+    });
+
+    const webhookStub = stub(stripe.webhooks, "constructEvent").returns({
+      type: "charge.dispute.created",
+      data: {
+        object: dispute,
+      },
+    } as unknown as Stripe.Event);
+
+    const { status, statusText, data } = await axios.post(`/v1/stripe-webhook`);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+    expect(data).to.equal("OK");
+
+    // wait a few seconds for the database to update since we return the response right away
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const chargebackReceipt = await paymentDatabase[
+      "knex"
+    ]<ChargebackReceiptDBResult>(tableNames.chargebackReceipt).where({
+      payment_receipt_id: disputeEventPaymentReceiptId,
+    });
+    expect(chargebackReceipt.length).to.equal(1);
+
+    const {
+      payment_amount,
+      currency_type,
+      destination_address,
+      destination_address_type,
+      payment_provider,
+      chargeback_receipt_date,
+      chargeback_receipt_id,
+      payment_receipt_id,
+      winston_credit_amount,
+      chargeback_reason,
+    } = chargebackReceipt[0];
+
+    expect(payment_amount).to.equal("100");
+    expect(currency_type).to.equal("usd");
+    expect(destination_address).to.equal(disputeEventUserAddress);
+    expect(destination_address_type).to.equal("arweave");
+    expect(payment_provider).to.equal("stripe");
+    expect(chargeback_receipt_date).to.exist;
+    expect(chargeback_receipt_id).to.exist;
+    expect(payment_receipt_id).to.equal(disputeEventPaymentReceiptId);
+    expect(winston_credit_amount).to.equal("50");
+    expect(chargeback_reason).to.equal("fraudulent");
+
+    const user = await paymentDatabase["knex"]<UserDBResult>(
+      tableNames.user
+    ).where({
+      user_address: disputeEventUserAddress,
+    });
+
+    expect(user[0].winston_credit_balance).to.equal("950");
+
+    webhookStub.restore();
+  });
+
+  it("POST /stripe-webhook returns 200 for valid stripe payment success event", async () => {
+    const paymentReceivedEventId = "A Payment Receipt Id";
+    const paymentReceivedUserAddress = "User Address credited payment";
+    const paymentSuccessTopUpQuoteId = "0x0987654321";
+
+    await dbTestHelper.insertStubUser({
+      user_address: paymentReceivedUserAddress,
+      winston_credit_balance: "0",
+    });
 
     await dbTestHelper.insertStubTopUpQuote({
-      top_up_quote_id: "webhook intent Succeeded",
-      payment_amount: "500",
-      currency_type: "usd",
+      top_up_quote_id: paymentSuccessTopUpQuoteId,
+      winston_credit_amount: "500",
+      payment_amount: "100",
+      destination_address: paymentReceivedUserAddress,
     });
 
     const successStub = paymentIntentStub({
-      id: "webhook intent Succeeded",
-      topUpQuoteId: "webhook intent Succeeded",
-      amount: 500,
+      id: paymentReceivedEventId,
+      metadata: {
+        topUpQuoteId: paymentSuccessTopUpQuoteId,
+      },
+      amount: 100,
       currency: "usd",
     });
 
-    await dbTestHelper.insertStubPaymentReceipt({
-      top_up_quote_id: "webhook dispute created",
-      payment_receipt_id: "webhook dispute created",
-      payment_amount: "1000",
-      currency_type: "gbp",
+    const webhookStub = stub(stripe.webhooks, "constructEvent").returns({
+      type: "payment_intent.succeeded",
+      data: {
+        object: successStub,
+      },
+    } as unknown as Stripe.Event);
+
+    const { status, statusText, data } = await axios.post(`/v1/stripe-webhook`);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+    expect(data).to.equal("OK");
+
+    // wait a few seconds for the database to update since we return the response right away
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const paymentReceipt = await paymentDatabase[
+      "knex"
+    ]<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
+      top_up_quote_id: paymentSuccessTopUpQuoteId,
     });
+    expect(paymentReceipt.length).to.equal(1);
 
-    const disputeStub = chargeDisputeStub({
-      id: "webhook dispute created",
-      topUpQuoteId: "webhook dispute created",
-      amount: 1000,
-      currency: "gbp",
-    });
+    const {
+      payment_amount,
+      currency_type,
+      destination_address,
+      destination_address_type,
+      payment_provider,
+    } = paymentReceipt[0];
 
-    const webhookEvents = [
-      ["payment_intent.succeeded", successStub],
-      ["charge.dispute.created", disputeStub],
-    ];
+    expect(payment_amount).to.equal("100");
+    expect(currency_type).to.equal("usd");
+    expect(destination_address).to.equal(paymentReceivedUserAddress);
+    expect(destination_address_type).to.equal("arweave");
+    expect(payment_provider).to.equal("stripe");
 
-    for (const [eventType, eventStub] of webhookEvents) {
-      const webhookStub = stub(stripe.webhooks, "constructEvent").returns({
-        type: eventType,
-        data: {
-          object: eventStub,
-        },
-      } as unknown as Stripe.Event);
-
-      const { status, statusText, data } = await axios.post(
-        `/v1/stripe-webhook`
-      );
-
-      expect(status).to.equal(200);
-      expect(statusText).to.equal("OK");
-      expect(data).to.equal("OK");
-
-      webhookStub.restore();
-    }
+    webhookStub.restore();
   });
 
   it("POST /stripe-webhook returns 400 for invalid stripe requests", async () => {
