@@ -11,6 +11,7 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "typecheck": "tsc --noEmit",
     "test": "nyc mocha --spec='src/**/*.test.ts' --spec='tests/**/*.test.ts'",
+    "test:local": "yarn db:up && yarn test $* ; yarn db:down",
     "test:unit": "nyc mocha --spec='src/**/*.test.ts'",
     "test:integration": "nyc mocha --spec='tests/**/*.test.ts'",
     "test:integration:local": "yarn db:up && yarn test:integration $* ; yarn db:down",
