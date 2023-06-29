@@ -128,9 +128,11 @@ export const chargeDisputeStub = ({
 export const stripeStubEvent = ({
   id = "evt_1NO6oXC8apPOWkDLjlNxy96d",
   eventObject,
+  type,
 }: {
-  eventObject: Stripe.Dispute;
+  eventObject: Stripe.Dispute | Stripe.PaymentIntent;
   id?: string;
+  type: string;
 }): Stripe.Event => {
   return {
     id,
@@ -141,7 +143,7 @@ export const stripeStubEvent = ({
     },
     api_version: "2022-11-15",
     livemode: false,
-    type: "charge.dispute.created",
+    type: type,
     pending_webhooks: 0,
     request: null,
   };

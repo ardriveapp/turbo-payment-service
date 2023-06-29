@@ -17,7 +17,6 @@ import {
   PaymentReceiptDBResult,
   UserDBResult,
 } from "../src/database/dbTypes.js";
-import { PostgresDatabase } from "../src/database/postgres";
 import logger from "../src/logger";
 import {
   CoingeckoArweaveToFiatOracle,
@@ -29,11 +28,11 @@ import { supportedPaymentCurrencyTypes } from "../src/types/supportedCurrencies"
 import { Winston } from "../src/types/winston";
 import { loadSecretsToEnv } from "../src/utils/loadSecretsToEnv";
 import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
-import { DbTestHelper } from "./dbTestHelper";
 import {
   chargeDisputeStub,
   expectedArPrices,
   paymentIntentStub,
+  stripeStubEvent,
 } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import {
@@ -610,7 +609,6 @@ describe("with a stubbed stripe instance", () => {
     logger.info("Server closed!");
   }
   before(async () => {
-    process.env.DISABLE_LOGS = "false";
     server = await createServer({ stripe, paymentDatabase });
   });
 
@@ -642,12 +640,14 @@ describe("with a stubbed stripe instance", () => {
       destination_address: disputeEventUserAddress,
     });
 
-    const webhookStub = stub(stripe.webhooks, "constructEvent").returns({
+    const stubEvent = stripeStubEvent({
       type: "charge.dispute.created",
-      data: {
-        object: dispute,
-      },
-    } as unknown as Stripe.Event);
+      eventObject: dispute,
+    });
+
+    const webhookStub = stub(stripe.webhooks, "constructEvent").returns(
+      stubEvent
+    );
 
     const { status, statusText, data } = await axios.post(`/v1/stripe-webhook`);
 
@@ -659,7 +659,7 @@ describe("with a stubbed stripe instance", () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const chargebackReceipt = await paymentDatabase[
-      "knex"
+      "knexReader"
     ]<ChargebackReceiptDBResult>(tableNames.chargebackReceipt).where({
       payment_receipt_id: disputeEventPaymentReceiptId,
     });
@@ -689,7 +689,7 @@ describe("with a stubbed stripe instance", () => {
     expect(winston_credit_amount).to.equal("50");
     expect(chargeback_reason).to.equal("fraudulent");
 
-    const user = await paymentDatabase["knex"]<UserDBResult>(
+    const user = await paymentDatabase["knexReader"]<UserDBResult>(
       tableNames.user
     ).where({
       user_address: disputeEventUserAddress,
@@ -726,12 +726,14 @@ describe("with a stubbed stripe instance", () => {
       currency: "usd",
     });
 
-    const webhookStub = stub(stripe.webhooks, "constructEvent").returns({
+    const stubEvent = stripeStubEvent({
       type: "payment_intent.succeeded",
-      data: {
-        object: successStub,
-      },
-    } as unknown as Stripe.Event);
+      eventObject: successStub,
+    });
+
+    const webhookStub = stub(stripe.webhooks, "constructEvent").returns(
+      stubEvent
+    );
 
     const { status, statusText, data } = await axios.post(`/v1/stripe-webhook`);
 
@@ -743,7 +745,7 @@ describe("with a stubbed stripe instance", () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const paymentReceipt = await paymentDatabase[
-      "knex"
+      "knexReader"
     ]<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
       top_up_quote_id: paymentSuccessTopUpQuoteId,
     });
