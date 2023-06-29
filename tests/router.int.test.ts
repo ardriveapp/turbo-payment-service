@@ -156,6 +156,7 @@ describe("Router tests", () => {
 
     expect(data).to.deep.equal(expectedRates);
   });
+
   it("GET /price/:currency/:value", async () => {
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave
