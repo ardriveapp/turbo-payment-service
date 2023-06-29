@@ -10,7 +10,7 @@
     "lint": "eslint . --ext .ts",
     "lint:fix": "eslint . --ext .ts --fix",
     "typecheck": "tsc --noEmit",
-    "test": "yarn test:unit; yarn test:integration",
+    "test": "nyc mocha --spec='src/**/*.test.ts' --spec='tests/**/*.test.ts'",
     "test:unit": "nyc mocha --spec='src/**/*.test.ts'",
     "test:integration": "nyc mocha --spec='tests/**/*.test.ts'",
     "test:integration:local": "yarn db:up && yarn test:integration $* ; yarn db:down",
