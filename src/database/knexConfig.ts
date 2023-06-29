@@ -12,17 +12,8 @@ const baseConfig = {
 };
 
 function getDbConnection(host: string) {
-  /** PostgreSQL port for test environment  */
-  const testEnvPort = 54320;
-
-  /** PostgreSQL port for local development environment and production */
-  const localEnvPort = 5432;
-
-  const dbPort =
-    process.env.DB_PORT || process.env.NODE_ENV === "test"
-      ? testEnvPort
-      : localEnvPort;
-  const dbPassword = process.env.DB_PASSWORD || "localTestPassword";
+  const dbPort = +(process.env.DB_PORT || 5432);
+  const dbPassword = process.env.DB_PASSWORD || "postgres";
 
   return `postgres://postgres:${dbPassword}@${host}:${dbPort}/postgres?sslmode=disable`;
 }

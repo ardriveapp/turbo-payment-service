@@ -1,15 +1,14 @@
 import { createLogger, format, transports } from "winston";
 
-import { isTestEnv } from "./constants";
-
 const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
 const LOG_ALL_STACKTRACES = process.env.LOG_ALL_STACKTRACES === "true";
 // TODO: Add "json" for dev and prod?
 const LOG_FORMAT = process.env.LOG_FORMAT ?? "simple";
+const DISABLE_LOGS = Boolean(process.env.DISABLE_LOGS) ?? false;
 
 const logger = createLogger({
   level: LOG_LEVEL,
-  silent: isTestEnv,
+  silent: DISABLE_LOGS,
   format: format.combine(
     format((info) => {
       // Only log stack traces when the log level is error or the

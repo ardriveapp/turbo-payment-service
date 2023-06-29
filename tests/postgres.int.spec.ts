@@ -1,16 +1,16 @@
 import { expect } from "chai";
 
-import { DbTestHelper } from "../../tests/dbTestHelper";
-import { expectAsyncErrorThrow } from "../../tests/helpers/testHelpers";
-import { Winston } from "../types/winston";
-import { tableNames } from "./dbConstants";
+import { tableNames } from "../src/database/dbConstants";
 import {
   ChargebackReceiptDBResult,
   PaymentReceiptDBResult,
   TopUpQuoteDBResult,
   UserDBResult,
-} from "./dbTypes";
-import { PostgresDatabase } from "./postgres";
+} from "../src/database/dbTypes";
+import { PostgresDatabase } from "../src/database/postgres";
+import { Winston } from "../src/types/winston";
+import { DbTestHelper } from "./dbTestHelper";
+import { expectAsyncErrorThrow } from "./helpers/testHelpers";
 
 describe("PostgresDatabase class", () => {
   const db = new PostgresDatabase();

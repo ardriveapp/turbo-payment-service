@@ -3,23 +3,27 @@ import Stripe from "stripe";
 interface StubPaymentIntentParams {
   id?: string;
   status?: Stripe.PaymentIntent.Status;
-  topUpQuoteId?: string;
   currency?: string;
   amount?: number;
+  metadata?: {
+    [x: string]: string;
+  };
 }
 export const paymentIntentStub = ({
   id = "pi_123",
   status = "succeeded",
-  topUpQuoteId = "0x1234567890",
   currency = "usd",
   amount = 100,
+  metadata = {
+    topUpQuoteId: "0x1234567890",
+  },
 }: StubPaymentIntentParams): Stripe.PaymentIntent => {
   return {
     id,
     status,
     amount,
     currency,
-    metadata: { topUpQuoteId },
+    metadata,
     object: "payment_intent",
     amount_capturable: 0,
     amount_received: 0,
@@ -63,9 +67,11 @@ export const paymentIntentFailedStub: Stripe.PaymentIntent = paymentIntentStub({
 
 export const chargeDisputeStub = ({
   id = "dp_1MnkNVC8apPOWkDLH9wJvENb",
-  topUpQuoteId = "0x1234567890",
   currency = "usd",
   amount = 100,
+  metadata = {
+    topUpQuoteId: "0x1234567890",
+  },
 }: StubPaymentIntentParams): Stripe.Dispute => {
   return {
     id,
@@ -112,12 +118,34 @@ export const chargeDisputeStub = ({
     },
     is_charge_refundable: true,
     livemode: false,
-    metadata: {
-      topUpQuoteId,
-    },
+    metadata,
     payment_intent: null,
     reason: "fraudulent",
     status: "warning_needs_response",
+  };
+};
+
+export const stripeStubEvent = ({
+  id = "evt_1NO6oXC8apPOWkDLjlNxy96d",
+  eventObject,
+  type,
+}: {
+  eventObject: Stripe.Dispute | Stripe.PaymentIntent;
+  id?: string;
+  type: string;
+}): Stripe.Event => {
+  return {
+    id,
+    created: 1687991177,
+    object: "event",
+    data: {
+      object: eventObject,
+    },
+    api_version: "2022-11-15",
+    livemode: false,
+    type: type,
+    pending_webhooks: 0,
+    request: null,
   };
 };
 
