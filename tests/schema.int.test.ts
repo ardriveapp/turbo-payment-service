@@ -16,6 +16,9 @@ describe("Schema class", () => {
 
     // Run a new schema create after the rollback test so database will be as expected for integration tests
     await Schema.create(knex);
+
+    // Run these tests that depend on db after schema tests
+    require("./postgres.int.spec");
   });
 
   it("after running latest knex migrations with knex CLI from docker-test.sh, all expected tables exists", async () => {
