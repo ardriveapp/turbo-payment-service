@@ -31,6 +31,7 @@ import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
 import {
   chargeDisputeStub,
   expectedArPrices,
+  expectedRates,
   paymentIntentStub,
   stripeStubEvent,
 } from "./helpers/stubs";
@@ -136,19 +137,25 @@ describe("Router tests", () => {
     expect(data).to.equal("Fiat Oracle Unavailable");
   });
 
+  it("GET /rates returns 502 if unable to fetch prices", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").throws();
+    const { status, statusText } = await axios.get(`/v1/rates`);
+
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+  });
+
   it("GET /rates returns the correct response", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").callsFake(
-      (currency): Promise<CoinGeckoResponse> => {
-        return Promise.resolve(expectedArPrices[currency]);
-      }
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
     );
     const { data, status, statusText } = await axios.get(`/v1/rates`);
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
-    expect(data).to.equal("Fiat Oracle Unavailable");
-  });
 
+    expect(data).to.deep.equal(expectedRates);
+  });
   it("GET /price/:currency/:value", async () => {
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave
