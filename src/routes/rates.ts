@@ -1,6 +1,7 @@
 import { Next } from "koa";
 
 import {
+  oneARInWinston,
   oneGiBInBytes,
   oneMinuteInSeconds,
   turboFeePercentageAsADecimal,
@@ -26,7 +27,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
 
         const fiatPriceForOneGiB = winston.times(fiatPriceForOneAR);
         const fiatValue =
-          (fiatPriceForOneGiB.toBigNumber().toNumber() / 1e12) *
+          (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
           (1 + turboFeePercentageAsADecimal);
 
         fiat[currency] = fiatValue;

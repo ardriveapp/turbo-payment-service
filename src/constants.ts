@@ -10,6 +10,7 @@ export const paymentIntentTopUpMethod = "payment-intent";
 export const checkoutSessionTopUpMethod = "checkout-session";
 
 export const oneGiBInBytes = ByteCount(1024 * 1024 * 1024);
+export const oneARInWinston = 1e12;
 
 export const topUpMethods = [
   paymentIntentTopUpMethod,
