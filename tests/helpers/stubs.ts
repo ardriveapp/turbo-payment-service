@@ -197,7 +197,7 @@ export const expectedArPrices = {
 };
 
 export const expectedRates = {
-  credits: 857922282166,
+  winc: 857922282166,
   fiat: {
     aud: 10.6656898118868,
     brl: 35.744473964163596,

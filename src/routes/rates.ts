@@ -35,17 +35,17 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     );
 
     const rates = {
-      credits: winston.toBigNumber().toNumber(),
+      winc: winston.toBigNumber().toNumber(),
       fiat: { ...fiat },
     };
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = rates;
-    logger.info("Rates calculated!", { rates });
+    logger.info("Successfully calculated rates.", { rates });
   } catch (error) {
     ctx.response.status = 502;
-    ctx.body = "Cannot calculate rates";
-    logger.error("Cannot calculate rates", error);
+    ctx.body = "Failed to calculate rates.";
+    logger.error("Failed to calculate rates.", error);
   }
   return next;
 }
