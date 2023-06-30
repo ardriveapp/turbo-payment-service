@@ -13,8 +13,6 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
   const { pricingService } = ctx.state;
 
-  logger.info("GET request for rates");
-
   try {
     const winston: Winston = await pricingService.getWCForBytes(oneGiBInBytes);
     const fiat: Record<string, number> = {};
