@@ -17,22 +17,23 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
 
   try {
     const winston: Winston = await pricingService.getWCForBytes(oneGiBInBytes);
-    const fiat = {} as Record<string, number>;
+    const fiat: Record<string, number> = {};
 
     // Calculate fiat prices for one GiB
-    await Promise.all(supportedPaymentCurrencyTypes.reduce(async (fiat, currency) => {
-      const fiatPriceForOneAR = await pricingService.getFiatPriceForOneAR(
-        currency
-      );
+    await Promise.all(
+      supportedPaymentCurrencyTypes.map(async (currency) => {
+        const fiatPriceForOneAR = await pricingService.getFiatPriceForOneAR(
+          currency
+        );
 
-      const fiatPriceForOneGiB = winston.times(fiatPriceForOneAR);
-
-      return {
-          ...fiat,
-           [currency]: (fiatPriceForOneGiB.toBigNumber().toNumber() / 1e12) *
+        const fiatPriceForOneGiB = winston.times(fiatPriceForOneAR);
+        const fiatValue =
+          (fiatPriceForOneGiB.toBigNumber().toNumber() / 1e12) *
           (1 + turboFeePercentageAsADecimal);
-        }
-    })
+
+        fiat[currency] = fiatValue;
+      })
+    );
 
     const rates = {
       credits: winston.toBigNumber().toNumber(),
