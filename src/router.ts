@@ -7,6 +7,7 @@ import { balanceRoute } from "./routes/balance";
 import { countriesHandler } from "./routes/countries";
 import { currenciesRoute } from "./routes/currencies";
 import { priceRoutes } from "./routes/priceRoutes";
+import { ratesHandler } from "./routes/rates";
 import { refundBalance } from "./routes/refundBalance";
 import { reserveBalance } from "./routes/reserveBalance";
 import { stripeRoute } from "./routes/stripe/stripeRoute";
@@ -36,6 +37,8 @@ router.get("/v1/reserve-balance/:walletAddress/:byteCount", reserveBalance);
 router.get("/v1/refund-balance/:walletAddress/:winstonCredits", refundBalance);
 
 router.get("/v1/countries", countriesHandler);
+
+router.get("/v1/rates", ratesHandler);
 
 // Health
 router.get("/health", async (ctx: KoaContext, next: Next) => {

@@ -73,6 +73,30 @@ components:
           type: string
           example: stripe
 
+    ConversionRates:
+      type: object
+      properties:
+        winc:
+          type: number
+          description: A big number representing the amount of credits in winc that 1GB of storage costs based on current market rates. One credit is equivalent to 1,000,000,000,000 winc.
+          example: 332824926
+        fiat:
+          type: object
+          description: The amount of fiat currencies that 1GB of storage costs based on current market rates.
+          example:
+            {
+              aud: 8.1228081675468,
+              brl: 26.0465204865588,
+              cad: 7.1550718332636,
+              eur: 4.9519274126615995,
+              gbp: 4.251862830414,
+              hkd: 42.3539072259708,
+              inr: 443.50120792114916,
+              jpy: 781.2411885860027,
+              sgd: 7.3197929114399995,
+              usd: 5.4049103776452005,
+            }
+
     PaymentSession:
       type: object
       description: The full payment-intent or checkout-session from a payment provider
@@ -353,3 +377,15 @@ paths:
                 example: ["United Kingdom", "United States"]
                 items:
                   type: string
+
+  /rates:
+    get:
+      summary: Get conversion rates for 1GB of storage
+      description: Returns the supported fiat currency conversion rates for 1GB of storage based on current market prices.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ConversionRates"

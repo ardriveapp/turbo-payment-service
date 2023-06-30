@@ -1,3 +1,4 @@
+import { ByteCount } from "./types/byteCount";
 import { SupportedPaymentCurrencyTypes } from "./types/supportedCurrencies";
 
 export const isTestEnv = process.env.NODE_ENV === "test";
@@ -7,6 +8,9 @@ export const oneHourInSeconds = 3600;
 export const oneMinuteInSeconds = 60;
 export const paymentIntentTopUpMethod = "payment-intent";
 export const checkoutSessionTopUpMethod = "checkout-session";
+
+export const oneGiBInBytes = ByteCount(1024 * 1024 * 1024);
+export const oneARInWinston = 1e12;
 
 export const topUpMethods = [
   paymentIntentTopUpMethod,
