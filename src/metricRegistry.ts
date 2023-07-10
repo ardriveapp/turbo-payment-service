@@ -33,6 +33,8 @@ export class MetricRegistry {
     help: "Count of uncaught exceptions",
   });
 
+  // TODO: add metric that tracks fraudulent wallet addresses
+
   private constructor() {
     this.registry = new promClient.Registry();
 

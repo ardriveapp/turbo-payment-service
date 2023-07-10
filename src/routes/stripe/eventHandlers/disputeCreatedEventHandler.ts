@@ -1,6 +1,7 @@
 import { randomUUID } from "crypto";
 import { Stripe } from "stripe";
 
+import { maxAllowedChargebackDisputes } from "../../../constants.js";
 import { Database } from "../../../database/database";
 import logger from "../../../logger";
 import { MetricRegistry } from "../../../metricRegistry";
@@ -28,10 +29,22 @@ export async function handleDisputeCreatedEvent(
       topUpQuoteId,
     });
 
-    // TODO: tag a user in stripe as potentially fraudulent
+    const totalWalletChargebacks =
+      await paymentDatabase.getChargebackReceiptsForAddress(destinationAddress);
+
+    if (totalWalletChargebacks.length > maxAllowedChargebackDisputes) {
+      // TODO: tag a user in stripe as potentially fraudulent, block payments from card/customer
+      logger.info(
+        "Wallet has suspicious number of chargebacks. Tagging as potentially fraudulent in stripe.",
+        {
+          destinationAddress,
+          totalWalletChargebacks,
+          maxAllowedChargebackDisputes,
+        }
+      );
+    }
 
     MetricRegistry.paymentChargebackCounter.inc();
-
     logger.info("Chargeback receipt created!", {
       chargebackReceiptId,
       topUpQuoteId,
