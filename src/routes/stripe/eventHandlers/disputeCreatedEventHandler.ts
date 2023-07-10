@@ -7,7 +7,8 @@ import { MetricRegistry } from "../../../metricRegistry";
 
 export async function handleDisputeCreatedEvent(
   pi: Stripe.Dispute,
-  paymentDatabase: Database
+  paymentDatabase: Database,
+  stripe: Stripe // eslint-disable-line
 ) {
   // TODO: Can we depend on this top up quote id to be in the metadata on every chargeback event?
   const topUpQuoteId = pi.metadata["topUpQuoteId"];
@@ -26,6 +27,8 @@ export async function handleDisputeCreatedEvent(
       chargebackReceiptId,
       topUpQuoteId,
     });
+
+    // TODO: tag a user in stripe as potentially fraudulent
 
     MetricRegistry.paymentChargebackCounter.inc();
 

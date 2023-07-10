@@ -4,8 +4,8 @@ export class Winston {
   private amount: BigNumber;
   constructor(amount: BigNumber.Value) {
     this.amount = new BigNumber(amount);
-    if (this.amount.isLessThan(0) || !this.amount.isInteger()) {
-      throw new Error("Winston value should be a non-negative integer!");
+    if (!this.amount.isInteger()) {
+      throw new Error("Winston value should be an integer!");
     }
   }
 

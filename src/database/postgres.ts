@@ -271,6 +271,26 @@ export class PostgresDatabase implements Database {
     return paymentReceiptDbResults.map(paymentReceiptDBMap)[0];
   }
 
+  private async getChargebackReceiptWhere(
+    where: Partial<ChargebackReceiptDBResult>,
+    knexTransaction: Knex.Transaction = this.knexReader as Knex.Transaction
+  ): Promise<ChargebackReceipt[]> {
+    const chargebackReceiptDbResult =
+      await knexTransaction<ChargebackReceiptDBResult>(
+        tableNames.chargebackReceipt
+      ).where(where);
+
+    return chargebackReceiptDbResult.map(chargebackReceiptDBMap);
+  }
+
+  public async getChargebackReceiptsForAddress(
+    userAddress: string
+  ): Promise<ChargebackReceipt[]> {
+    return this.getChargebackReceiptWhere({
+      destination_address: userAddress,
+    });
+  }
+
   public async createChargebackReceipt({
     topUpQuoteId,
     chargebackReason,
@@ -295,9 +315,9 @@ export class PostgresDatabase implements Database {
 
       let newBalance: Winston;
       try {
+        // this could result in a negative balance for a user
         newBalance = currentBalance.minus(winstonCreditAmount);
       } catch (error) {
-        // TODO: We don't allow negative winston type. but should we allow negative Winston Credit type in this error scenario?
         throw Error(
           `User with address '${destinationAddress}' does not have enough balance to decrement this chargeback!`
         );
