@@ -313,15 +313,8 @@ export class PostgresDatabase implements Database {
       // Decrement balance of existing user
       const currentBalance = user.winstonCreditBalance;
 
-      let newBalance: Winston;
-      try {
-        // this could result in a negative balance for a user
-        newBalance = currentBalance.minus(winstonCreditAmount);
-      } catch (error) {
-        throw Error(
-          `User with address '${destinationAddress}' does not have enough balance to decrement this chargeback!`
-        );
-      }
+      // this could result in a negative balance for a user, will throw an error if non-integer winston balance
+      const newBalance = currentBalance.minus(winstonCreditAmount);
 
       // Update the users balance.
       await knexTransaction<UserDBResult>(tableNames.user)
