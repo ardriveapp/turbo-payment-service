@@ -34,6 +34,10 @@ export class MetricRegistry {
   });
 
   // TODO: add metric that tracks fraudulent wallet addresses
+  public static suspiciousWalletActivity = new promClient.Counter({
+    name: "suspicious_wallet_activity",
+    help: "Count of suspicious wallet activity (e.g. high number of chargebacks)",
+  });
 
   private constructor() {
     this.registry = new promClient.Registry();
@@ -46,6 +50,7 @@ export class MetricRegistry {
     this.registry.registerMetric(
       MetricRegistry.stripeSessionCreationErrorCounter
     );
+    this.registry.registerMetric(MetricRegistry.suspiciousWalletActivity);
   }
 
   public static getInstance(): MetricRegistry {

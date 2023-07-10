@@ -42,6 +42,18 @@ export class Winston {
     return this.amount.isGreaterThan(winston.amount);
   }
 
+  isLessThan(winston: Winston): boolean {
+    return this.amount.isLessThan(winston.amount);
+  }
+
+  isNonZeroPositiveInteger(): boolean {
+    return this.amount.isGreaterThan(0) && this.amount.isInteger();
+  }
+
+  isNonZeroNegativeInteger(): boolean {
+    return this.amount.isLessThan(0) && this.amount.isInteger();
+  }
+
   isGreaterThanOrEqualTo(winston: Winston): boolean {
     return this.amount.isGreaterThanOrEqualTo(winston.amount);
   }
