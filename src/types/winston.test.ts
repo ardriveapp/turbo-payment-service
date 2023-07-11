@@ -167,6 +167,34 @@ describe("Winston class", () => {
     });
   });
 
+  describe("isNonZeroPositiveInteger", () => {
+    it("returns true for a positive non zero integer", () => {
+      expect(new Winston(1).isNonZeroPositiveInteger()).to.be.true;
+    });
+
+    it("returns false for 0", () => {
+      expect(new Winston(0).isNonZeroPositiveInteger()).to.be.false;
+    });
+
+    it("returns false for a negative non-zero integer", () => {
+      expect(new Winston(-1).isNonZeroPositiveInteger()).to.be.false;
+    });
+  });
+
+  describe("isNonZeroNegativeInteger", () => {
+    it("returns true for a negative non zero integer", () => {
+      expect(new Winston(-1).isNonZeroNegativeInteger()).to.be.true;
+    });
+
+    it("returns false for 0", () => {
+      expect(new Winston(0).isNonZeroNegativeInteger()).to.be.false;
+    });
+
+    it("returns false for a positive non-zero integer", () => {
+      expect(new Winston(1).isNonZeroNegativeInteger()).to.be.false;
+    });
+  });
+
   describe("difference function", () => {
     it("can return a positive difference between Winstons", () => {
       expect(Winston.difference(new Winston(2), new Winston(1))).to.equal("1");
