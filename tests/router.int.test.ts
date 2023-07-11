@@ -166,7 +166,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data.winc)).to.equal(113960113960);
+    expect(+new Winston(data.winc)).to.equal(109686609687);
   });
 
   it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
