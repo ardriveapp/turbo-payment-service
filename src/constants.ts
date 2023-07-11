@@ -19,7 +19,7 @@ export const topUpMethods = [
 
 export const TEST_PRIVATE_ROUTE_SECRET = "test-secret";
 
-export const turboFeePercentageAsADecimal = 0.2;
+export const turboFeePercentageAsADecimal = 0.23;
 
 // cspell:disable
 export const electronicallySuppliedServicesTaxCode = "txcd_10000000"; //cspell:disable
