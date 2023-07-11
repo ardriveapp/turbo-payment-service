@@ -367,11 +367,10 @@ export class PostgresDatabase implements Database {
       const user = await this.getUser(userAddress, knexTransaction);
 
       const currentWinstonBalance = user.winstonCreditBalance;
-      let newBalance: Winston;
+      const newBalance = currentWinstonBalance.minus(winstonCreditAmount);
 
-      try {
-        newBalance = currentWinstonBalance.minus(winstonCreditAmount);
-      } catch {
+      // throw insufficient balance error if the user would go to a negative balance
+      if (newBalance.isNonZeroNegativeInteger()) {
         throw new InsufficientBalance(userAddress);
       }
 
