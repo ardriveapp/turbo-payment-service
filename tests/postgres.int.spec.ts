@@ -424,34 +424,62 @@ describe("PostgresDatabase class", () => {
       ).to.equal(0);
     });
 
-    it("errors as expected when user has no funds to decrement balance", async () => {
+    it("decrements user's balance and creates a chargeback even if the chargeback results in a negative balance", async () => {
       const underfundedUserAddress = "Broke 😭";
+      const topUpQuoteId = "Used top up quote";
+      const chargebackReceiptId = "negative balance chargeback";
+      const disputedWinstonAmount = "200";
 
       await dbTestHelper.insertStubUser({
         user_address: underfundedUserAddress,
-        winston_credit_balance: "200",
-      });
-      await dbTestHelper.insertStubPaymentReceipt({
-        top_up_quote_id: "New ID 42342",
-        destination_address: underfundedUserAddress,
+        winston_credit_balance: "100",
       });
 
-      await expectAsyncErrorThrow({
-        promiseToError: db.createChargebackReceipt({
-          topUpQuoteId: "New ID 42342",
-          chargebackReceiptId: "Great value",
-          chargebackReason: "What ?",
-        }),
-        errorMessage: `User with address '${underfundedUserAddress}' does not have enough balance to decrement this chargeback!`,
+      await dbTestHelper.insertStubPaymentReceipt({
+        top_up_quote_id: topUpQuoteId,
+        destination_address: underfundedUserAddress,
+        winston_credit_amount: disputedWinstonAmount,
       });
+
+      const negativeBalanceUserBefore = await db["knexWriter"]<UserDBResult>(
+        tableNames.user
+      ).where({
+        user_address: underfundedUserAddress,
+      });
+
+      const balanceBeforeChargeback = new Winston(
+        negativeBalanceUserBefore[0].winston_credit_balance
+      );
+
+      await db.createChargebackReceipt({
+        topUpQuoteId: topUpQuoteId,
+        chargebackReceiptId: chargebackReceiptId,
+        chargebackReason: "Stripe Dispute Webhook Event",
+      });
+
+      const negativeBalanceAfter = await db["knexWriter"]<UserDBResult>(
+        tableNames.user
+      ).where({
+        user_address: underfundedUserAddress,
+      });
+
+      const balanceAfterChargeback = new Winston(
+        negativeBalanceAfter[0].winston_credit_balance
+      );
+
+      expect(balanceAfterChargeback.toString()).to.equal(
+        balanceBeforeChargeback
+          .minus(new Winston(disputedWinstonAmount))
+          .toString()
+      );
 
       expect(
         (
           await db["knexWriter"](tableNames.chargebackReceipt).where({
-            chargeback_receipt_id: "Great value",
+            chargeback_receipt_id: chargebackReceiptId,
           })
         ).length
-      ).to.equal(0);
+      ).to.equal(1);
     });
   });
 
