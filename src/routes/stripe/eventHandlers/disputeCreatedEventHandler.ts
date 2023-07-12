@@ -9,20 +9,27 @@ import { MetricRegistry } from "../../../metricRegistry";
 export async function handleDisputeCreatedEvent(
   pi: Stripe.Dispute,
   paymentDatabase: Database,
-  _stripe: Stripe // eslint-disable-line
+  stripe: Stripe
 ) {
-  // TODO: Can we depend on this top up quote id to be in the metadata on every chargeback event?
-  const topUpQuoteId = pi.metadata["topUpQuoteId"];
-  const destinationAddress = pi.metadata["destinationAddress"];
-  logger.info(`🔔  Webhook Dispute Created Event!`, {
-    topUpQuoteId,
-    destinationAddress,
+  logger.info(`🔔 Webhook Dispute Created Event!`, {
     pi,
   });
-
   const chargebackReceiptId = randomUUID();
-
   try {
+    const paymentIntentId = pi.payment_intent as string;
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (!paymentIntent) {
+      throw new Error("Payment intent not found.");
+    }
+
+    // capture the payment intent destination address and top up quote id
+    const { destinationAddress, topUpQuoteId } = paymentIntent.metadata;
+
+    logger.info("Found payment intent related to dispute.", {
+      disputeId: pi.id,
+      paymentIntent,
+    });
+
     await paymentDatabase.createChargebackReceipt({
       chargebackReason: pi.reason,
       chargebackReceiptId,
@@ -30,6 +37,11 @@ export async function handleDisputeCreatedEvent(
     });
 
     MetricRegistry.paymentChargebackCounter.inc();
+
+    logger.info("Chargeback receipt created!", {
+      chargebackReceiptId,
+      topUpQuoteId,
+    });
 
     const [walletBalanceAfterChargeback, totalWalletChargebacks] =
       await Promise.all([
@@ -54,16 +66,10 @@ export async function handleDisputeCreatedEvent(
       );
       MetricRegistry.suspiciousWalletActivity.inc();
     }
-
-    logger.info("Chargeback receipt created!", {
-      chargebackReceiptId,
-      topUpQuoteId,
-    });
   } catch (error) {
     logger.error("Chargeback receipt failed!", {
       chargebackReceiptId,
-      topUpQuoteId,
+      error,
     });
-    logger.error(error);
   }
 }

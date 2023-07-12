@@ -8,6 +8,7 @@ interface StubPaymentIntentParams {
   metadata?: {
     [x: string]: string;
   };
+  paymentIntent?: string;
 }
 export const paymentIntentStub = ({
   id = "pi_123",
@@ -72,6 +73,7 @@ export const chargeDisputeStub = ({
   metadata = {
     topUpQuoteId: "0x1234567890",
   },
+  paymentIntent,
 }: StubPaymentIntentParams): Stripe.Dispute => {
   return {
     id,
@@ -119,7 +121,7 @@ export const chargeDisputeStub = ({
     is_charge_refundable: true,
     livemode: false,
     metadata,
-    payment_intent: null,
+    payment_intent: paymentIntent,
     reason: "fraudulent",
     status: "warning_needs_response",
   };
