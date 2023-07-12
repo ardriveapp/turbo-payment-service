@@ -41,6 +41,9 @@ export interface Database {
   createChargebackReceipt: (
     createChargebackReceiptParams: CreateChargebackReceiptParams
   ) => Promise<void>;
+  getChargebackReceiptsForAddress: (
+    userAddress: UserAddress
+  ) => Promise<ChargebackReceipt[]>;
   getChargebackReceipt: (
     chargebackReceiptId: ChargebackReceiptId
   ) => Promise<ChargebackReceipt>;

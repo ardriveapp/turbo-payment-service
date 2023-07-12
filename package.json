@@ -21,7 +21,7 @@
     "dev": "yarn clean && tsc --project ./tsconfig.prod.json -w",
     "start": "yarn node lib/index.js",
     "start:dev": "yarn nodemon lib/index.js",
-    "start:watch": "yarn nodemon -r ./src/index.ts",
+    "start:watch": "yarn nodemon -r dotenv/config -r ./src/index.ts",
     "start:docker": "docker compose up payment-service --build",
     "db:up": "docker compose up payment-service-pg -d && yarn db:migrate:latest",
     "db:down": "docker compose down ; docker volume rm payment-service_payment-service-data",

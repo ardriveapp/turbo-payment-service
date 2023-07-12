@@ -4,8 +4,8 @@ export class Winston {
   private amount: BigNumber;
   constructor(amount: BigNumber.Value) {
     this.amount = new BigNumber(amount);
-    if (this.amount.isLessThan(0) || !this.amount.isInteger()) {
-      throw new Error("Winston value should be a non-negative integer!");
+    if (!this.amount.isInteger()) {
+      throw new Error("Winston value should be an integer!");
     }
   }
 
@@ -40,6 +40,18 @@ export class Winston {
 
   isGreaterThan(winston: Winston): boolean {
     return this.amount.isGreaterThan(winston.amount);
+  }
+
+  isLessThan(winston: Winston): boolean {
+    return this.amount.isLessThan(winston.amount);
+  }
+
+  isNonZeroPositiveInteger(): boolean {
+    return this.amount.isGreaterThan(0) && this.amount.isInteger();
+  }
+
+  isNonZeroNegativeInteger(): boolean {
+    return this.amount.isLessThan(0) && this.amount.isInteger();
   }
 
   isGreaterThanOrEqualTo(winston: Winston): boolean {

@@ -11,6 +11,10 @@ export const checkoutSessionTopUpMethod = "checkout-session";
 
 export const oneGiBInBytes = ByteCount(1024 * 1024 * 1024);
 export const oneARInWinston = 1e12;
+// the number of existing charge-backs recorded before we mark a wallet as fraudulent
+export const maxAllowedChargebackDisputes = +(
+  process.env.MAX_ALLOWED_CHARGE_BACKS ?? 1
+);
 
 export const topUpMethods = [
   paymentIntentTopUpMethod,

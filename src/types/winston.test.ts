@@ -5,11 +5,6 @@ import { Winston } from "./winston";
 
 describe("Winston class", () => {
   describe("constructor", () => {
-    it("constructor throws an exception when a negative Winston value is provided", () => {
-      expect(() => new Winston(-1)).to.throw(Error);
-      expect(() => new Winston("-1")).to.throw(Error);
-    });
-
     it("constructor throws an exception when a non-integer Winston value is provided", () => {
       expect(() => new Winston(0.5)).to.throw(Error);
       expect(() => new Winston("0.5")).to.throw(Error);
@@ -31,8 +26,17 @@ describe("Winston class", () => {
       expect(() => new Winston("1")).to.not.throw(Error);
     });
 
+    it("constructor builds Winston values for negative integer strings without throwing an error", () => {
+      expect(() => new Winston("-1")).to.not.throw(Error);
+      expect(() => new Winston("-10")).to.not.throw(Error);
+    });
+
     it("constructor builds Winston values for positive BigNumber integer strings", () => {
       expect(() => new Winston("18014398509481982")).to.not.throw(Error);
+    });
+
+    it("constructor builds Winston values for a negative BigNumber integer strings", () => {
+      expect(() => new Winston("-18014398509481982")).to.not.throw(Error);
     });
   });
 
@@ -63,13 +67,13 @@ describe("Winston class", () => {
       ).to.equal("9007199254740991");
     });
 
-    it("throws an error when the subtraction result is less than 0", () => {
-      expect(() => new Winston(1).minus(new Winston(2))).to.throw(Error);
+    it("correctly calculates negative Winston value when subtraction result is less than 0", () => {
+      expect(new Winston(1).minus(new Winston(2)).toString()).to.equal("-1");
     });
   });
 
   describe("times function", () => {
-    it("correctly multiplies Winston values by whole and fractional numbres", () => {
+    it("correctly multiplies Winston values by whole and fractional numbers", () => {
       expect(new Winston(2).times(3).toString()).to.equal("6");
       expect(new Winston(2).times(1.5).toString()).to.equal("3");
     });
@@ -90,8 +94,8 @@ describe("Winston class", () => {
       ).to.equal("13510798882111486");
     });
 
-    it("throws an error when the multiplying by negative numbers", () => {
-      expect(() => new Winston(1).times(-1)).to.throw(Error);
+    it("correctly multiplies Winston values when multiplying by negative numbers", () => {
+      expect(new Winston(1).times(-1).toString()).to.equal("-1");
     });
   });
 
@@ -130,8 +134,8 @@ describe("Winston class", () => {
       );
     });
 
-    it("throws an error when dividing by negative numbers", () => {
-      expect(() => new Winston(1).dividedBy(-1)).to.throw(Error);
+    it("correctly divides Winston values when dividing by negative numbers", () => {
+      expect(new Winston(1).dividedBy(-1).toString()).to.equal("-1");
     });
   });
 
@@ -160,6 +164,34 @@ describe("Winston class", () => {
 
     it("returns true when other Winston is equal", () => {
       expect(new Winston(2).isGreaterThanOrEqualTo(new Winston(2))).to.be.true;
+    });
+  });
+
+  describe("isNonZeroPositiveInteger", () => {
+    it("returns true for a positive non zero integer", () => {
+      expect(new Winston(1).isNonZeroPositiveInteger()).to.be.true;
+    });
+
+    it("returns false for 0", () => {
+      expect(new Winston(0).isNonZeroPositiveInteger()).to.be.false;
+    });
+
+    it("returns false for a negative non-zero integer", () => {
+      expect(new Winston(-1).isNonZeroPositiveInteger()).to.be.false;
+    });
+  });
+
+  describe("isNonZeroNegativeInteger", () => {
+    it("returns true for a negative non zero integer", () => {
+      expect(new Winston(-1).isNonZeroNegativeInteger()).to.be.true;
+    });
+
+    it("returns false for 0", () => {
+      expect(new Winston(0).isNonZeroNegativeInteger()).to.be.false;
+    });
+
+    it("returns false for a positive non-zero integer", () => {
+      expect(new Winston(1).isNonZeroNegativeInteger()).to.be.false;
     });
   });
 
