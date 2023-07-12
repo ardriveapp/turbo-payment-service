@@ -8,6 +8,11 @@ export class MetricRegistry {
     help: "Count of successful payments fulfilled that were then disputed and/or charged back",
   });
 
+  public static failedChargebackCounter = new promClient.Counter({
+    name: "payment_intent_chargeback_failed",
+    help: "Count of payment chargebacks that failed to properly handle a dispute",
+  });
+
   public static paymentRefundedCounter = new promClient.Counter({
     name: "payment_intent_refunded",
     help: "Count of payment success events received that were immediately rejected at a database level and refunded",
@@ -43,6 +48,7 @@ export class MetricRegistry {
     this.registry = new promClient.Registry();
 
     this.registry.registerMetric(MetricRegistry.paymentChargebackCounter);
+    this.registry.registerMetric(MetricRegistry.failedChargebackCounter);
     this.registry.registerMetric(MetricRegistry.paymentRefundedCounter);
     this.registry.registerMetric(MetricRegistry.paymentSuccessCounter);
     this.registry.registerMetric(MetricRegistry.topUpsCounter);

@@ -73,7 +73,7 @@ export const chargeDisputeStub = ({
   metadata = {
     topUpQuoteId: "0x1234567890",
   },
-  paymentIntent,
+  paymentIntent = "pi_123",
 }: StubPaymentIntentParams): Stripe.Dispute => {
   return {
     id,

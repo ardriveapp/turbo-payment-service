@@ -71,5 +71,6 @@ export async function handleDisputeCreatedEvent(
       chargebackReceiptId,
       error,
     });
+    MetricRegistry.failedChargebackCounter.inc();
   }
 }
