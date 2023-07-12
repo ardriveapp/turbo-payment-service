@@ -19,7 +19,7 @@ export async function handleDisputeCreatedEvent(
     const paymentIntentId = pi.payment_intent as string;
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     if (!paymentIntent) {
-      throw Error("Payment intent not found.");
+      throw new Error("Payment intent not found.");
     }
 
     // capture the payment intent destination address and top up quote id
@@ -37,6 +37,11 @@ export async function handleDisputeCreatedEvent(
     });
 
     MetricRegistry.paymentChargebackCounter.inc();
+
+    logger.info("Chargeback receipt created!", {
+      chargebackReceiptId,
+      topUpQuoteId,
+    });
 
     const [walletBalanceAfterChargeback, totalWalletChargebacks] =
       await Promise.all([
@@ -61,11 +66,6 @@ export async function handleDisputeCreatedEvent(
       );
       MetricRegistry.suspiciousWalletActivity.inc();
     }
-
-    logger.info("Chargeback receipt created!", {
-      chargebackReceiptId,
-      topUpQuoteId,
-    });
   } catch (error) {
     logger.error("Chargeback receipt failed!", {
       chargebackReceiptId,
