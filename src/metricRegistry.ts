@@ -5,12 +5,12 @@ export class MetricRegistry {
   private registry: promClient.Registry;
   public static paymentChargebackCounter = new promClient.Counter({
     name: "payment_intent_chargeback",
-    help: "Count of successful payments fulfilled that were then disputed and/or charged back",
+    help: "Count of successful payments fulfilled that were then disputed and/or charged back and successfully processed",
   });
 
   public static failedChargebackCounter = new promClient.Counter({
     name: "payment_intent_chargeback_failed",
-    help: "Count of payment chargebacks that failed to properly handle a dispute",
+    help: "Count of successful payments fulfilled that were then disputed and/or charged back and failed to process",
   });
 
   public static paymentRefundedCounter = new promClient.Counter({
