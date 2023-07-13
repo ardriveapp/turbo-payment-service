@@ -271,6 +271,26 @@ export class PostgresDatabase implements Database {
     return paymentReceiptDbResults.map(paymentReceiptDBMap)[0];
   }
 
+  private async getChargebackReceiptWhere(
+    where: Partial<ChargebackReceiptDBResult>,
+    knexTransaction: Knex.Transaction = this.knexReader as Knex.Transaction
+  ): Promise<ChargebackReceipt[]> {
+    const chargebackReceiptDbResult =
+      await knexTransaction<ChargebackReceiptDBResult>(
+        tableNames.chargebackReceipt
+      ).where(where);
+
+    return chargebackReceiptDbResult.map(chargebackReceiptDBMap);
+  }
+
+  public async getChargebackReceiptsForAddress(
+    userAddress: string
+  ): Promise<ChargebackReceipt[]> {
+    return this.getChargebackReceiptWhere({
+      destination_address: userAddress,
+    });
+  }
+
   public async createChargebackReceipt({
     topUpQuoteId,
     chargebackReason,
@@ -293,15 +313,8 @@ export class PostgresDatabase implements Database {
       // Decrement balance of existing user
       const currentBalance = user.winstonCreditBalance;
 
-      let newBalance: Winston;
-      try {
-        newBalance = currentBalance.minus(winstonCreditAmount);
-      } catch (error) {
-        // TODO: We don't allow negative winston type. but should we allow negative Winston Credit type in this error scenario?
-        throw Error(
-          `User with address '${destinationAddress}' does not have enough balance to decrement this chargeback!`
-        );
-      }
+      // this could result in a negative balance for a user, will throw an error if non-integer winston balance
+      const newBalance = currentBalance.minus(winstonCreditAmount);
 
       // Update the users balance.
       await knexTransaction<UserDBResult>(tableNames.user)
@@ -354,11 +367,10 @@ export class PostgresDatabase implements Database {
       const user = await this.getUser(userAddress, knexTransaction);
 
       const currentWinstonBalance = user.winstonCreditBalance;
-      let newBalance: Winston;
+      const newBalance = currentWinstonBalance.minus(winstonCreditAmount);
 
-      try {
-        newBalance = currentWinstonBalance.minus(winstonCreditAmount);
-      } catch {
+      // throw insufficient balance error if the user would go to a negative balance
+      if (newBalance.isNonZeroNegativeInteger()) {
         throw new InsufficientBalance(userAddress);
       }
 

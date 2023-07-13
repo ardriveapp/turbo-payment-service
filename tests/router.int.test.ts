@@ -166,7 +166,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data.winc)).to.equal(113960113960);
+    expect(+new Winston(data.winc)).to.equal(109686609687);
   });
 
   it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
@@ -642,18 +642,36 @@ describe("with a stubbed stripe instance", () => {
     const disputeEventPaymentReceiptId = "A Payment Receipt Id to Dispute 👊🏻";
     const disputeEventUserAddress = "User Address to Dispute 🤺";
     const topUpQuoteId = "0x1234567890";
-    const dispute = chargeDisputeStub({
+    const paymentIntent = paymentIntentStub({
       metadata: {
-        destinationAddress: disputeEventUserAddress,
-        topUpQuoteId: topUpQuoteId,
+        disputeEventUserAddress,
+        topUpQuoteId,
       },
     });
+    const dispute = chargeDisputeStub({
+      paymentIntent: paymentIntent.id,
+    });
+
+    const paymentIntentResponse: Stripe.Response<Stripe.PaymentIntent> = {
+      ...paymentIntent,
+      lastResponse: {
+        headers: {},
+        requestId: "test-response",
+        statusCode: 200,
+      },
+    };
+
+    const paymentIntentResponseStub = stub(
+      stripe.paymentIntents,
+      "retrieve"
+    ).resolves(paymentIntentResponse);
 
     // Insert payment receipt and user that dispute event depends on
     await dbTestHelper.insertStubUser({
       user_address: disputeEventUserAddress,
       winston_credit_balance: "1000",
     });
+
     await dbTestHelper.insertStubPaymentReceipt({
       payment_receipt_id: disputeEventPaymentReceiptId,
       winston_credit_amount: "50",
@@ -666,7 +684,7 @@ describe("with a stubbed stripe instance", () => {
       eventObject: dispute,
     });
 
-    const webhookStub = stub(stripe.webhooks, "constructEvent").returns(
+    const eventStub = stub(stripe.webhooks, "constructEvent").returns(
       stubEvent
     );
 
@@ -718,7 +736,8 @@ describe("with a stubbed stripe instance", () => {
 
     expect(user[0].winston_credit_balance).to.equal("950");
 
-    webhookStub.restore();
+    eventStub.restore();
+    paymentIntentResponseStub.restore();
   });
 
   it("POST /stripe-webhook returns 200 for valid stripe payment success event", async () => {

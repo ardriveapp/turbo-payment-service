@@ -2,9 +2,8 @@ import { createLogger, format, transports } from "winston";
 
 const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
 const LOG_ALL_STACKTRACES = process.env.LOG_ALL_STACKTRACES === "true";
-// TODO: Add "json" for dev and prod?
 const LOG_FORMAT = process.env.LOG_FORMAT ?? "simple";
-const DISABLE_LOGS = Boolean(process.env.DISABLE_LOGS) ?? false;
+const DISABLE_LOGS = process.env.DISABLE_LOGS == "true" ?? false;
 
 const logger = createLogger({
   level: LOG_LEVEL,

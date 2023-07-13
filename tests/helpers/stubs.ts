@@ -8,6 +8,7 @@ interface StubPaymentIntentParams {
   metadata?: {
     [x: string]: string;
   };
+  paymentIntent?: string;
 }
 export const paymentIntentStub = ({
   id = "pi_123",
@@ -72,6 +73,7 @@ export const chargeDisputeStub = ({
   metadata = {
     topUpQuoteId: "0x1234567890",
   },
+  paymentIntent = "pi_123",
 }: StubPaymentIntentParams): Stripe.Dispute => {
   return {
     id,
@@ -119,7 +121,7 @@ export const chargeDisputeStub = ({
     is_charge_refundable: true,
     livemode: false,
     metadata,
-    payment_intent: null,
+    payment_intent: paymentIntent,
     reason: "fraudulent",
     status: "warning_needs_response",
   };
@@ -199,15 +201,15 @@ export const expectedArPrices = {
 export const expectedRates = {
   winc: 857922282166,
   fiat: {
-    aud: 10.6656898118868,
-    brl: 35.744473964163596,
-    cad: 9.667068275445601,
-    eur: 6.578548059648,
-    gbp: 5.724057466610399,
-    hkd: 56.6125755555696,
-    inr: 592.2031612444176,
-    jpy: 971.1542966553972,
-    sgd: 9.584707736357998,
-    usd: 7.227137304965999,
+    aud: 10.93233205718397,
+    brl: 36.638085813267686,
+    cad: 9.908744982331742,
+    eur: 6.743011761139201,
+    gbp: 5.8671589032756595,
+    hkd: 58.02788994445884,
+    inr: 607.008240275528,
+    jpy: 995.4331540717822,
+    sgd: 9.82432542976695,
+    usd: 7.407815737590149,
   },
 };

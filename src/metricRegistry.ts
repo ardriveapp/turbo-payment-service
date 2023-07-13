@@ -5,7 +5,12 @@ export class MetricRegistry {
   private registry: promClient.Registry;
   public static paymentChargebackCounter = new promClient.Counter({
     name: "payment_intent_chargeback",
-    help: "Count of successful payments fulfilled that were then disputed and/or charged back",
+    help: "Count of successful payments fulfilled that were then disputed and/or charged back and successfully processed",
+  });
+
+  public static failedChargebackCounter = new promClient.Counter({
+    name: "payment_intent_chargeback_failed",
+    help: "Count of successful payments fulfilled that were then disputed and/or charged back and failed to process",
   });
 
   public static paymentRefundedCounter = new promClient.Counter({
@@ -33,10 +38,17 @@ export class MetricRegistry {
     help: "Count of uncaught exceptions",
   });
 
+  // TODO: add metric that tracks fraudulent wallet addresses
+  public static suspiciousWalletActivity = new promClient.Counter({
+    name: "suspicious_wallet_activity",
+    help: "Count of suspicious wallet activity (e.g. high number of chargebacks)",
+  });
+
   private constructor() {
     this.registry = new promClient.Registry();
 
     this.registry.registerMetric(MetricRegistry.paymentChargebackCounter);
+    this.registry.registerMetric(MetricRegistry.failedChargebackCounter);
     this.registry.registerMetric(MetricRegistry.paymentRefundedCounter);
     this.registry.registerMetric(MetricRegistry.paymentSuccessCounter);
     this.registry.registerMetric(MetricRegistry.topUpsCounter);
@@ -44,6 +56,7 @@ export class MetricRegistry {
     this.registry.registerMetric(
       MetricRegistry.stripeSessionCreationErrorCounter
     );
+    this.registry.registerMetric(MetricRegistry.suspiciousWalletActivity);
   }
 
   public static getInstance(): MetricRegistry {

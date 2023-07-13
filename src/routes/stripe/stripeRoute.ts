@@ -75,7 +75,8 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handleDisputeCreatedEvent(
           data.object as Stripe.Dispute,
-          ctx.state.paymentDatabase
+          ctx.state.paymentDatabase,
+          stripe
         );
       } catch (error) {
         logger.error(
