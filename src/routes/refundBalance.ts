@@ -5,11 +5,10 @@ import { KoaContext } from "../server";
 import { Winston } from "../types/winston";
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
-  const logger = ctx.state.logger;
-
-  const { paymentDatabase } = ctx.state;
-  const { winstonCredits, dataItemId } = ctx.query;
+  const { paymentDatabase, logger } = ctx.state;
   const { walletAddress } = ctx.params;
+  // TODO: do some regex validation on the dataItemId
+  const { winstonCredits, dataItemId } = ctx.query;
 
   if (!ctx.request.headers.authorization || !ctx.state.user) {
     ctx.response.status = 401;

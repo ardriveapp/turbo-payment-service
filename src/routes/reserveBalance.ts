@@ -5,10 +5,9 @@ import { KoaContext } from "../server";
 import { ByteCount } from "../types";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
-  const logger = ctx.state.logger;
-
-  const { paymentDatabase, pricingService } = ctx.state;
+  const { paymentDatabase, pricingService, logger } = ctx.state;
   const { walletAddress } = ctx.params;
+  // TODO: do some regex validation on the dataItemId
   const { byteCount: rawByteCount, dataItemId } = ctx.query;
 
   if (!ctx.request.headers.authorization || !ctx.state.user) {
