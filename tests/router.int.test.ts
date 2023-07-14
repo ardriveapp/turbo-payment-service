@@ -513,6 +513,33 @@ describe("Router tests", () => {
     expect(data).to.equal("100");
   });
 
+  it("GET /reserve-balance returns 200 for correct params using legacy route", async () => {
+    const testAddress = "a stub address 2";
+    await dbTestHelper.insertStubUser({
+      user_address: testAddress,
+      winston_credit_balance: "1000000000",
+    });
+
+    const byteCount = 1;
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
+      expiresIn: "1h",
+    });
+
+    stub(pricingService, "getWCForBytes").resolves(new Winston("100"));
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/reserve-balance/${testAddress}/${byteCount}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    expect(statusText).to.equal("Balance reserved");
+    expect(status).to.equal(200);
+    expect(data).to.equal("100");
+  });
+
   it("GET /reserve-balance returns 401 for missing authorization", async () => {
     const byteCount = 1000;
 
@@ -569,6 +596,24 @@ describe("Router tests", () => {
 
     const { status, statusText } = await axios.get(
       `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    expect(statusText).to.equal("Balance refunded");
+    expect(status).to.equal(200);
+  });
+
+  it("GET /refund-balance returns 200 for correct params", async () => {
+    const winstonCredits = 1000;
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
+      expiresIn: "1h",
+    });
+
+    const { status, statusText } = await axios.get(
+      `/v1/refund-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

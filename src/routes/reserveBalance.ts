@@ -2,11 +2,7 @@ import { Next } from "koa";
 
 import { InsufficientBalance, UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
-<<<<<<< HEAD
-import { ByteCount } from "../types/byteCount";
-=======
 import { ByteCount } from "../types";
->>>>>>> df18662 (fix(PE-4209): additional validation against query params, update tests, fix status codes)
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
@@ -28,24 +24,14 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     return next();
   }
 
-<<<<<<< HEAD
-  let byteCount: ByteCount;
-  let walletAddressToCredit: string;
-
-  const dataItemId = ctx.request.query.dataItemId as string | undefined;
-
-  if (!ctx.params.walletAddress || !ctx.params.byteCount) {
-    ctx.response.status = 403;
-=======
   // validate we have what we need
   if (
+    // TODO: once the new service is converted, validate dataItemId exists here
+    Array.isArray(dataItemId) ||
     !rawByteCount ||
-    Array.isArray(rawByteCount) ||
-    !dataItemId ||
-    Array.isArray(dataItemId)
+    Array.isArray(rawByteCount)
   ) {
     ctx.response.status = 400;
->>>>>>> df18662 (fix(PE-4209): additional validation against query params, update tests, fix status codes)
     ctx.body = "Missing parameters";
     logger.error("GET Reserve balance route with missing parameters!", {
       ...ctx.params,

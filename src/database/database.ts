@@ -34,12 +34,12 @@ export interface Database {
   reserveBalance: (
     userAddress: UserAddress,
     winstonCreditAmount: WC,
-    dataItemId?: TransactionId
+    dataItemId?: TransactionId // TODO: once the upload-service is updated with the new routes, make this required
   ) => Promise<void>;
   refundBalance: (
     userAddress: UserAddress,
     winstonCreditAmount: WC,
-    dataItemId?: TransactionId
+    dataItemId?: TransactionId // TODO: once the upload-service is updated with the new routes, make this required
   ) => Promise<void>;
   createChargebackReceipt: (
     createChargebackReceiptParams: CreateChargebackReceiptParams

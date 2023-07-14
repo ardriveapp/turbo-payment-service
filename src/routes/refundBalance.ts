@@ -19,7 +19,7 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
   }
 
   if (
-    !dataItemId ||
+    // TODO: once the new service is converted, validate dataItemId exists here
     Array.isArray(dataItemId) ||
     !winstonCredits ||
     Array.isArray(winstonCredits)
