@@ -3,6 +3,7 @@ import { Next } from "koa";
 import { InsufficientBalance, UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
 import { ByteCount } from "../types/byteCount";
+import { TransactionId } from "../types/types";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
@@ -19,30 +20,36 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
         headers: ctx.request.headers,
       }
     );
-    return next;
+    return next();
   }
 
   let byteCount: ByteCount;
   let walletAddressToCredit: string;
+  let dataItemId: TransactionId;
 
-  if (!ctx.params.walletAddress || !ctx.params.byteCount) {
+  if (
+    !ctx.params.walletAddress ||
+    !ctx.params.byteCount ||
+    !ctx.params.dataItemId
+  ) {
     ctx.response.status = 403;
     ctx.body = "Missing parameters";
     logger.error("GET Reserve balance route with missing parameters!", {
       params: ctx.params,
     });
-    return next;
+    return next();
   } else {
     try {
       byteCount = ByteCount(+ctx.params.byteCount);
       walletAddressToCredit = ctx.params.walletAddress;
+      dataItemId = ctx.params.dataItemId;
     } catch (error) {
       ctx.response.status = 403;
       ctx.body = "Invalid parameters";
       logger.error("GET Reserve balance route with invalid parameters!", {
         params: ctx.params,
       });
-      return next;
+      return next();
     }
   }
 
@@ -50,6 +57,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     logger.info("Getting base credit amount for byte count...", {
       walletAddressToCredit,
       byteCount,
+      dataItemId,
     });
     const winstonCredits = await pricingService.getWCForBytes(byteCount);
 
@@ -57,8 +65,13 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       walletAddressToCredit,
       byteCount,
       winstonCredits,
+      dataItemId,
     });
-    await paymentDatabase.reserveBalance(walletAddressToCredit, winstonCredits);
+    await paymentDatabase.reserveBalance(
+      walletAddressToCredit,
+      winstonCredits,
+      dataItemId
+    );
     ctx.response.status = 200;
     ctx.response.message = "Balance reserved";
     ctx.response.body = winstonCredits;
@@ -67,6 +80,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       walletAddressToCredit,
       byteCount,
       winstonCredits,
+      dataItemId,
     });
 
     return next;

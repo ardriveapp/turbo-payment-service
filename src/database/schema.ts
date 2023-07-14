@@ -172,8 +172,7 @@ export class Schema {
       t.string(changeReason).notNullable();
       t.string(changeId).nullable();
 
-      // TODO: Could combined index these together to easily get a date range snapshot of a user
-      // t.index(userAddress, auditDate)
+      t.index([userAddress, auditDate], "user_audit_range");
     });
   }
 

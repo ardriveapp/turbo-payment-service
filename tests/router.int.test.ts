@@ -34,6 +34,7 @@ import {
   expectedRates,
   paymentIntentStub,
   stripeStubEvent,
+  stubTxId1,
 } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import {
@@ -500,7 +501,7 @@ describe("Router tests", () => {
     stub(pricingService, "getWCForBytes").resolves(new Winston("100"));
 
     const { status, statusText, data } = await axios.get(
-      `/v1/reserve-balance/${testAddress}/${byteCount}`,
+      `/v1/reserve-balance/${testAddress}/${byteCount}/${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -516,7 +517,7 @@ describe("Router tests", () => {
     const byteCount = 1000;
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}/${byteCount}`
+      `/v1/reserve-balance/${testAddress}/${byteCount}/${stubTxId1}`
     );
     expect(statusText).to.equal("Unauthorized");
     expect(status).to.equal(401);
@@ -529,7 +530,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}/${byteCount}`,
+      `/v1/reserve-balance/${testAddress}/${byteCount}/${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -549,7 +550,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}/${byteCount}`,
+      `/v1/reserve-balance/${testAddress}/${byteCount}/${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -567,7 +568,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}/${winstonCredits}`,
+      `/v1/refund-balance/${testAddress}/${winstonCredits}/${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -582,7 +583,7 @@ describe("Router tests", () => {
     const winstonCredits = 1000;
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}/${winstonCredits}`
+      `/v1/refund-balance/${testAddress}/${winstonCredits}/${stubTxId1}`
     );
     expect(statusText).to.equal("Unauthorized");
     expect(status).to.equal(401);
@@ -596,7 +597,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}/${winstonCredits}`,
+      `/v1/refund-balance/${testAddress}/${winstonCredits}/${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

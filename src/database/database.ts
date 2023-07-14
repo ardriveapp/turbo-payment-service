@@ -1,4 +1,5 @@
 import { WC } from "../types/arc";
+import { TransactionId } from "../types/types";
 import {
   ChargebackReceipt,
   ChargebackReceiptId,
@@ -32,11 +33,13 @@ export interface Database {
   ) => Promise<PaymentReceipt>;
   reserveBalance: (
     userAddress: UserAddress,
-    winstonCreditAmount: WC
+    winstonCreditAmount: WC,
+    dataItemId: TransactionId
   ) => Promise<void>;
   refundBalance: (
     userAddress: UserAddress,
-    winstonCreditAmount: WC
+    winstonCreditAmount: WC,
+    dataItemId: TransactionId
   ) => Promise<void>;
   createChargebackReceipt: (
     createChargebackReceiptParams: CreateChargebackReceiptParams

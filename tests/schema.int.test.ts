@@ -16,6 +16,7 @@ describe("Schema class", () => {
 
     // Run a new schema create after the rollback test so database will be as expected for integration tests
     await Schema.create(knex);
+    await Schema.migrateToAuditLog(knex);
 
     // Run these tests that depend on db after schema tests
     require("./postgres.int.spec");

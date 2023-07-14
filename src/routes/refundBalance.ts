@@ -2,6 +2,7 @@ import { Next } from "koa";
 
 import { UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
+import { TransactionId } from "../types/types";
 import { Winston } from "../types/winston";
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
@@ -18,8 +19,13 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
 
   let winstonCreditsToRefund: Winston;
   let walletAddressToRefund: string;
+  let dataItemId: TransactionId;
 
-  if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
+  if (
+    !ctx.params.walletAddress ||
+    !ctx.params.winstonCredits ||
+    !ctx.params.dataItemId
+  ) {
     ctx.response.status = 403;
     ctx.body = "Missing parameters";
     logger.error("GET Refund balance route with missing parameters!", {
@@ -30,6 +36,7 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     try {
       winstonCreditsToRefund = new Winston(ctx.params.winstonCredits);
       walletAddressToRefund = ctx.params.walletAddress;
+      dataItemId = ctx.params.dataItemId;
     } catch (error) {
       ctx.response.status = 403;
       ctx.body = "Invalid parameters";
@@ -43,17 +50,20 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
   logger.info("Refunding balance for user ", {
     walletAddressToRefund,
     winstonCreditsToRefund,
+    dataItemId,
   });
   try {
     await paymentDatabase.refundBalance(
       walletAddressToRefund,
-      winstonCreditsToRefund
+      winstonCreditsToRefund,
+      dataItemId
     );
     ctx.response.status = 200;
     ctx.response.message = "Balance refunded";
     logger.info("Balance refund processed", {
       walletAddressToRefund,
       winstonCreditsToRefund,
+      dataItemId,
     });
     return next;
   } catch (error: UserNotFoundWarning | unknown) {

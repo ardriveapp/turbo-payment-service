@@ -10,6 +10,7 @@ import {
 import { PostgresDatabase } from "../src/database/postgres";
 import { Winston } from "../src/types/winston";
 import { DbTestHelper } from "./dbTestHelper";
+import { stubTxId1 } from "./helpers/stubs";
 import { expectAsyncErrorThrow } from "./helpers/testHelpers";
 
 describe("PostgresDatabase class", () => {
@@ -637,7 +638,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("reserves the balance as expected when winston balance is available", async () => {
-      await db.reserveBalance(richAddress, new Winston(500));
+      await db.reserveBalance(richAddress, new Winston(500), stubTxId1);
 
       const richUser = await db.getUser(richAddress);
 
@@ -646,7 +647,11 @@ describe("PostgresDatabase class", () => {
 
     it("throws an error as expected when winston balance is not available", async () => {
       await expectAsyncErrorThrow({
-        promiseToError: db.reserveBalance(poorAddress, new Winston(200)),
+        promiseToError: db.reserveBalance(
+          poorAddress,
+          new Winston(200),
+          stubTxId1
+        ),
         errorType: "InsufficientBalance",
         errorMessage: `Insufficient balance for '${poorAddress}'`,
       });
@@ -659,7 +664,8 @@ describe("PostgresDatabase class", () => {
       await expectAsyncErrorThrow({
         promiseToError: db.reserveBalance(
           "Non Existent Address",
-          new Winston(1337)
+          new Winston(1337),
+          stubTxId1
         ),
         errorType: "UserNotFoundWarning",
         errorMessage:
@@ -679,7 +685,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("refunds the balance as expected", async () => {
-      await db.refundBalance(happyAddress, new Winston(100_000));
+      await db.refundBalance(happyAddress, new Winston(100_000), stubTxId1);
 
       const happyUser = await db.getUser(happyAddress);
 
@@ -690,7 +696,8 @@ describe("PostgresDatabase class", () => {
       await expectAsyncErrorThrow({
         promiseToError: db.refundBalance(
           "Non Existent Address",
-          new Winston(1337)
+          new Winston(1337),
+          stubTxId1
         ),
         errorType: "UserNotFoundWarning",
         errorMessage:

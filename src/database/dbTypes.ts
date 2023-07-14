@@ -86,6 +86,20 @@ export interface UserDBInsert {
   winston_credit_balance: string;
 }
 
+export type AuditChangeReasons =
+  | "upload"
+  | "payment"
+  | "account_creation"
+  | "chargeback"
+  | "refund_on_upload_error";
+
+export interface AuditLogInsert {
+  user_address: string;
+  winston_credit_amount: string;
+  change_reason: AuditChangeReasons;
+  change_id?: string;
+}
+
 export interface UserDBResult extends UserDBInsert {
   promotional_info: JsonSerializable;
   user_creation_date: string;

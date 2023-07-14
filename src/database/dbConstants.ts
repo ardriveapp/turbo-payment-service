@@ -41,8 +41,7 @@ export const columnNames = {
 
   // Audit Log
   auditId: "audit_id",
-  // userAddress
-  auditDate: "audit_date", // date
+  auditDate: "audit_date",
   changeReason: "change_reason",
   changeId: "change_id",
 } as const;
