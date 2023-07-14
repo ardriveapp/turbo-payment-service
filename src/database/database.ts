@@ -1,5 +1,5 @@
+import { TransactionId } from "../types";
 import { WC } from "../types/arc";
-import { TransactionId } from "../types/types";
 import {
   ChargebackReceipt,
   ChargebackReceiptId,

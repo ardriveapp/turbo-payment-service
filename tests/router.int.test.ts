@@ -501,7 +501,7 @@ describe("Router tests", () => {
     stub(pricingService, "getWCForBytes").resolves(new Winston("100"));
 
     const { status, statusText, data } = await axios.get(
-      `/v1/reserve-balance/${testAddress}/${byteCount}?dataItemId=${stubTxId1}`,
+      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -517,20 +517,20 @@ describe("Router tests", () => {
     const byteCount = 1000;
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}/${byteCount}?dataItemId=${stubTxId1}`
+      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`
     );
     expect(statusText).to.equal("Unauthorized");
     expect(status).to.equal(401);
   });
 
-  it("GET /reserve-balance returns 403 for insufficient balance", async () => {
+  it("GET /reserve-balance returns 402 for insufficient balance", async () => {
     const byteCount = 100000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}/${byteCount}?dataItemId=${stubTxId1}`,
+      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -538,10 +538,10 @@ describe("Router tests", () => {
       }
     );
     expect(statusText).to.equal("Insufficient balance");
-    expect(status).to.equal(403);
+    expect(status).to.equal(402);
   });
 
-  it("GET /reserve-balance returns 403 if user not found", async () => {
+  it("GET /reserve-balance returns 404 if user not found", async () => {
     const testAddress = "someRandomAddress";
     const byteCount = 100000;
 
@@ -550,7 +550,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}/${byteCount}?dataItemId=${stubTxId1}`,
+      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -558,7 +558,7 @@ describe("Router tests", () => {
       }
     );
     expect(statusText).to.equal("User not found");
-    expect(status).to.equal(403);
+    expect(status).to.equal(404);
   });
 
   it("GET /refund-balance returns 200 for correct params", async () => {
@@ -568,7 +568,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}/${winstonCredits}?dataItemId=${stubTxId1}`,
+      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -583,13 +583,13 @@ describe("Router tests", () => {
     const winstonCredits = 1000;
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}/${winstonCredits}?dataItemId=${stubTxId1}`
+      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`
     );
     expect(statusText).to.equal("Unauthorized");
     expect(status).to.equal(401);
   });
 
-  it("GET /refund-balance returns 403 if user not found", async () => {
+  it("GET /refund-balance returns 404 if user not found", async () => {
     const testAddress = "someRandomAddress";
     const winstonCredits = 100000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
@@ -597,7 +597,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}/${winstonCredits}?dataItemId=${stubTxId1}`,
+      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -606,7 +606,7 @@ describe("Router tests", () => {
     );
 
     expect(statusText).to.equal("User not found");
-    expect(status).to.equal(403);
+    expect(status).to.equal(404);
   });
 
   it("GET /currencies returns status 200 and the expected list of currencies and limits", async () => {
