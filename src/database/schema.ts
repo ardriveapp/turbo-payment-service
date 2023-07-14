@@ -166,7 +166,7 @@ export class Schema {
   private async createAuditLogTable(): Promise<void> {
     return this.pg.schema.createTable(auditLog, (t) => {
       t.increments(auditId).primary();
-      t.string(userAddress).notNullable().index();
+      t.string(userAddress).notNullable();
       t.timestamp(auditDate).notNullable().defaultTo(this.defaultTimestamp());
       t.string(winstonCreditAmount).notNullable();
       t.string(changeReason).notNullable();
