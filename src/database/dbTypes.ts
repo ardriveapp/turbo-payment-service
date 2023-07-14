@@ -86,7 +86,7 @@ export interface UserDBInsert {
   winston_credit_balance: string;
 }
 
-export type AuditChangeReasons =
+export type AuditChangeReason =
   | "upload"
   | "payment"
   | "account_creation"
@@ -96,7 +96,7 @@ export type AuditChangeReasons =
 export interface AuditLogInsert {
   user_address: string;
   winston_credit_amount: string;
-  change_reason: AuditChangeReasons;
+  change_reason: AuditChangeReason;
   change_id?: string;
 }
 
