@@ -1,5 +1,5 @@
+import { PublicArweaveAddress } from "../types";
 import { WC } from "../types/arc";
-import { PublicArweaveAddress } from "../types/types";
 
 export type UserAddress = string | PublicArweaveAddress;
 export type UserAddressType = string | "arweave";

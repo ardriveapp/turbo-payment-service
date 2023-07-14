@@ -2,7 +2,7 @@ import knexConstructor, { Knex } from "knex";
 import winston from "winston";
 
 import logger from "../logger";
-import { TransactionId, WC, Winston } from "../types/types";
+import { TransactionId, WC, Winston } from "../types";
 import { Database } from "./database";
 import { columnNames, tableNames } from "./dbConstants";
 import {
