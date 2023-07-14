@@ -38,7 +38,12 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     ctx.response.status = 403;
 =======
   // validate we have what we need
-  if (!rawByteCount || !dataItemId) {
+  if (
+    !rawByteCount ||
+    Array.isArray(rawByteCount) ||
+    !dataItemId ||
+    Array.isArray(dataItemId)
+  ) {
     ctx.response.status = 400;
 >>>>>>> df18662 (fix(PE-4209): additional validation against query params, update tests, fix status codes)
     ctx.body = "Missing parameters";
@@ -46,13 +51,6 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       ...ctx.params,
       ...ctx.query,
     });
-    return next();
-  }
-
-  // validate only one data item id is provided
-  if (Array.isArray(dataItemId)) {
-    ctx.response.status = 400;
-    ctx.body = "Only one dataItemId can be provided";
     return next();
   }
 

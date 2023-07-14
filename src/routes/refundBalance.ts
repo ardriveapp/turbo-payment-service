@@ -18,20 +18,18 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     return next();
   }
 
-  if (!dataItemId || !winstonCredits) {
+  if (
+    !dataItemId ||
+    Array.isArray(dataItemId) ||
+    !winstonCredits ||
+    Array.isArray(winstonCredits)
+  ) {
     ctx.response.status = 400;
-    ctx.body = "Missing parameters";
-    logger.error("GET Refund balance route with missing parameters!", {
+    ctx.body = "Invalid parameters";
+    logger.error("GET Refund balance route with invalid parameters!", {
       query: ctx.query,
       params: ctx.params,
     });
-    return next();
-  }
-
-  // validate only one data item id is provided
-  if (Array.isArray(dataItemId)) {
-    ctx.response.status = 400;
-    ctx.body = "Only one dataItemId can be provided";
     return next();
   }
 
