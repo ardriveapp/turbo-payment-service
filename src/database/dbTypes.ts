@@ -91,7 +91,7 @@ export type AuditChangeReasons =
   | "payment"
   | "account_creation"
   | "chargeback"
-  | "refund_on_upload_error";
+  | "refund";
 
 export interface AuditLogInsert {
   user_address: string;

@@ -437,7 +437,7 @@ export class PostgresDatabase implements Database {
       const auditLogInsert: AuditLogInsert = {
         user_address: userAddress,
         winston_credit_amount: winstonCreditAmount.toString(),
-        change_reason: "refund_on_upload_error",
+        change_reason: "refund",
         change_id: dataItemId,
       };
       await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
