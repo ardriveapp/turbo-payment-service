@@ -388,7 +388,7 @@ export class PostgresDatabase implements Database {
   public async reserveBalance(
     userAddress: string,
     winstonCreditAmount: Winston,
-    dataItemId: TransactionId
+    dataItemId?: TransactionId
   ): Promise<void> {
     await this.knexWriter.transaction(async (knexTransaction) => {
       const user = await this.getUser(userAddress, knexTransaction);
@@ -420,7 +420,7 @@ export class PostgresDatabase implements Database {
   public async refundBalance(
     userAddress: string,
     winstonCreditAmount: Winston,
-    dataItemId: TransactionId
+    dataItemId?: TransactionId
   ): Promise<void> {
     await this.knexWriter.transaction(async (knexTransaction) => {
       const user = await this.getUser(userAddress, knexTransaction);

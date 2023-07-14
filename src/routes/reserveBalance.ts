@@ -3,7 +3,6 @@ import { Next } from "koa";
 import { InsufficientBalance, UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
 import { ByteCount } from "../types/byteCount";
-import { TransactionId } from "../types/types";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
@@ -25,13 +24,10 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
 
   let byteCount: ByteCount;
   let walletAddressToCredit: string;
-  let dataItemId: TransactionId;
 
-  if (
-    !ctx.params.walletAddress ||
-    !ctx.params.byteCount ||
-    !ctx.params.dataItemId
-  ) {
+  const dataItemId = ctx.request.query.dataItemId as string | undefined;
+
+  if (!ctx.params.walletAddress || !ctx.params.byteCount) {
     ctx.response.status = 403;
     ctx.body = "Missing parameters";
     logger.error("GET Reserve balance route with missing parameters!", {
@@ -42,7 +38,6 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     try {
       byteCount = ByteCount(+ctx.params.byteCount);
       walletAddressToCredit = ctx.params.walletAddress;
-      dataItemId = ctx.params.dataItemId;
     } catch (error) {
       ctx.response.status = 403;
       ctx.body = "Invalid parameters";

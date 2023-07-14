@@ -2,7 +2,6 @@ import { Next } from "koa";
 
 import { UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
-import { TransactionId } from "../types/types";
 import { Winston } from "../types/winston";
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
@@ -19,13 +18,9 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
 
   let winstonCreditsToRefund: Winston;
   let walletAddressToRefund: string;
-  let dataItemId: TransactionId;
+  const dataItemId = ctx.request.query.dataItemId as string | undefined;
 
-  if (
-    !ctx.params.walletAddress ||
-    !ctx.params.winstonCredits ||
-    !ctx.params.dataItemId
-  ) {
+  if (!ctx.params.walletAddress || !ctx.params.winstonCredits) {
     ctx.response.status = 403;
     ctx.body = "Missing parameters";
     logger.error("GET Refund balance route with missing parameters!", {
@@ -36,7 +31,6 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     try {
       winstonCreditsToRefund = new Winston(ctx.params.winstonCredits);
       walletAddressToRefund = ctx.params.walletAddress;
-      dataItemId = ctx.params.dataItemId;
     } catch (error) {
       ctx.response.status = 403;
       ctx.body = "Invalid parameters";

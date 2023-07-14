@@ -34,12 +34,12 @@ export interface Database {
   reserveBalance: (
     userAddress: UserAddress,
     winstonCreditAmount: WC,
-    dataItemId: TransactionId
+    dataItemId?: TransactionId
   ) => Promise<void>;
   refundBalance: (
     userAddress: UserAddress,
     winstonCreditAmount: WC,
-    dataItemId: TransactionId
+    dataItemId?: TransactionId
   ) => Promise<void>;
   createChargebackReceipt: (
     createChargebackReceiptParams: CreateChargebackReceiptParams
