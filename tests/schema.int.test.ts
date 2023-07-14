@@ -26,6 +26,7 @@ describe("Schema class", () => {
 
     expect(allTables.rows.map((t) => t.table_name)).to.deep.equal([
       // Tables are returned alphabetized
+      "audit_log",
       "chargeback_receipt",
       "failed_top_up_quote",
       "knex_migrations",
@@ -71,7 +72,8 @@ describe("Schema class", () => {
     });
   });
 
-  it("rollback schema public static method removes all expected tables", async () => {
+  it("rollback schema public static methods remove all expected tables", async () => {
+    await Schema.rollbackFromAuditLog(knex);
     await Schema.rollback(knex);
 
     const allTables = await listTables(knex);
