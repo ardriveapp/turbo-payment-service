@@ -606,7 +606,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
   });
 
-  it("GET /refund-balance returns 200 for correct params", async () => {
+  it("GET /refund-balance returns 200 for correct params for legacy route", async () => {
     const winstonCredits = 1000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
