@@ -53,14 +53,14 @@ The service relies on a postgres database. The following scripts can be used to 
 
 ### Migrations
 
-Knex is used to create and run migrations. To make a migration following these steps:
+Knex is used to create and run migrations. To make a migration follow these steps:
 
 1. Add migration function and logic to `schema.ts`
-2. Run the yarn command to stage the migration - which generates a new migration script in `migrations/` directory
+2. Run the yarn command to stage the migration, which generates a new migration script in `migrations/` directory
 
 - `yarn db:make:migration MIGRATION_NAME`
 
-3. Update the new migration to call the static function created in 1.
+3. Update the new migration to call the static function created in step 1.
 
 4. Run the migration
 
