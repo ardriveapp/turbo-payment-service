@@ -1,3 +1,5 @@
+import winston from "winston";
+
 import {
   CurrencyLimitation,
   CurrencyLimitations,
@@ -5,7 +7,7 @@ import {
   turboFeePercentageAsADecimal,
 } from "../constants";
 import { CurrencyType } from "../database/dbTypes";
-import logger from "../logger";
+import defaultLogger from "../logger";
 import { ByteCount, WC, Winston } from "../types";
 import { Payment } from "../types/payment";
 import {
@@ -16,11 +18,17 @@ import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
+export type SubsidizedWinstonAmount = {
+  originalWincTotal: WC;
+  subsidizedWincTotal: WC;
+  subsidies: { description: string; value: number }[];
+};
+
 export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
-  getWCForBytes: (bytes: ByteCount) => Promise<WC>;
+  getWCForBytes: (bytes: ByteCount) => Promise<SubsidizedWinstonAmount>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -29,17 +37,26 @@ const maxStripeDigits = 8;
 /** This is a cleaner representation of the actual max: 999_999_99 */
 const maxStripeAmount = 990_000_00;
 
+// TODO: store the subsidized amount in the database
+const subsidizedWinstonCreditPercentage = process.env.SUBSIDIZED_WINC_PERCENTAGE
+  ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
+  : 0;
+
 export class TurboPricingService implements PricingService {
+  private logger: winston.Logger;
   private readonly bytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
   private readonly arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
 
   constructor({
     bytesToWinstonOracle,
     arweaveToFiatOracle,
+    logger = defaultLogger,
   }: {
     bytesToWinstonOracle?: ReadThroughBytesToWinstonOracle;
     arweaveToFiatOracle?: ReadThroughArweaveToFiatOracle;
+    logger?: winston.Logger;
   }) {
+    this.logger = logger.child({ class: this.constructor.name });
     this.bytesToWinstonOracle =
       bytesToWinstonOracle ?? new ReadThroughBytesToWinstonOracle({});
     this.arweaveToFiatOracle =
@@ -135,12 +152,15 @@ export class TurboPricingService implements PricingService {
       ? currSuggested
       : dynamicSuggested;
 
-    logger.debug("Dynamic Prices:", {
-      curr,
-      dynamicMinimum,
-      dynamicMaximum,
-      dynamicSuggested,
-    });
+    this.logger.debug(
+      "Successfully fetched dynamic prices for supported currencies",
+      {
+        curr,
+        dynamicMinimum,
+        dynamicMaximum,
+        dynamicSuggested,
+      }
+    );
 
     return {
       maximumPaymentAmount,
@@ -186,21 +206,31 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  async getWCForBytes(bytes: ByteCount): Promise<Winston> {
+  async getWCForBytes(bytes: ByteCount): Promise<SubsidizedWinstonAmount> {
     const chunkSize = roundToArweaveChunkSize(bytes);
     const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize
     );
 
-    const subsidizedAmount = process.env.SUBSIDIZED_WINC_PERCENTAGE
-      ? winston.times(+process.env.SUBSIDIZED_WINC_PERCENTAGE / 100)
-      : new Winston(0);
+    const subsidizedMultiplier = subsidizedWinstonCreditPercentage / 100;
+    const subsidizedAmount = winston.times(subsidizedMultiplier);
 
-    logger.info("Subsidizing amount!", {
+    this.logger.info("Applying subsidy to upload", {
+      originalAmount: winston.toString(),
       subsidizedAmount,
       subsidyPct: process.env.SUBSIDIZED_WINC_PERCENTAGE,
     });
 
-    return winston.minus(subsidizedAmount);
+    return {
+      originalWincTotal: winston,
+      subsidizedWincTotal: winston.minus(subsidizedAmount),
+      subsidies: [
+        {
+          // TODO: pull these from the database (PE-4183)
+          description: "FWD Research July 2023 Subsidy",
+          value: subsidizedMultiplier,
+        },
+      ],
+    };
   }
 }

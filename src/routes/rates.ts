@@ -7,7 +7,6 @@ import {
   turboFeePercentageAsADecimal,
 } from "../constants";
 import { KoaContext } from "../server";
-import { Winston } from "../types";
 import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
 
 export async function ratesHandler(ctx: KoaContext, next: Next) {
@@ -15,7 +14,9 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
   const { pricingService } = ctx.state;
 
   try {
-    const winston: Winston = await pricingService.getWCForBytes(oneGiBInBytes);
+    const priceWithSubsidies = await pricingService.getWCForBytes(
+      oneGiBInBytes
+    );
     const fiat: Record<string, number> = {};
 
     // Calculate fiat prices for one GiB
@@ -25,7 +26,8 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
           currency
         );
 
-        const fiatPriceForOneGiB = winston.times(fiatPriceForOneAR);
+        const fiatPriceForOneGiB =
+          priceWithSubsidies.subsidizedWincTotal.times(fiatPriceForOneAR);
         const fiatValue =
           (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
           (1 + turboFeePercentageAsADecimal);
@@ -35,8 +37,12 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     );
 
     const rates = {
-      winc: winston.toBigNumber().toNumber(),
+      winc: priceWithSubsidies.subsidizedWincTotal.toBigNumber().toNumber(),
       fiat: { ...fiat },
+      originalWincTotal: priceWithSubsidies.originalWincTotal
+        .toBigNumber()
+        .toNumber(),
+      subsidies: priceWithSubsidies.subsidies,
     };
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
