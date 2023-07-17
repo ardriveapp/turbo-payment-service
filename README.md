@@ -51,6 +51,21 @@ The service relies on a postgres database. The following scripts can be used to 
 - `yarn db:migrate:latest`: Runs migrations on a local PostgreSQL database
 - `yarn db:down`: Tears down local docker PostgreSQL container and deletes the db volume
 
+### Migration
+
+Knex is used to create and run migrations. To make a migration following these steps:
+
+1. Add migration function and logic to `schema.ts`
+2. Run the yarn command to stage the migration - which generates a new migration script in `migrations/` directory
+
+- `yarn db:make:migration MIGRATION_NAME`
+
+3. Update the new migration to call the static function created in 1.
+
+4. Run the migration
+
+- `yarn db:migration:latest`
+
 ## Tests
 
 Unit and integration tests can be run locally or via docker. For either, you can set environment variables for the service via a `.env` file:

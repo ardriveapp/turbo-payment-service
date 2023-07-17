@@ -343,7 +343,7 @@ export class PostgresDatabase implements Database {
 
       const auditLogInsert: AuditLogInsert = {
         user_address: destinationAddress,
-        winston_credit_amount: winstonCreditAmount.toString(),
+        winston_credit_amount: `-${winstonCreditAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
         change_reason: "chargeback",
         change_id: chargebackReceiptId,
       };
@@ -409,7 +409,7 @@ export class PostgresDatabase implements Database {
 
       const auditLogInsert: AuditLogInsert = {
         user_address: userAddress,
-        winston_credit_amount: winstonCreditAmount.toString(),
+        winston_credit_amount: `-${winstonCreditAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
         change_reason: "upload",
         change_id: dataItemId,
       };
@@ -436,7 +436,7 @@ export class PostgresDatabase implements Database {
 
       const auditLogInsert: AuditLogInsert = {
         user_address: userAddress,
-        winston_credit_amount: winstonCreditAmount.toString(),
+        winston_credit_amount: winstonCreditAmount.toString(), // a positive value because this amount was incremented to the users balance
         change_reason: "refund",
         change_id: dataItemId,
       };
