@@ -72,7 +72,8 @@ You can rollback knex migrations using the following command:
 
 - `yarn db:migrate:rollback` - rolls back the most recent migration
 - `yarn db:migrate:rollback --all` - rolls back all migrations
-- `yarn knex migrate:down MIGRATION_NAME.ts` - rolls back a specific migration
+- `yarn knex migrate:list` - lists all the migrations applied to the database
+- `yarn knex migrate:down MIGRATION_NAME.ts --knexfile src/database/knexfile.ts` - rolls back a specific migration
 
 Additional `knex` documentation can be found [here](https://knexjs.org/guide/migrations.html).
 

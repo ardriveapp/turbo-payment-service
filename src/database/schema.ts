@@ -200,9 +200,9 @@ export class Schema {
       "chargeback",
       "upload",
     ];
-    const existingAuditRecords = await this.pg<AuditLogDBResult>(
-      auditLog
-    ).whereIn("change_reason", negativeCreditChangeReasons);
+    const existingAuditRecords = await this.pg<AuditLogDBResult>(auditLog)
+      .whereIn("change_reason", negativeCreditChangeReasons)
+      .andWhere("winston_credit_amount", "not like", "-%"); // filter out existing rows that are already negative
     const negativeChangePromises = existingAuditRecords.reduce(
       (promises: Knex.QueryBuilder[], record: AuditLogDBResult) => {
         if (negativeCreditChangeReasons.includes(record.change_reason)) {
@@ -226,6 +226,7 @@ export class Schema {
     await Promise.all(negativeChangePromises);
     logger.info("Finished audit log credit amount migration!", {
       migrationDurationMs: Date.now() - migrationStartTime,
+      numRecords: negativeChangePromises.length,
     });
   }
 
@@ -241,9 +242,9 @@ export class Schema {
       "chargeback",
       "upload",
     ];
-    const existingAuditRecords = await this.pg<AuditLogDBResult>(
-      auditLog
-    ).whereIn("change_reason", negativeCreditChangeReasons);
+    const existingAuditRecords = await this.pg<AuditLogDBResult>(auditLog)
+      .whereIn("change_reason", negativeCreditChangeReasons)
+      .andWhere("winston_credit_amount", "like", "-%"); // only modify rows that are negative
     const negativeChangePromises = existingAuditRecords.reduce(
       (promises: Knex.QueryBuilder[], record: AuditLogDBResult) => {
         if (negativeCreditChangeReasons.includes(record.change_reason)) {
@@ -262,6 +263,7 @@ export class Schema {
     await Promise.all(negativeChangePromises);
     logger.info("Finished audit log credit amount rollback!", {
       migrationDurationMs: Date.now() - migrationStartTime,
+      numRecords: negativeChangePromises.length,
     });
   }
 
