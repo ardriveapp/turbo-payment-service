@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 
 export const stubTxId1 = "0000000000000000000000000000000000000000001";
+export const stubTxId2 = "0000000000000000000000000000000000000000002";
 
 interface StubPaymentIntentParams {
   id?: string;

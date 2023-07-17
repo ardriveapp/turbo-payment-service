@@ -35,6 +35,7 @@ import {
   paymentIntentStub,
   stripeStubEvent,
   stubTxId1,
+  stubTxId2,
 } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import {
@@ -505,7 +506,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText, data } = await axios.get(
-      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
+      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId2}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -517,7 +518,7 @@ describe("Router tests", () => {
     expect(data).to.equal("100");
   });
 
-  it("GET /reserve-balance returns 200 for correct params using legacy route", async () => {
+  it("GET /reserve-balance returns 400 for legacy route without a data item ID", async () => {
     const testAddress = "a stub address 2";
     await dbTestHelper.insertStubUser({
       user_address: testAddress,
@@ -541,9 +542,9 @@ describe("Router tests", () => {
         },
       }
     );
-    expect(statusText).to.equal("Balance reserved");
-    expect(status).to.equal(200);
-    expect(data).to.equal("100");
+    expect(statusText).to.equal("Bad Request");
+    expect(status).to.equal(400);
+    expect(data).to.equal("Missing parameters");
   });
 
   it("GET /reserve-balance returns 401 for missing authorization", async () => {

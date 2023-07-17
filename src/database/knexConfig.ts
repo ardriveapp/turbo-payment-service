@@ -12,7 +12,7 @@ const baseConfig = {
 };
 
 function getDbConnection(host: string) {
-  const dbPort = +(process.env.DB_PORT || 5433);
+  const dbPort = +(process.env.DB_PORT || 5432);
   const dbPassword = process.env.DB_PASSWORD || "postgres";
 
   return `postgres://postgres:${dbPassword}@${host}:${dbPort}/postgres?sslmode=disable`;

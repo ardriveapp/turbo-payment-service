@@ -258,6 +258,11 @@ export class TurboPricingService implements PricingService {
       }
     }
 
-    return { winc: adjustedWinc, adjustments };
+    return {
+      winc: adjustedWinc.isNonZeroNegativeInteger()
+        ? new Winston(0) // Return as 0 if negative value is calculated so we don't pay users to upload?
+        : adjustedWinc,
+      adjustments,
+    };
   }
 }

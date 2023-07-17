@@ -14,8 +14,10 @@ import {
 } from "./dbMaps";
 import {
   AuditLogInsert,
+  BalanceReservationDBResult,
   ChargebackReceipt,
   ChargebackReceiptDBResult,
+  CreateBalanceReservationParams,
   CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
@@ -134,6 +136,7 @@ export class PostgresDatabase implements Database {
   }
 
   public async getBalance(userAddress: string): Promise<WC> {
+    // TODO: getBalance should be the result of current_winc_balance - all pending balance_reservation.reserved_winc_amount once implemented
     return (await this.getUser(userAddress)).winstonCreditBalance;
   }
 
@@ -391,22 +394,33 @@ export class PostgresDatabase implements Database {
     return chargebackReceiptDbResult.map(chargebackReceiptDBMap)[0];
   }
 
-  public async reserveBalance(
-    userAddress: string,
-    winstonCreditAmount: Winston,
-    dataItemId?: TransactionId
-  ): Promise<void> {
+  public async reserveBalance({
+    adjustments,
+    reservationId,
+    reservedWincAmount,
+    userAddress,
+  }: CreateBalanceReservationParams): Promise<void> {
     await this.knexWriter.transaction(async (knexTransaction) => {
       const user = await this.getUser(userAddress, knexTransaction);
 
       const currentWinstonBalance = user.winstonCreditBalance;
-      const newBalance = currentWinstonBalance.minus(winstonCreditAmount);
+      const newBalance = currentWinstonBalance.minus(reservedWincAmount);
 
       // throw insufficient balance error if the user would go to a negative balance
       if (newBalance.isNonZeroNegativeInteger()) {
         throw new InsufficientBalance(userAddress);
       }
 
+      await knexTransaction<BalanceReservationDBResult>(
+        tableNames.balanceReservation
+      ).insert({
+        adjustments,
+        reservation_id: reservationId,
+        reserved_winc_amount: reservedWincAmount.toString(),
+        user_address: userAddress,
+      });
+
+      // TODO: Decrement balance on moving to finalized_reservation once implemented
       await knexTransaction<UserDBResult>(tableNames.user)
         .where({
           user_address: userAddress,
@@ -415,9 +429,9 @@ export class PostgresDatabase implements Database {
 
       const auditLogInsert: AuditLogInsert = {
         user_address: userAddress,
-        winston_credit_amount: `-${winstonCreditAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
+        winston_credit_amount: `-${reservedWincAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
         change_reason: "upload",
-        change_id: dataItemId,
+        change_id: reservationId,
       };
       await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
     });

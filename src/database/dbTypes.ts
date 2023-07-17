@@ -95,7 +95,7 @@ export type CreateBalanceReservationParams = {
   reservationId: ReservationId;
   userAddress: UserAddress;
   reservedWincAmount: WC;
-  adjustments: AdjustmentResult;
+  adjustments?: AdjustmentResult;
 };
 
 export type AdjustmentTarget = "upload" | "payment";
@@ -184,7 +184,7 @@ export interface BalanceReservationDBInsert {
   reservation_id: string;
   user_address: string;
   reserved_winc_amount: string;
-  adjustments: AdjustmentResult;
+  adjustments?: AdjustmentResult;
 }
 
 export interface BalanceReservationDBResult extends BalanceReservationDBInsert {

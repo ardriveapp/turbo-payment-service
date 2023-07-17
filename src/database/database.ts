@@ -3,6 +3,7 @@ import { WC } from "../types/arc";
 import {
   ChargebackReceipt,
   ChargebackReceiptId,
+  CreateBalanceReservationParams,
   CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
@@ -33,9 +34,7 @@ export interface Database {
     paymentReceiptId: PaymentReceiptId
   ) => Promise<PaymentReceipt>;
   reserveBalance: (
-    userAddress: UserAddress,
-    winstonCreditAmount: WC,
-    dataItemId?: TransactionId // TODO: once the upload-service is updated with the new routes, make this required
+    reserveBalanceParams: CreateBalanceReservationParams
   ) => Promise<void>;
   refundBalance: (
     userAddress: UserAddress,

@@ -25,7 +25,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
 
   // validate we have what we need
   if (
-    // TODO: once the new service is converted, validate dataItemId exists here
+    !dataItemId ||
     Array.isArray(dataItemId) ||
     !rawByteCount ||
     Array.isArray(rawByteCount)
@@ -58,10 +58,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       byteCount,
       dataItemId,
     });
-    // TODO: Expose adjustments via Reserve Balance
-    const { winc /* adjustments */ } = await pricingService.getWCForBytes(
-      byteCount
-    );
+    const { winc, adjustments } = await pricingService.getWCForBytes(byteCount);
 
     logger.info("Reserving balance for user ", {
       walletAddress,
@@ -69,11 +66,16 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       winc,
       dataItemId,
     });
-    await paymentDatabase.reserveBalance(walletAddress, winc, dataItemId);
+    await paymentDatabase.reserveBalance({
+      reservationId: dataItemId,
+      userAddress: walletAddress,
+      reservedWincAmount: winc,
+      adjustments,
+    });
     ctx.response.status = 200;
     ctx.response.message = "Balance reserved";
 
-    // TODO: Adjust to JSON response body to Expose adjustments via Reserve balance (e.g: body = { winc, adjustments })
+    // TODO: Adjust to JSON response body to Expose adjustments via Reserve balance (e.g: body = { winc, adjustments }), and then to the user of data POST
     ctx.response.body = winc;
 
     logger.info("Balance reserved for user!", {

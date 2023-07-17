@@ -638,7 +638,11 @@ describe("PostgresDatabase class", () => {
     });
 
     it("reserves the balance as expected when winston balance is available", async () => {
-      await db.reserveBalance(richAddress, new Winston(500), stubTxId1);
+      await db.reserveBalance({
+        userAddress: richAddress,
+        reservedWincAmount: new Winston(500),
+        reservationId: stubTxId1,
+      });
 
       const richUser = await db.getUser(richAddress);
 
@@ -647,11 +651,11 @@ describe("PostgresDatabase class", () => {
 
     it("throws an error as expected when winston balance is not available", async () => {
       await expectAsyncErrorThrow({
-        promiseToError: db.reserveBalance(
-          poorAddress,
-          new Winston(200),
-          stubTxId1
-        ),
+        promiseToError: db.reserveBalance({
+          userAddress: poorAddress,
+          reservedWincAmount: new Winston(200),
+          reservationId: stubTxId1,
+        }),
         errorType: "InsufficientBalance",
         errorMessage: `Insufficient balance for '${poorAddress}'`,
       });
@@ -662,11 +666,11 @@ describe("PostgresDatabase class", () => {
 
     it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
-        promiseToError: db.reserveBalance(
-          "Non Existent Address",
-          new Winston(1337),
-          stubTxId1
-        ),
+        promiseToError: db.reserveBalance({
+          userAddress: "Non Existent Address",
+          reservedWincAmount: new Winston(1337),
+          reservationId: stubTxId1,
+        }),
         errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
