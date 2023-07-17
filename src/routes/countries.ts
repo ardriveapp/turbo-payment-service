@@ -8,5 +8,5 @@ export async function countriesHandler(ctx: KoaContext, next: Next) {
   ctx.body = recognizedCountries;
   ctx.set("Cache-Control", `max-age=${oneHourInSeconds}`);
 
-  return next;
+  return next();
 }

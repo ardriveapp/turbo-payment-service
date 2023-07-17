@@ -16,7 +16,7 @@ function loadSwaggerYAML() {
 }
 export function swaggerDocsJSON(ctx: KoaContext, next: Next) {
   ctx.response.body = JSON.stringify(loadSwaggerYAML(), null, 2);
-  return next;
+  return next();
 }
 
 export const swaggerDocs = koaSwagger({
