@@ -31,7 +31,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
     logger.error(err);
     ctx.status = 400;
     ctx.response.body = `Webhook Error!`;
-    return next;
+    return next();
   }
 
   // Extract the data from the event.
@@ -96,5 +96,5 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
       return;
   }
 
-  return next;
+  return next();
 }

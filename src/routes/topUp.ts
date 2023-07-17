@@ -28,14 +28,14 @@ export async function topUp(ctx: KoaContext, next: Next) {
     ctx.response.status = 400;
     ctx.body = `Payment method must include one of: ${topUpMethods.toString()}!`;
     logger.info("top-up GET -- Invalid payment method", loggerObject);
-    return next;
+    return next();
   }
 
   if (!isValidArweaveBase64URL(destinationAddress)) {
     ctx.response.status = 403;
     ctx.body = "Destination address is not a valid Arweave native address!";
     logger.info("top-up GET -- Invalid destination address", loggerObject);
-    return next;
+    return next();
   }
 
   let currencyLimitations: CurrencyLimitations;
@@ -46,7 +46,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     logger.error(error);
     ctx.response.status = 502;
     ctx.body = "Fiat Oracle Unavailable";
-    return next;
+    return next();
   }
 
   let payment: Payment;
@@ -67,7 +67,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
       ctx.body = "Fiat Oracle Unavailable";
     }
 
-    return next;
+    return next();
   }
 
   let winstonCreditAmount: WC;
@@ -78,7 +78,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     ctx.response.status = 502;
     ctx.body = "Fiat Oracle Unavailable";
 
-    return next;
+    return next();
   }
 
   const oneSecondMs = 1000;
@@ -153,7 +153,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     ctx.body = `Error creating stripe payment session with method: ${method}!`;
     MetricRegistry.stripeSessionCreationErrorCounter.inc();
     logger.error(error);
-    return next;
+    return next();
   }
 
   try {
@@ -162,7 +162,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     logger.error(error);
     ctx.response.status = 503;
     ctx.body = "Cloud Database Unavailable";
-    return next;
+    return next();
   }
 
   ctx.body = {
@@ -171,5 +171,5 @@ export async function topUp(ctx: KoaContext, next: Next) {
   };
   ctx.response.status = 200;
 
-  return next;
+  return next();
 }

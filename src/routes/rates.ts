@@ -47,5 +47,5 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     ctx.body = "Failed to calculate rates.";
     logger.error("Failed to calculate rates.", error);
   }
-  return next;
+  return next();
 }
