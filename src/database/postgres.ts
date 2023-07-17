@@ -35,7 +35,11 @@ import {
   User,
   UserDBResult,
 } from "./dbTypes";
-import { InsufficientBalance, UserNotFoundWarning } from "./errors";
+import {
+  BalanceReservationNotFoundError,
+  InsufficientBalance,
+  UserNotFoundWarning,
+} from "./errors";
 import { getWriterConfig } from "./knexConfig";
 import { getReaderConfig } from "./knexConfig";
 
@@ -454,7 +458,7 @@ export class PostgresDatabase implements Database {
           .returning("*");
 
       if (balanceReservationDbResult.length === 0) {
-        throw Error("No balance reservation found for refund!");
+        throw new BalanceReservationNotFoundError();
       }
       const balanceReservation = balanceReservationDbResult[0];
       const { user_address, reserved_winc_amount } = balanceReservation;

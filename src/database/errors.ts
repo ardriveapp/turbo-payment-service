@@ -59,3 +59,10 @@ export class PaymentAmountTooLarge extends PaymentValidationError {
     this.name = "PaymentAmountTooLarge";
   }
 }
+
+export class BalanceReservationNotFoundError extends Error {
+  constructor() {
+    super("No balance reservation found for refund!");
+    this.name = "BalanceReservationNotFoundError";
+  }
+}

@@ -712,9 +712,8 @@ describe("PostgresDatabase class", () => {
           reservationId: "Non Existent Id",
           refundedReason: "?!",
         }),
-        errorType: "Error",
-        errorMessage:
-          "No user found in database with address 'Non Existent Address'",
+        errorType: "BalanceReservationNotFoundError",
+        errorMessage: "No balance reservation found for refund!",
       });
     });
   });

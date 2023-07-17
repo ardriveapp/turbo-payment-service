@@ -623,7 +623,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
   });
 
-  it("GET /refund-balance returns 200 for correct params for legacy route", async () => {
+  it("GET /refund-balance returns 400 for legacy route with no ID", async () => {
     const winstonCredits = 1000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
@@ -637,8 +637,8 @@ describe("Router tests", () => {
         },
       }
     );
-    expect(statusText).to.equal("Balance refunded");
-    expect(status).to.equal(200);
+    expect(statusText).to.equal("Bad Request");
+    expect(status).to.equal(400);
   });
 
   it("GET /refund-balance returns 401 for missing authorization", async () => {
@@ -651,7 +651,7 @@ describe("Router tests", () => {
     expect(status).to.equal(401);
   });
 
-  it("GET /refund-balance returns 404 if user not found", async () => {
+  it("GET /refund-balance returns 400 if reservation not found", async () => {
     const testAddress = "someRandomAddress";
     const winstonCredits = 100000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
@@ -659,7 +659,7 @@ describe("Router tests", () => {
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`,
+      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=badID`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -667,8 +667,8 @@ describe("Router tests", () => {
       }
     );
 
-    expect(statusText).to.equal("User not found");
-    expect(status).to.equal(404);
+    expect(statusText).to.equal("Reservation not found on refund");
+    expect(status).to.equal(400);
   });
 
   it("GET /currencies returns status 200 and the expected list of currencies and limits", async () => {

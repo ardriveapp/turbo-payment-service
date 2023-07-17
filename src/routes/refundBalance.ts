@@ -1,6 +1,6 @@
 import { Next } from "koa";
 
-import { UserNotFoundWarning } from "../database/errors";
+import { BalanceReservationNotFoundError } from "../database/errors";
 import { KoaContext } from "../server";
 import { Winston } from "../types/winston";
 
@@ -58,13 +58,14 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
       winstonCreditsToRefund,
       dataItemId,
     });
-  } catch (error: UserNotFoundWarning | unknown) {
-    if (error instanceof UserNotFoundWarning) {
-      ctx.response.status = 404;
-      ctx.response.message = "User not found";
-      logger.info(error.message, {
+  } catch (error: BalanceReservationNotFoundError | unknown) {
+    if (error instanceof BalanceReservationNotFoundError) {
+      ctx.response.status = 400;
+      ctx.response.message = "Reservation not found on refund";
+      logger.error(error.message, {
         walletAddress,
         winstonCreditsToRefund,
+        dataItemId,
       });
     } else {
       ctx.response.status = 502;
