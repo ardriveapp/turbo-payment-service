@@ -26,6 +26,7 @@
     "db:up": "docker compose up payment-service-pg -d && yarn db:migrate:latest",
     "db:down": "docker compose down ; docker volume rm payment-service_payment-service-data",
     "db:migrate:latest": "yarn knex migrate:latest --knexfile \"src/database/knexfile.ts\"",
+    "db:migrate:rollback": "yarn knex migrate:rollback --knexfile \"src/database/knexfile.ts\"",
     "db:make:migration": "knex migrate:make $* -x ts --knexfile \"src/database/knexfile.ts\""
   },
   "devDependencies": {
