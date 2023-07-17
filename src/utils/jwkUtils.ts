@@ -2,7 +2,7 @@ import { b64UrlToBuffer } from "arweave/node/lib/utils";
 import { Buffer } from "buffer";
 import { createHash } from "crypto";
 
-import { RSAModulusString } from "../types/types";
+import { RSAModulusString } from "../types";
 import { toB64Url } from "./base64";
 
 // TODO: create a factory that returns address for various wallet types (Arweave, ETH, SOL)

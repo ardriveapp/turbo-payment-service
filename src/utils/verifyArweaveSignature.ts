@@ -1,7 +1,7 @@
 import Arweave from "arweave/node/common.js";
 import { stringToBuffer } from "arweave/node/lib/utils";
 
-import { PublicKeyString } from "../types/types";
+import { PublicKeyString } from "../types";
 
 export interface VerifySignatureParams {
   publicKey: PublicKeyString;

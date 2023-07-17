@@ -9,7 +9,7 @@ import { CacheParams } from "../../cache/promiseCache";
 import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import { msPerMinute } from "../../constants";
 import logger from "../../logger";
-import { ByteCount, Winston } from "../../types/types";
+import { ByteCount, Winston } from "../../types";
 
 export interface BytesToWinstonOracle {
   getWinstonForBytes: (bytes: ByteCount) => Promise<Winston>;

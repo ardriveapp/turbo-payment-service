@@ -1,3 +1,4 @@
+import { TransactionId } from "../types";
 import { WC } from "../types/arc";
 import {
   ChargebackReceipt,
@@ -32,11 +33,13 @@ export interface Database {
   ) => Promise<PaymentReceipt>;
   reserveBalance: (
     userAddress: UserAddress,
-    winstonCreditAmount: WC
+    winstonCreditAmount: WC,
+    dataItemId?: TransactionId // TODO: once the upload-service is updated with the new routes, make this required
   ) => Promise<void>;
   refundBalance: (
     userAddress: UserAddress,
-    winstonCreditAmount: WC
+    winstonCreditAmount: WC,
+    dataItemId?: TransactionId // TODO: once the upload-service is updated with the new routes, make this required
   ) => Promise<void>;
   createChargebackReceipt: (
     createChargebackReceiptParams: CreateChargebackReceiptParams

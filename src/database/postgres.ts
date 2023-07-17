@@ -2,7 +2,7 @@ import knexConstructor, { Knex } from "knex";
 import winston from "winston";
 
 import logger from "../logger";
-import { WC, Winston } from "../types/types";
+import { TransactionId, WC, Winston } from "../types";
 import { Database } from "./database";
 import { columnNames, tableNames } from "./dbConstants";
 import {
@@ -12,6 +12,7 @@ import {
   userDBMap,
 } from "./dbMaps";
 import {
+  AuditLogInsert,
   ChargebackReceipt,
   ChargebackReceiptDBResult,
   CreateChargebackReceiptParams,
@@ -207,6 +208,14 @@ export class PostgresDatabase implements Database {
           user_address_type: destination_address_type,
           winston_credit_balance: winston_credit_amount,
         });
+
+        const auditLogInsert: AuditLogInsert = {
+          user_address: destination_address,
+          winston_credit_amount,
+          change_reason: "account_creation",
+          change_id: paymentReceiptId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
       } else {
         // Increment balance of existing user
         const currentBalance = new Winston(
@@ -222,11 +231,20 @@ export class PostgresDatabase implements Database {
           newBalance,
           paymentReceipt,
         });
+
         await knexTransaction<UserDBResult>(tableNames.user)
           .where({
             user_address: destination_address,
           })
           .update({ winston_credit_balance: newBalance.toString() });
+
+        const auditLogInsert: AuditLogInsert = {
+          user_address: destination_address,
+          winston_credit_amount,
+          change_reason: "payment",
+          change_id: paymentReceiptId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
       }
     });
   }
@@ -302,11 +320,14 @@ export class PostgresDatabase implements Database {
 
     await this.knexWriter.transaction(async (knexTransaction) => {
       // This will throw if payment receipt does not exist
-      const { destinationAddress, paymentReceiptId, winstonCreditAmount } =
-        await this.getPaymentReceiptByTopUpQuoteId(
-          topUpQuoteId,
-          knexTransaction
-        );
+      const {
+        destinationAddress,
+        paymentReceiptId,
+        winstonCreditAmount: winstonClawbackAmount,
+      } = await this.getPaymentReceiptByTopUpQuoteId(
+        topUpQuoteId,
+        knexTransaction
+      );
 
       const user = await this.getUser(destinationAddress, knexTransaction);
 
@@ -314,7 +335,7 @@ export class PostgresDatabase implements Database {
       const currentBalance = user.winstonCreditBalance;
 
       // this could result in a negative balance for a user, will throw an error if non-integer winston balance
-      const newBalance = currentBalance.minus(winstonCreditAmount);
+      const newBalance = currentBalance.minus(winstonClawbackAmount);
 
       // Update the users balance.
       await knexTransaction<UserDBResult>(tableNames.user)
@@ -322,6 +343,14 @@ export class PostgresDatabase implements Database {
           user_address: destinationAddress,
         })
         .update({ winston_credit_balance: newBalance.toString() });
+
+      const auditLogInsert: AuditLogInsert = {
+        user_address: destinationAddress,
+        winston_credit_amount: `-${winstonClawbackAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
+        change_reason: "chargeback",
+        change_id: chargebackReceiptId,
+      };
+      await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
 
       // Remove from payment receipt table,
       const paymentReceiptDbResult =
@@ -361,7 +390,8 @@ export class PostgresDatabase implements Database {
 
   public async reserveBalance(
     userAddress: string,
-    winstonCreditAmount: Winston
+    winstonCreditAmount: Winston,
+    dataItemId?: TransactionId
   ): Promise<void> {
     await this.knexWriter.transaction(async (knexTransaction) => {
       const user = await this.getUser(userAddress, knexTransaction);
@@ -379,12 +409,21 @@ export class PostgresDatabase implements Database {
           user_address: userAddress,
         })
         .update({ winston_credit_balance: newBalance.toString() });
+
+      const auditLogInsert: AuditLogInsert = {
+        user_address: userAddress,
+        winston_credit_amount: `-${winstonCreditAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
+        change_reason: "upload",
+        change_id: dataItemId,
+      };
+      await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
     });
   }
 
   public async refundBalance(
     userAddress: string,
-    winstonCreditAmount: Winston
+    winstonCreditAmount: Winston,
+    dataItemId?: TransactionId
   ): Promise<void> {
     await this.knexWriter.transaction(async (knexTransaction) => {
       const user = await this.getUser(userAddress, knexTransaction);
@@ -397,6 +436,14 @@ export class PostgresDatabase implements Database {
           user_address: userAddress,
         })
         .update({ winston_credit_balance: newBalance.toString() });
+
+      const auditLogInsert: AuditLogInsert = {
+        user_address: userAddress,
+        winston_credit_amount: winstonCreditAmount.toString(), // a positive value because this amount was incremented to the users balance
+        change_reason: "refund",
+        change_id: dataItemId,
+      };
+      await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
     });
   }
 

@@ -7,8 +7,8 @@ import {
   turboFeePercentageAsADecimal,
 } from "../constants";
 import { KoaContext } from "../server";
+import { Winston } from "../types";
 import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
-import { Winston } from "../types/types";
 
 export async function ratesHandler(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;

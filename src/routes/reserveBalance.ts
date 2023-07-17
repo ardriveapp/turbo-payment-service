@@ -2,12 +2,13 @@ import { Next } from "koa";
 
 import { InsufficientBalance, UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
-import { ByteCount } from "../types/byteCount";
+import { ByteCount } from "../types";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
-  const logger = ctx.state.logger;
-
-  const { paymentDatabase, pricingService } = ctx.state;
+  const { paymentDatabase, pricingService, logger } = ctx.state;
+  const { walletAddress } = ctx.params;
+  // TODO: do some regex validation on the dataItemId
+  const { byteCount: rawByteCount, dataItemId } = ctx.query;
 
   if (!ctx.request.headers.authorization || !ctx.state.user) {
     ctx.response.status = 401;
@@ -19,78 +20,89 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
         headers: ctx.request.headers,
       }
     );
-    return next;
+    return next();
+  }
+
+  // validate we have what we need
+  if (
+    // TODO: once the new service is converted, validate dataItemId exists here
+    Array.isArray(dataItemId) ||
+    !rawByteCount ||
+    Array.isArray(rawByteCount)
+  ) {
+    ctx.response.status = 400;
+    ctx.body = "Missing parameters";
+    logger.error("GET Reserve balance route with missing parameters!", {
+      ...ctx.params,
+      ...ctx.query,
+    });
+    return next();
   }
 
   let byteCount: ByteCount;
-  let walletAddressToCredit: string;
-
-  if (!ctx.params.walletAddress || !ctx.params.byteCount) {
-    ctx.response.status = 403;
-    ctx.body = "Missing parameters";
-    logger.error("GET Reserve balance route with missing parameters!", {
-      params: ctx.params,
+  try {
+    byteCount = ByteCount(+rawByteCount);
+  } catch (error) {
+    ctx.response.status = 400;
+    ctx.body = `Invalid parameter for byteCount: ${rawByteCount}`;
+    logger.error("GET Reserve balance route with invalid parameters!", {
+      ...ctx.params,
+      ...ctx.query,
     });
-    return next;
-  } else {
-    try {
-      byteCount = ByteCount(+ctx.params.byteCount);
-      walletAddressToCredit = ctx.params.walletAddress;
-    } catch (error) {
-      ctx.response.status = 403;
-      ctx.body = "Invalid parameters";
-      logger.error("GET Reserve balance route with invalid parameters!", {
-        params: ctx.params,
-      });
-      return next;
-    }
+    return next();
   }
 
   try {
     logger.info("Getting base credit amount for byte count...", {
-      walletAddressToCredit,
+      walletAddress,
       byteCount,
+      dataItemId,
     });
     const winstonCredits = await pricingService.getWCForBytes(byteCount);
 
     logger.info("Reserving balance for user ", {
-      walletAddressToCredit,
+      walletAddress,
       byteCount,
       winstonCredits,
+      dataItemId,
     });
-    await paymentDatabase.reserveBalance(walletAddressToCredit, winstonCredits);
+    await paymentDatabase.reserveBalance(
+      walletAddress,
+      winstonCredits,
+      dataItemId
+    );
     ctx.response.status = 200;
     ctx.response.message = "Balance reserved";
     ctx.response.body = winstonCredits;
 
     logger.info("Balance reserved for user!", {
-      walletAddressToCredit,
+      walletAddress,
       byteCount,
       winstonCredits,
+      dataItemId,
     });
 
-    return next;
+    return next();
   } catch (error: UserNotFoundWarning | InsufficientBalance | unknown) {
     if (error instanceof UserNotFoundWarning) {
-      ctx.response.status = 403;
+      ctx.response.status = 404;
       ctx.response.message = "User not found";
-      logger.info(error.message, { walletAddressToCredit, byteCount });
-      return next;
-    }
-    if (error instanceof InsufficientBalance) {
-      ctx.response.status = 403;
+      logger.info(error.message, { walletAddress, byteCount });
+    } else if (error instanceof InsufficientBalance) {
+      ctx.response.status = 402;
       ctx.response.message = "Insufficient balance";
-      logger.info(error.message, { walletAddressToCredit, byteCount });
-      return next;
-    }
-    logger.error("Error reserving balance", {
-      walletAddressToCredit,
-      byteCount,
-      error,
-    });
+      logger.info(error.message, { walletAddress, byteCount });
+      return next();
+    } else {
+      logger.error("Error reserving balance", {
+        walletAddress,
+        byteCount,
+        error,
+      });
 
-    ctx.response.status = 502;
-    ctx.response.message = "Error reserving balance";
-    return next;
+      ctx.response.status = 502;
+      ctx.response.message = "Error reserving balance";
+    }
   }
+  return next();
 }

@@ -1,6 +1,6 @@
 import { expect } from "chai";
 
-import { ByteCount } from "../types/types";
+import { ByteCount } from "../types";
 import { roundToArweaveChunkSize } from "./roundToChunkSize";
 
 describe("roundToChunkSize function", () => {

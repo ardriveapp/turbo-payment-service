@@ -6,12 +6,12 @@ import {
 } from "../constants";
 import { CurrencyType } from "../database/dbTypes";
 import logger from "../logger";
+import { ByteCount, WC, Winston } from "../types";
 import { Payment } from "../types/payment";
 import {
   SupportedPaymentCurrencyTypes,
   zeroDecimalCurrencyTypes,
 } from "../types/supportedCurrencies";
-import { ByteCount, WC, Winston } from "../types/types";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";

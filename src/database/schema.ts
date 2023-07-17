@@ -2,6 +2,7 @@ import { Knex } from "knex";
 
 import logger from "../logger";
 import { columnNames, tableNames } from "./dbConstants";
+import { AuditChangeReason, AuditLogDBResult } from "./dbTypes";
 
 export class Schema {
   private constructor(private readonly pg: Knex) {}
@@ -12,6 +13,28 @@ export class Schema {
 
   public static rollback(pg: Knex): Promise<void> {
     return new Schema(pg).rollbackInitialSchema();
+  }
+
+  public static migrateToAuditLog(pg: Knex): Promise<void> {
+    return new Schema(pg).migrateToAuditLog();
+  }
+
+  public static rollbackFromAuditLog(pg: Knex): Promise<void> {
+    return new Schema(pg).rollbackFromAuditLog();
+  }
+
+  public static async migrateAuditLogToPositiveNegativeCredits(
+    pg: Knex
+  ): Promise<void> {
+    return new Schema(pg).migrateAuditLogToPositiveNegativeCredits();
+  }
+
+  public static async rollBackFromMigrateAuditLogToPositiveNegativeCredits(
+    pg: Knex
+  ): Promise<void> {
+    return new Schema(
+      pg
+    ).rollBackFromMigrateAuditLogToPositiveNegativeCredits();
   }
 
   private async initializeSchema(): Promise<void> {
@@ -41,6 +64,28 @@ export class Schema {
 
     logger.info("Schema dropped. Initial migration rollback successful!", {
       rollbackDurationMs: Date.now() - rollbackStartTime,
+    });
+  }
+
+  private async migrateToAuditLog() {
+    logger.info("Starting audit log migration...");
+    const migrationStartTime = Date.now();
+
+    await this.createAuditLogTable();
+
+    logger.info("Finished audit log migration!", {
+      migrationMs: Date.now() - migrationStartTime,
+    });
+  }
+
+  private async rollbackFromAuditLog() {
+    logger.info("Starting audit log rollback...");
+    const rollbackStartTime = Date.now();
+
+    await this.pg.schema.dropTable(auditLog);
+
+    logger.info("Finished audit log rollback!", {
+      rollbackMs: Date.now() - rollbackStartTime,
     });
   }
 
@@ -133,12 +178,102 @@ export class Schema {
     });
   }
 
+  private async createAuditLogTable(): Promise<void> {
+    return this.pg.schema.createTable(auditLog, (t) => {
+      t.increments(auditId).primary();
+      t.string(userAddress).notNullable();
+      t.timestamp(auditDate).notNullable().defaultTo(this.defaultTimestamp());
+      t.string(winstonCreditAmount).notNullable();
+      t.string(changeReason).notNullable();
+      t.string(changeId).nullable();
+
+      t.index([userAddress, auditDate], "user_audit_range");
+    });
+  }
+
+  private async migrateAuditLogToPositiveNegativeCredits(): Promise<void> {
+    const migrationStartTime = Date.now();
+    logger.info("Starting audit log credit amount migration...", {
+      startTime: migrationStartTime,
+    });
+    const negativeCreditChangeReasons: AuditChangeReason[] = [
+      "chargeback",
+      "upload",
+    ];
+    const existingAuditRecords = await this.pg<AuditLogDBResult>(auditLog)
+      .whereIn("change_reason", negativeCreditChangeReasons)
+      .andWhere("winston_credit_amount", "not like", "-%"); // filter out existing rows that are already negative
+    const negativeChangePromises = existingAuditRecords.reduce(
+      (promises: Knex.QueryBuilder[], record: AuditLogDBResult) => {
+        if (negativeCreditChangeReasons.includes(record.change_reason)) {
+          logger.info(
+            "Found audit record that should have negative winston_credit_amount",
+            {
+              ...record,
+            }
+          );
+          const updatePromise = this.pg(auditLog)
+            .update({
+              [columnNames.winstonCreditAmount]: `-${record.winston_credit_amount}`,
+            })
+            .where({ audit_id: record.audit_id });
+          promises.push(updatePromise);
+        }
+        return promises;
+      },
+      []
+    );
+    await Promise.all(negativeChangePromises);
+    logger.info("Finished audit log credit amount migration!", {
+      migrationDurationMs: Date.now() - migrationStartTime,
+      numRecords: negativeChangePromises.length,
+    });
+  }
+
+  private async rollBackFromMigrateAuditLogToPositiveNegativeCredits(): Promise<void> {
+    const migrationStartTime = Date.now();
+    logger.info(
+      "Rolling back schema from audit log positive/negative credit balance migration...",
+      {
+        startTime: migrationStartTime,
+      }
+    );
+    const negativeCreditChangeReasons: AuditChangeReason[] = [
+      "chargeback",
+      "upload",
+    ];
+    const existingAuditRecords = await this.pg<AuditLogDBResult>(auditLog)
+      .whereIn("change_reason", negativeCreditChangeReasons)
+      .andWhere("winston_credit_amount", "like", "-%"); // only modify rows that are negative
+    const negativeChangePromises = existingAuditRecords.reduce(
+      (promises: Knex.QueryBuilder[], record: AuditLogDBResult) => {
+        if (negativeCreditChangeReasons.includes(record.change_reason)) {
+          const updatePromise = this.pg(auditLog)
+            .update({
+              [columnNames.winstonCreditAmount]:
+                record.winston_credit_amount.replace("-", ""),
+            })
+            .where({ audit_id: record.audit_id });
+          promises.push(updatePromise);
+        }
+        return promises;
+      },
+      []
+    );
+    await Promise.all(negativeChangePromises);
+    logger.info("Finished audit log credit amount rollback!", {
+      migrationDurationMs: Date.now() - migrationStartTime,
+      numRecords: negativeChangePromises.length,
+    });
+  }
+
   private defaultTimestamp() {
     return this.pg.fn.now();
   }
 }
 
 const {
+  auditLog,
   chargebackReceipt,
   failedTopUpQuote,
   paymentReceipt,
@@ -147,7 +282,11 @@ const {
 } = tableNames;
 
 const {
+  auditDate,
+  auditId,
   paymentAmount,
+  changeId,
+  changeReason,
   chargebackReason,
   chargebackReceiptDate,
   chargebackReceiptId,

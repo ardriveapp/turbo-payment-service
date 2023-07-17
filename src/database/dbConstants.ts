@@ -4,8 +4,7 @@ export const tableNames = {
   failedTopUpQuote: "failed_top_up_quote",
   paymentReceipt: "payment_receipt",
   chargebackReceipt: "chargeback_receipt",
-  // TODO: Do we use audit log table for accountability during disputes (see tech design)
-  // auditLog: "audit_log",
+  auditLog: "audit_log",
 } as const;
 
 export const columnNames = {
@@ -39,4 +38,10 @@ export const columnNames = {
   chargebackReceiptId: "chargeback_receipt_id",
   chargebackReason: "chargeback_reason",
   chargebackReceiptDate: "chargeback_receipt_date",
+
+  // Audit Log
+  auditId: "audit_id",
+  auditDate: "audit_date",
+  changeReason: "change_reason",
+  changeId: "change_id",
 } as const;
