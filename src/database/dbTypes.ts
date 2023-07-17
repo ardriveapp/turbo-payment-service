@@ -116,6 +116,10 @@ export interface AuditLogInsert {
   change_id?: string;
 }
 
+export interface AuditLogDBResult extends AuditLogInsert {
+  audit_id: number;
+}
+
 export interface UserDBResult extends UserDBInsert {
   promotional_info: JsonSerializable;
   user_creation_date: string;
