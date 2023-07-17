@@ -13,7 +13,8 @@ const privateRouteSecretName = "private-route-secret";
 const jwtSecretName = "jwt-secret";
 const dbPasswordSecretName = "payment-db-password";
 
-const wincSubsidizedPercentageParamName = "winc-subsidized-percentage";
+const wincSubsidizedPercentageParamName =
+  "payment-service/winc-subsidized-percentage";
 
 export async function loadSecretsToEnv() {
   try {
