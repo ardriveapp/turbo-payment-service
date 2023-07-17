@@ -91,6 +91,13 @@ export interface BalanceReservation {
   adjustments: AdjustmentResult;
 }
 
+export type CreateBalanceReservationParams = {
+  reservationId: ReservationId;
+  userAddress: UserAddress;
+  reservedWincAmount: WC;
+  adjustments: AdjustmentResult;
+};
+
 export type AdjustmentTarget = "upload" | "payment";
 export type AdjustmentOperator = "add" | "multiply";
 export interface PriceAdjustment {
@@ -173,12 +180,15 @@ export interface ChargebackReceiptDBResult extends ChargebackReceiptDBInsert {
   chargeback_receipt_date: string;
 }
 
-export interface BalanceReservationDBResult {
-  reservationId: ReservationId;
-  userAddress: UserAddress;
-  reservedDate: Timestamp;
-  reservedWincAmount: WC;
-  adjustments: Record<string, { adjustmentName: k }>[];
+export interface BalanceReservationDBInsert {
+  reservation_id: string;
+  user_address: string;
+  reserved_winc_amount: string;
+  adjustments: AdjustmentResult;
+}
+
+export interface BalanceReservationDBResult extends BalanceReservationDBInsert {
+  reserved_date: string;
 }
 
 export interface PriceAdjustmentDBResult {
