@@ -17,6 +17,7 @@ describe("Schema class", () => {
     // Run a new schema create after the rollback test so database will be as expected for integration tests
     await Schema.create(knex);
     await Schema.migrateToAuditLog(knex);
+    await Schema.migrateToBalanceReservation(knex);
 
     // Run these tests that depend on db after schema tests
     require("./postgres.int.spec");
@@ -28,11 +29,15 @@ describe("Schema class", () => {
     expect(allTables.rows.map((t) => t.table_name)).to.deep.equal([
       // Tables are returned alphabetized
       "audit_log",
+      "balance_reservation",
       "chargeback_receipt",
       "failed_top_up_quote",
+      "finalized_reservation",
       "knex_migrations",
       "knex_migrations_lock",
       "payment_receipt",
+      "price_adjustment",
+      "refunded_reservation",
       "top_up_quote",
       "user",
     ]);
@@ -74,6 +79,7 @@ describe("Schema class", () => {
   });
 
   it("rollback schema public static methods remove all expected tables", async () => {
+    await Schema.rollbackFromBalanceReservation(knex);
     await Schema.rollbackFromAuditLog(knex);
     await Schema.rollback(knex);
 

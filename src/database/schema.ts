@@ -22,6 +22,14 @@ export class Schema {
     return new Schema(pg).rollbackFromAuditLog();
   }
 
+  public static migrateToBalanceReservation(pg: Knex): Promise<void> {
+    return new Schema(pg).migrateToBalanceReservation();
+  }
+
+  public static rollbackFromBalanceReservation(pg: Knex): Promise<void> {
+    return new Schema(pg).rollbackFromBalanceReservation();
+  }
+
   private async initializeSchema(): Promise<void> {
     logger.info("Starting initial migration...");
     const migrationStartTime = Date.now();
@@ -70,6 +78,34 @@ export class Schema {
     await this.pg.schema.dropTable(auditLog);
 
     logger.info("Finished audit log rollback!", {
+      rollbackMs: Date.now() - rollbackStartTime,
+    });
+  }
+
+  private async migrateToBalanceReservation() {
+    logger.info("Starting balance reservation migration...");
+    const migrationStartTime = Date.now();
+
+    await this.createBalanceReservationTable();
+    await this.createFinalizedReservationTable();
+    await this.createRefundedReservationTable();
+    await this.createPriceAdjustmentTable();
+
+    logger.info("Finished balance reservation migration!", {
+      migrationMs: Date.now() - migrationStartTime,
+    });
+  }
+
+  private async rollbackFromBalanceReservation() {
+    logger.info("Starting balance reservation rollback...");
+    const rollbackStartTime = Date.now();
+
+    await this.pg.schema.dropTable(balanceReservation);
+    await this.pg.schema.dropTable(finalizedReservation);
+    await this.pg.schema.dropTable(refundedReservation);
+    await this.pg.schema.dropTable(priceAdjustment);
+
+    logger.info("Finished balance reservation rollback!", {
       rollbackMs: Date.now() - rollbackStartTime,
     });
   }
@@ -176,6 +212,64 @@ export class Schema {
     });
   }
 
+  private async createBalanceReservationTable(): Promise<void> {
+    return this.pg.schema.createTable(balanceReservation, (t) => {
+      t.string(reservationId).primary();
+      t.string(userAddress).notNullable().index();
+      t.timestamp(reservedDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
+      t.string(reservedWincAmount).notNullable();
+      t.jsonb(adjustments).defaultTo([]);
+      t.index(["adjustments"], "adjustment_idx", "gin");
+    });
+  }
+
+  private async createFinalizedReservationTable(): Promise<void> {
+    return this.pg.schema.createTable(finalizedReservation, (t) => {
+      t.string(reservationId).primary();
+      t.string(userAddress).notNullable().index();
+      t.timestamp(reservedDate).notNullable();
+      t.string(reservedWincAmount).notNullable();
+      t.jsonb(adjustments).notNullable();
+      t.index(["adjustments"], "finalized_adjustment_idx", "gin");
+
+      t.timestamp(finalizedDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
+      t.string(amortizedWincAmount).notNullable();
+    });
+  }
+
+  private async createRefundedReservationTable(): Promise<void> {
+    return this.pg.schema.createTable(refundedReservation, (t) => {
+      t.string(reservationId).primary();
+      t.string(userAddress).notNullable().index();
+      t.timestamp(reservedDate).notNullable();
+      t.string(reservedWincAmount).notNullable();
+      t.jsonb(adjustments).notNullable();
+      t.index(["adjustments"], "refunded_adjustment_idx", "gin");
+
+      t.timestamp(refundedDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
+      t.string(refundedReason).notNullable();
+    });
+  }
+
+  private async createPriceAdjustmentTable(): Promise<void> {
+    return this.pg.schema.createTable(priceAdjustment, (t) => {
+      t.increments(adjustmentId).primary();
+      t.string(adjustmentName).notNullable();
+      t.string(adjustmentTarget).notNullable();
+      t.string(adjustmentOperator).notNullable();
+      t.timestamp(adjustmentStartDate)
+        .notNullable()
+        .defaultTo(this.defaultTimestamp());
+      t.timestamp(adjustmentExpirationDate).notNullable();
+    });
+  }
+
   private defaultTimestamp() {
     return this.pg.fn.now();
   }
@@ -183,14 +277,26 @@ export class Schema {
 
 const {
   auditLog,
+  balanceReservation,
   chargebackReceipt,
   failedTopUpQuote,
+  finalizedReservation,
   paymentReceipt,
+  priceAdjustment,
+  refundedReservation,
   topUpQuote,
   user,
 } = tableNames;
 
 const {
+  adjustmentExpirationDate,
+  adjustmentId,
+  adjustmentName,
+  adjustmentOperator,
+  adjustmentStartDate,
+  adjustmentTarget,
+  adjustments,
+  amortizedWincAmount,
   auditDate,
   auditId,
   paymentAmount,
@@ -203,6 +309,7 @@ const {
   destinationAddress,
   destinationAddressType,
   failedReason,
+  finalizedDate,
   paymentProvider,
   paymentReceiptDate,
   paymentReceiptId,
@@ -210,6 +317,11 @@ const {
   quoteCreationDate,
   quoteExpirationDate,
   quoteFailedDate,
+  refundedDate,
+  refundedReason,
+  reservationId,
+  reservedDate,
+  reservedWincAmount,
   topUpQuoteId,
   userAddress,
   userAddressType,
