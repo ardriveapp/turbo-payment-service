@@ -214,4 +214,10 @@ export const expectedRates = {
     sgd: 9.82432542976695,
     usd: 7.407815737590149,
   },
+  subsidies: [
+    {
+      description: "FWD Research July 2023 Subsidy",
+      value: 0,
+    },
+  ],
 };

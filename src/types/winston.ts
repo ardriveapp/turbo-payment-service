@@ -23,6 +23,10 @@ export class Winston {
     );
   }
 
+  round(value: "ROUND_DOWN" | "ROUND_CEIL" = "ROUND_DOWN"): Winston {
+    return W(this.amount.decimalPlaces(0, BigNumber[value]));
+  }
+
   dividedBy(
     divisor: BigNumber.Value,
     round: "ROUND_DOWN" | "ROUND_CEIL" = "ROUND_CEIL"

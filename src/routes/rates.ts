@@ -39,9 +39,6 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     const rates = {
       winc: priceWithSubsidies.subsidizedWincTotal.toBigNumber().toNumber(),
       fiat: { ...fiat },
-      originalWincTotal: priceWithSubsidies.originalWincTotal
-        .toBigNumber()
-        .toNumber(),
       subsidies: priceWithSubsidies.subsidies,
     };
     ctx.response.status = 200;

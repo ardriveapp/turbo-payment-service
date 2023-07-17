@@ -213,7 +213,10 @@ export class TurboPricingService implements PricingService {
     );
 
     const subsidizedMultiplier = subsidizedWinstonCreditPercentage / 100;
-    const subsidizedAmount = winston.times(subsidizedMultiplier);
+    // round down to closest full integer for the subsidy amount
+    const subsidizedAmount = winston
+      .times(subsidizedMultiplier)
+      .round("ROUND_DOWN");
 
     this.logger.info("Applying subsidy to upload", {
       originalAmount: winston.toString(),

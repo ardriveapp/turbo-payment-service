@@ -73,12 +73,8 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
     );
     ctx.response.status = 200;
     ctx.response.message = "Balance reserved";
-    ctx.response.body = {
-      winc: priceWithSubsidies.subsidizedWincTotal.toString(),
-      originalWincTotal: priceWithSubsidies.originalWincTotal.toString(),
-      subsides: priceWithSubsidies.subsidies,
-    };
-
+    // TODO: add subsidy amounts to this response
+    ctx.response.body = priceWithSubsidies.subsidizedWincTotal;
     logger.info("Balance reserved for user!", {
       walletAddress,
       byteCount,
