@@ -100,7 +100,7 @@ export function priceAdjustmentDBMap({
 }: PriceAdjustmentDBResult): PriceAdjustment {
   return {
     adjustmentExpirationDate: adjustment_expiration_date,
-    adjustmentId: +adjustment_id,
+    adjustmentId: adjustment_id,
     adjustmentName: adjustment_name,
     adjustmentOperator: adjustment_operator as AdjustmentOperator,
     adjustmentPriority: adjustment_priority,

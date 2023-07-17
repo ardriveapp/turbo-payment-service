@@ -1,3 +1,4 @@
+import { AdjustmentResult } from "../pricing/pricing";
 import { PublicArweaveAddress } from "../types";
 import { WC } from "../types/arc";
 
@@ -24,8 +25,7 @@ export type TopUpQuoteId = IdType;
 export type PaymentReceiptId = IdType;
 export type ChargebackReceiptId = IdType;
 export type ReservationId = IdType;
-
-export type AdjustmentId = number;
+export type AdjustmentId = IdType;
 
 export type PaymentAmount = number;
 
@@ -82,6 +82,14 @@ export type CreateChargebackReceiptParams = {
   chargebackReason: string;
   chargebackReceiptId: ChargebackReceiptId;
 };
+
+export interface BalanceReservation {
+  reservationId: ReservationId;
+  userAddress: UserAddress;
+  reservedDate: Timestamp;
+  reservedWincAmount: WC;
+  adjustments: AdjustmentResult;
+}
 
 export type AdjustmentTarget = "upload" | "payment";
 export type AdjustmentOperator = "add" | "multiply";
@@ -163,6 +171,14 @@ export interface ChargebackReceiptDBInsert extends PaymentReceiptDBResult {
 
 export interface ChargebackReceiptDBResult extends ChargebackReceiptDBInsert {
   chargeback_receipt_date: string;
+}
+
+export interface BalanceReservationDBResult {
+  reservationId: ReservationId;
+  userAddress: UserAddress;
+  reservedDate: Timestamp;
+  reservedWincAmount: WC;
+  adjustments: Record<string, { adjustmentName: k }>[];
 }
 
 export interface PriceAdjustmentDBResult {

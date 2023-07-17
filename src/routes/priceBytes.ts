@@ -30,11 +30,11 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
     return next;
   }
   try {
-    const price = await pricingService.getWCForBytes(bytes);
+    const { winc } = await pricingService.getWCForBytes(bytes);
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
-    ctx.body = { winc: price.toString() };
-    logger.info("Price found for byte count!", { price, bytesValue });
+    ctx.body = { winc };
+    logger.info("Price found for byte count!", { winc, bytesValue });
   } catch (error) {
     ctx.response.status = 502;
     ctx.body = "Pricing Oracle Unavailable";
