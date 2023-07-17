@@ -2,7 +2,7 @@ import { Knex } from "knex";
 
 import logger from "../logger";
 import { columnNames, tableNames } from "./dbConstants";
-import { AuditLogDBResult } from "./dbTypes";
+import { AuditChangeReason, AuditLogDBResult } from "./dbTypes";
 
 export class Schema {
   private constructor(private readonly pg: Knex) {}
@@ -196,7 +196,10 @@ export class Schema {
     logger.info("Starting audit log credit amount migration...", {
       startTime: migrationStartTime,
     });
-    const negativeCreditChangeReasons = ["chargeback", "upload"];
+    const negativeCreditChangeReasons: AuditChangeReason[] = [
+      "chargeback",
+      "upload",
+    ];
     const existingAuditRecords = await this.pg<AuditLogDBResult>(
       auditLog
     ).whereIn("change_reason", negativeCreditChangeReasons);
@@ -234,7 +237,10 @@ export class Schema {
         startTime: migrationStartTime,
       }
     );
-    const negativeCreditChangeReasons = ["chargeback", "upload"];
+    const negativeCreditChangeReasons: AuditChangeReason[] = [
+      "chargeback",
+      "upload",
+    ];
     const existingAuditRecords = await this.pg<AuditLogDBResult>(
       auditLog
     ).whereIn("change_reason", negativeCreditChangeReasons);
