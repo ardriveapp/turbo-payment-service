@@ -8,6 +8,7 @@ import { columnNames, tableNames } from "./dbConstants";
 import {
   chargebackReceiptDBMap,
   paymentReceiptDBMap,
+  priceAdjustmentDBMap,
   topUpQuoteDBMap,
   userDBMap,
 } from "./dbMaps";
@@ -21,6 +22,8 @@ import {
   FailedTopUpQuoteDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
+  PriceAdjustment,
+  PriceAdjustmentDBResult,
   PromotionalInfo,
   TopUpQuote,
   TopUpQuoteDBResult,
@@ -472,5 +475,15 @@ export class PostgresDatabase implements Database {
         false
       );
     });
+  }
+
+  public async getCurrentUploadAdjustments(): Promise<PriceAdjustment[]> {
+    const currentDate = new Date();
+    const currentAdjustments = (
+      await this.knexReader<PriceAdjustmentDBResult>(tableNames.priceAdjustment)
+        .where(columnNames.adjustmentStartDate, "<", currentDate)
+        .andWhere(columnNames.adjustmentExpirationDate, ">", currentDate)
+    ).filter((a) => a.adjustment_target === "upload");
+    return currentAdjustments.map(priceAdjustmentDBMap);
   }
 }

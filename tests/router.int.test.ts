@@ -83,7 +83,9 @@ describe("Router tests", () => {
   });
 
   it("GET /price/bytes", async () => {
-    stub(pricingService, "getWCForBytes").resolves(new Winston("1234567890"));
+    stub(pricingService, "getWCForBytes").resolves({
+      winc: new Winston("1234567890"),
+    });
 
     const { status, statusText, data } = await axios.get(
       `/v1/price/bytes/1024`
@@ -498,7 +500,9 @@ describe("Router tests", () => {
       expiresIn: "1h",
     });
 
-    stub(pricingService, "getWCForBytes").resolves(new Winston("100"));
+    stub(pricingService, "getWCForBytes").resolves({
+      winc: new Winston("100"),
+    });
 
     const { status, statusText, data } = await axios.get(
       `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
@@ -525,7 +529,9 @@ describe("Router tests", () => {
       expiresIn: "1h",
     });
 
-    stub(pricingService, "getWCForBytes").resolves(new Winston("100"));
+    stub(pricingService, "getWCForBytes").resolves({
+      winc: new Winston("100"),
+    });
 
     const { status, statusText, data } = await axios.get(
       `/v1/reserve-balance/${testAddress}/${byteCount}`,

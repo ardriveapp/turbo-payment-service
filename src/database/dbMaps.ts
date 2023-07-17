@@ -1,11 +1,15 @@
 import { Winston } from "../types/winston";
 import {
+  AdjustmentOperator,
+  AdjustmentTarget,
   ChargebackReceipt,
   ChargebackReceiptDBResult,
   FailedTopUpQuote,
   FailedTopUpQuoteDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
+  PriceAdjustment,
+  PriceAdjustmentDBResult,
   PromotionalInfo,
   TopUpQuote,
   TopUpQuoteDBResult,
@@ -81,5 +85,27 @@ export function chargebackReceiptDBMap(
     chargebackReceiptDate: dbResult.chargeback_receipt_date,
     chargebackReason: dbResult.chargeback_reason,
     chargebackReceiptId: dbResult.chargeback_receipt_id,
+  };
+}
+
+export function priceAdjustmentDBMap({
+  adjustment_expiration_date,
+  adjustment_id,
+  adjustment_name,
+  adjustment_operator,
+  adjustment_priority,
+  adjustment_start_date,
+  adjustment_target,
+  adjustment_value,
+}: PriceAdjustmentDBResult): PriceAdjustment {
+  return {
+    adjustmentExpirationDate: adjustment_expiration_date,
+    adjustmentId: +adjustment_id,
+    adjustmentName: adjustment_name,
+    adjustmentOperator: adjustment_operator as AdjustmentOperator,
+    adjustmentPriority: adjustment_priority,
+    adjustmentStartDate: adjustment_start_date,
+    adjustmentTarget: adjustment_target as AdjustmentTarget,
+    adjustmentValue: adjustment_value,
   };
 }

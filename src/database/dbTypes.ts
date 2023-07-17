@@ -83,12 +83,15 @@ export type CreateChargebackReceiptParams = {
   chargebackReceiptId: ChargebackReceiptId;
 };
 
+export type AdjustmentTarget = "upload" | "payment";
+export type AdjustmentOperator = "add" | "multiply";
 export interface PriceAdjustment {
   adjustmentId: AdjustmentId;
   adjustmentName: string;
-  adjustmentTarget: "upload" | "payment";
-  adjustmentOperator: "add" | "multiply";
+  adjustmentTarget: AdjustmentTarget;
+  adjustmentOperator: AdjustmentOperator;
   adjustmentValue: number;
+  adjustmentPriority: number;
   adjustmentStartDate: Timestamp;
   adjustmentExpirationDate: Timestamp;
 }
@@ -156,4 +159,15 @@ export interface ChargebackReceiptDBInsert extends PaymentReceiptDBResult {
 
 export interface ChargebackReceiptDBResult extends ChargebackReceiptDBInsert {
   chargeback_receipt_date: string;
+}
+
+export interface PriceAdjustmentDBResult {
+  adjustment_id: string;
+  adjustment_name: string;
+  adjustment_target: string;
+  adjustment_operator: string;
+  adjustment_value: number;
+  adjustment_priority: number;
+  adjustment_start_date: string;
+  adjustment_expiration_date: string;
 }

@@ -64,7 +64,7 @@ export const columnNames = {
   adjustmentTarget: "adjustment_target", // e.g "upload" for on data uploads or "payment" on credit purchases
   adjustmentOperator: "adjustment_operator", // e.g "add" || "multiply"
   adjustmentValue: "adjustment_value", // e.g "200000" || "0.6"
-  adjustmentPriority: "adjustment_priority", // Integer representing the order in which this adjustment should be applied. e.g: 0 for FIRST. Adjustments with equal priority value will sort next based on start date
+  adjustmentPriority: "adjustment_priority", // Integer representing the order in which this adjustment should be applied. e.g: 0 for FIRST
   adjustmentStartDate: "adjustment_start_date",
   adjustmentExpirationDate: "adjustment_expiration_date",
 

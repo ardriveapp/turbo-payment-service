@@ -58,27 +58,23 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       byteCount,
       dataItemId,
     });
-    const winstonCredits = await pricingService.getWCForBytes(byteCount);
+    const { winc } = await pricingService.getWCForBytes(byteCount);
 
     logger.info("Reserving balance for user ", {
       walletAddress,
       byteCount,
-      winstonCredits,
+      winstonCredits: winc,
       dataItemId,
     });
-    await paymentDatabase.reserveBalance(
-      walletAddress,
-      winstonCredits,
-      dataItemId
-    );
+    await paymentDatabase.reserveBalance(walletAddress, winc, dataItemId);
     ctx.response.status = 200;
     ctx.response.message = "Balance reserved";
-    ctx.response.body = winstonCredits;
+    ctx.response.body = winc;
 
     logger.info("Balance reserved for user!", {
       walletAddress,
       byteCount,
-      winstonCredits,
+      winstonCredits: winc,
       dataItemId,
     });
 

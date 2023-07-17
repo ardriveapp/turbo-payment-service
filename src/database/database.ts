@@ -8,6 +8,7 @@ import {
   CreateTopUpQuoteParams,
   PaymentReceipt,
   PaymentReceiptId,
+  PriceAdjustment,
   PromotionalInfo,
   TopUpQuote,
   TopUpQuoteId,
@@ -53,4 +54,5 @@ export interface Database {
   checkForExistingPaymentByTopUpQuoteId: (
     topUpQuoteId: TopUpQuoteId
   ) => Promise<boolean>;
+  getCurrentUploadAdjustments: () => Promise<PriceAdjustment[]>;
 }

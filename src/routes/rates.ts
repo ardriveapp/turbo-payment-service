@@ -7,7 +7,6 @@ import {
   turboFeePercentageAsADecimal,
 } from "../constants";
 import { KoaContext } from "../server";
-import { Winston } from "../types";
 import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
 
 export async function ratesHandler(ctx: KoaContext, next: Next) {
@@ -15,7 +14,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
   const { pricingService } = ctx.state;
 
   try {
-    const winston: Winston = await pricingService.getWCForBytes(oneGiBInBytes);
+    const { winc } = await pricingService.getWCForBytes(oneGiBInBytes);
     const fiat: Record<string, number> = {};
 
     // Calculate fiat prices for one GiB
@@ -25,7 +24,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
           currency
         );
 
-        const fiatPriceForOneGiB = winston.times(fiatPriceForOneAR);
+        const fiatPriceForOneGiB = winc.times(fiatPriceForOneAR);
         const fiatValue =
           (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
           (1 + turboFeePercentageAsADecimal);
@@ -35,7 +34,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     );
 
     const rates = {
-      winc: winston.toBigNumber().toNumber(),
+      winc: winc.toBigNumber().toNumber(),
       fiat: { ...fiat },
     };
     ctx.response.status = 200;

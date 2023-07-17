@@ -4,7 +4,9 @@ import {
   paymentAmountLimits,
   turboFeePercentageAsADecimal,
 } from "../constants";
-import { CurrencyType } from "../database/dbTypes";
+import { Database } from "../database/database";
+import { AdjustmentId, CurrencyType } from "../database/dbTypes";
+import { PostgresDatabase } from "../database/postgres";
 import logger from "../logger";
 import { ByteCount, WC, Winston } from "../types";
 import { Payment } from "../types/payment";
@@ -16,11 +18,21 @@ import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
+export type AdjustmentResult = Record<
+  AdjustmentId,
+  { adjustedWincAmount: WC; adjustmentName: string }
+>[];
+
+export interface GetWincForBytesResult {
+  winc: WC;
+  adjustments?: AdjustmentResult;
+}
+
 export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
-  getWCForBytes: (bytes: ByteCount) => Promise<WC>;
+  getWCForBytes: (bytes: ByteCount) => Promise<GetWincForBytesResult>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -32,18 +44,22 @@ const maxStripeAmount = 990_000_00;
 export class TurboPricingService implements PricingService {
   private readonly bytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
   private readonly arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
+  private readonly paymentDatabase: Database;
 
   constructor({
     bytesToWinstonOracle,
     arweaveToFiatOracle,
+    paymentDatabase,
   }: {
     bytesToWinstonOracle?: ReadThroughBytesToWinstonOracle;
     arweaveToFiatOracle?: ReadThroughArweaveToFiatOracle;
+    paymentDatabase?: Database;
   }) {
     this.bytesToWinstonOracle =
       bytesToWinstonOracle ?? new ReadThroughBytesToWinstonOracle({});
     this.arweaveToFiatOracle =
       arweaveToFiatOracle ?? new ReadThroughArweaveToFiatOracle({});
+    this.paymentDatabase = paymentDatabase ?? new PostgresDatabase();
   }
 
   private isWithinTenPercent(value: number, targetValue: number): boolean {
@@ -186,11 +202,62 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  async getWCForBytes(bytes: ByteCount): Promise<Winston> {
+  async getWCForBytes(bytes: ByteCount): Promise<GetWincForBytesResult> {
     const chunkSize = roundToArweaveChunkSize(bytes);
-    const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
-      chunkSize
-    );
-    return winston;
+    const winc = await this.bytesToWinstonOracle.getWinstonForBytes(chunkSize);
+
+    const currentUploadAdjustments = (
+      await this.paymentDatabase.getCurrentUploadAdjustments()
+    ).sort((a, b) => a.adjustmentPriority - b.adjustmentPriority);
+
+    let adjustedWinc = winc;
+    let adjustments: AdjustmentResult | undefined = undefined;
+    for (const adjustment of currentUploadAdjustments) {
+      const {
+        adjustmentId,
+        adjustmentName,
+        adjustmentOperator,
+        adjustmentValue,
+      } = adjustment;
+      switch (adjustmentOperator) {
+        case "add":
+          adjustedWinc = adjustedWinc.plus(new Winston(adjustmentValue));
+          adjustments = Object.assign(
+            {
+              [adjustmentId]: {
+                adjustmentName,
+                adjustedWincAmount: adjustmentValue,
+              },
+            },
+            adjustments
+          );
+          break;
+
+        case "multiply":
+          // eslint-disable-next-line no-case-declarations
+          const adjustedValue = adjustedWinc.times(adjustmentValue);
+          // eslint-disable-next-line no-case-declarations
+          const adjustedWincAmount = adjustedWinc.minus(adjustedValue);
+
+          adjustedWinc = adjustedValue;
+          adjustments = Object.assign(
+            {
+              [adjustmentId]: {
+                adjustmentName,
+                adjustedWincAmount,
+              },
+            },
+            adjustments
+          );
+
+          break;
+
+        default:
+          logger.error("Unknown Adjustment Operator!", { adjustment });
+          break;
+      }
+    }
+
+    return { winc: adjustedWinc, adjustments };
   }
 }
