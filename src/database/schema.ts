@@ -263,6 +263,8 @@ export class Schema {
       t.string(adjustmentName).notNullable();
       t.string(adjustmentTarget).notNullable();
       t.string(adjustmentOperator).notNullable();
+      t.integer(adjustmentPriority).notNullable().defaultTo(1);
+      t.decimal(adjustmentValue).notNullable();
       t.timestamp(adjustmentStartDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
@@ -293,8 +295,10 @@ const {
   adjustmentId,
   adjustmentName,
   adjustmentOperator,
+  adjustmentPriority,
   adjustmentStartDate,
   adjustmentTarget,
+  adjustmentValue,
   adjustments,
   amortizedWincAmount,
   auditDate,

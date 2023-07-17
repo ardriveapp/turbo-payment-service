@@ -23,6 +23,9 @@ type IdType = string;
 export type TopUpQuoteId = IdType;
 export type PaymentReceiptId = IdType;
 export type ChargebackReceiptId = IdType;
+export type ReservationId = IdType;
+
+export type AdjustmentId = number;
 
 export type PaymentAmount = number;
 
@@ -79,6 +82,16 @@ export type CreateChargebackReceiptParams = {
   chargebackReason: string;
   chargebackReceiptId: ChargebackReceiptId;
 };
+
+export interface PriceAdjustment {
+  adjustmentId: AdjustmentId;
+  adjustmentName: string;
+  adjustmentTarget: "upload" | "payment";
+  adjustmentOperator: "add" | "multiply";
+  adjustmentValue: number;
+  adjustmentStartDate: Timestamp;
+  adjustmentExpirationDate: Timestamp;
+}
 
 export interface UserDBInsert {
   user_address: string;
