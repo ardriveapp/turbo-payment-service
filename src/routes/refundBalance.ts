@@ -18,7 +18,7 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
   }
 
   if (
-    // TODO: once the new service is converted, validate dataItemId exists here
+    !dataItemId ||
     Array.isArray(dataItemId) ||
     !winstonCredits ||
     Array.isArray(winstonCredits)
@@ -47,11 +47,10 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     dataItemId,
   });
   try {
-    await paymentDatabase.refundBalance(
-      walletAddress,
-      winstonCreditsToRefund,
-      dataItemId
-    );
+    await paymentDatabase.refundBalance({
+      reservationId: dataItemId,
+      refundedReason: "upload error",
+    });
     ctx.response.status = 200;
     ctx.response.message = "Balance refunded";
     logger.info("Balance refund processed", {

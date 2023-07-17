@@ -13,6 +13,7 @@ import {
 } from "../src/constants";
 import { tableNames } from "../src/database/dbConstants";
 import {
+  BalanceReservationDBResult,
   ChargebackReceiptDBResult,
   PaymentReceiptDBResult,
   UserDBResult,
@@ -596,13 +597,22 @@ describe("Router tests", () => {
   });
 
   it("GET /refund-balance returns 200 for correct params", async () => {
+    const refundUniqueId = "this is unique";
+    await dbTestHelper.db["knexWriter"]<BalanceReservationDBResult>(
+      tableNames.balanceReservation
+    ).insert({
+      reservation_id: refundUniqueId,
+      reserved_winc_amount: "1000",
+      user_address: testAddress,
+    });
+
     const winstonCredits = 1000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
       expiresIn: "1h",
     });
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`,
+      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${refundUniqueId}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,

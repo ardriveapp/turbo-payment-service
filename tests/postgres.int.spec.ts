@@ -2,6 +2,7 @@ import { expect } from "chai";
 
 import { tableNames } from "../src/database/dbConstants";
 import {
+  BalanceReservationDBResult,
   ChargebackReceiptDBResult,
   PaymentReceiptDBResult,
   TopUpQuoteDBResult,
@@ -680,30 +681,38 @@ describe("PostgresDatabase class", () => {
 
   describe("refundBalance method", () => {
     const happyAddress = "Happy 😁";
+    const reservationId = "unique ID";
 
     before(async () => {
       await dbTestHelper.insertStubUser({
         user_address: happyAddress,
-        winston_credit_balance: "2000",
+        winston_credit_balance: "100000",
+      });
+      await db["knexWriter"]<BalanceReservationDBResult>(
+        tableNames.balanceReservation
+      ).insert({
+        reservation_id: reservationId,
+        user_address: happyAddress,
+        reserved_winc_amount: "2000",
       });
     });
 
     it("refunds the balance as expected", async () => {
-      await db.refundBalance(happyAddress, new Winston(100_000), stubTxId1);
+      const happyUserBeforeRefund = await db.getUser(happyAddress);
+      expect(+happyUserBeforeRefund.winstonCreditBalance).to.equal(100_000);
 
+      await db.refundBalance({ reservationId, refundedReason: "upload error" });
       const happyUser = await db.getUser(happyAddress);
-
       expect(+happyUser.winstonCreditBalance).to.equal(102_000);
     });
 
     it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
-        promiseToError: db.refundBalance(
-          "Non Existent Address",
-          new Winston(1337),
-          stubTxId1
-        ),
-        errorType: "UserNotFoundWarning",
+        promiseToError: db.refundBalance({
+          reservationId: "Non Existent Id",
+          refundedReason: "?!",
+        }),
+        errorType: "Error",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
       });

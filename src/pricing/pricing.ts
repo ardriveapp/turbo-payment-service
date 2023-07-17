@@ -212,6 +212,9 @@ export class TurboPricingService implements PricingService {
 
     let adjustedWinc = winc;
     let adjustments: AdjustmentResult | undefined = undefined;
+
+    let adjustedValue: Winston = new Winston(0);
+    let adjustedWincAmount: Winston = new Winston(0);
     for (const adjustment of currentUploadAdjustments) {
       const {
         adjustmentId,
@@ -234,10 +237,8 @@ export class TurboPricingService implements PricingService {
           break;
 
         case "multiply":
-          // eslint-disable-next-line no-case-declarations
-          const adjustedValue = adjustedWinc.times(adjustmentValue);
-          // eslint-disable-next-line no-case-declarations
-          const adjustedWincAmount = adjustedWinc.minus(adjustedValue);
+          adjustedValue = adjustedWinc.times(adjustmentValue);
+          adjustedWincAmount = adjustedWinc.minus(adjustedValue);
 
           adjustedWinc = adjustedValue;
           adjustments = Object.assign(
@@ -245,6 +246,22 @@ export class TurboPricingService implements PricingService {
               [adjustmentId]: {
                 adjustmentName,
                 adjustedWincAmount,
+              },
+            },
+            adjustments
+          );
+
+          break;
+
+        case "subsidy":
+          adjustedValue = adjustedWinc.times(adjustmentValue);
+
+          adjustedWinc = adjustedWinc.minus(adjustedValue);
+          adjustments = Object.assign(
+            {
+              [adjustmentId]: {
+                adjustmentName,
+                adjustedWincAmount: adjustedValue,
               },
             },
             adjustments
@@ -260,7 +277,7 @@ export class TurboPricingService implements PricingService {
 
     return {
       winc: adjustedWinc.isNonZeroNegativeInteger()
-        ? new Winston(0) // Return as 0 if negative value is calculated so we don't pay users to upload?
+        ? new Winston(0) // Return as 0 if negative value is calculated so we don't pay users to upload
         : adjustedWinc,
       adjustments,
     };

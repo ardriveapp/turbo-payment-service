@@ -26,6 +26,7 @@ export type PaymentReceiptId = IdType;
 export type ChargebackReceiptId = IdType;
 export type ReservationId = IdType;
 export type AdjustmentId = IdType;
+export type DataItemId = IdType;
 
 export type PaymentAmount = number;
 
@@ -98,8 +99,23 @@ export type CreateBalanceReservationParams = {
   adjustments?: AdjustmentResult;
 };
 
+export interface FinalizedReservation extends BalanceReservation {
+  finalizedDate: Timestamp;
+  amortizedWincAmount: WC;
+}
+
+export interface RefundedReservation extends BalanceReservation {
+  refundedDate: Timestamp;
+  refundedReason: string;
+}
+
+export type CreateRefundReservationParams = {
+  reservationId: ReservationId;
+  refundedReason: string;
+};
+
 export type AdjustmentTarget = "upload" | "payment";
-export type AdjustmentOperator = "add" | "multiply";
+export type AdjustmentOperator = "add" | "multiply" | "subsidy";
 export interface PriceAdjustment {
   adjustmentId: AdjustmentId;
   adjustmentName: string;
@@ -189,6 +205,24 @@ export interface BalanceReservationDBInsert {
 
 export interface BalanceReservationDBResult extends BalanceReservationDBInsert {
   reserved_date: string;
+}
+
+export interface FinalizedReservationDBInsert
+  extends BalanceReservationDBResult {
+  amortized_winc_amount: string;
+}
+
+export interface FinalizedReservationDBResult
+  extends FinalizedReservationDBInsert {
+  finalized_date: string;
+}
+
+export interface RefundReservationDBInsert extends BalanceReservationDBResult {
+  refunded_reason: string;
+}
+
+export interface RefundReservationDBResult extends RefundReservationDBInsert {
+  refund_date: string;
 }
 
 export interface PriceAdjustmentDBResult {

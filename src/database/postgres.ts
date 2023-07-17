@@ -2,7 +2,7 @@ import knexConstructor, { Knex } from "knex";
 import winston from "winston";
 
 import logger from "../logger";
-import { TransactionId, WC, Winston } from "../types";
+import { WC, Winston } from "../types";
 import { Database } from "./database";
 import { columnNames, tableNames } from "./dbConstants";
 import {
@@ -20,6 +20,7 @@ import {
   CreateBalanceReservationParams,
   CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
+  CreateRefundReservationParams,
   CreateTopUpQuoteParams,
   FailedTopUpQuoteDBResult,
   PaymentReceipt,
@@ -27,6 +28,8 @@ import {
   PriceAdjustment,
   PriceAdjustmentDBResult,
   PromotionalInfo,
+  RefundReservationDBInsert,
+  RefundReservationDBResult,
   TopUpQuote,
   TopUpQuoteDBResult,
   User,
@@ -437,28 +440,52 @@ export class PostgresDatabase implements Database {
     });
   }
 
-  public async refundBalance(
-    userAddress: string,
-    winstonCreditAmount: Winston,
-    dataItemId?: TransactionId
-  ): Promise<void> {
+  public async refundBalance({
+    refundedReason,
+    reservationId,
+  }: CreateRefundReservationParams): Promise<void> {
     await this.knexWriter.transaction(async (knexTransaction) => {
-      const user = await this.getUser(userAddress, knexTransaction);
+      const balanceReservationDbResult =
+        await knexTransaction<BalanceReservationDBResult>(
+          tableNames.balanceReservation
+        )
+          .where({ reservation_id: reservationId })
+          .del()
+          .returning("*");
 
+      if (balanceReservationDbResult.length === 0) {
+        throw Error("No balance reservation found for refund!");
+      }
+      const balanceReservation = balanceReservationDbResult[0];
+      const { user_address, reserved_winc_amount } = balanceReservation;
+
+      const refundInsert: RefundReservationDBInsert = {
+        ...balanceReservation,
+        refunded_reason: refundedReason,
+      };
+
+      await knexTransaction<RefundReservationDBResult>(
+        tableNames.refundedReservation
+      ).insert(refundInsert);
+
+      const user = await this.getUser(user_address, knexTransaction);
       const currentWinstonBalance = user.winstonCreditBalance;
-      const newBalance = currentWinstonBalance.plus(winstonCreditAmount);
+      const newBalance = currentWinstonBalance.plus(
+        new Winston(reserved_winc_amount)
+      );
 
+      // TODO: Won't do the balance increment here once finalized_reservations are implemented
       await knexTransaction<UserDBResult>(tableNames.user)
         .where({
-          user_address: userAddress,
+          user_address,
         })
         .update({ winston_credit_balance: newBalance.toString() });
 
       const auditLogInsert: AuditLogInsert = {
-        user_address: userAddress,
-        winston_credit_amount: winstonCreditAmount.toString(), // a positive value because this amount was incremented to the users balance
+        user_address,
+        winston_credit_amount: reserved_winc_amount, // a positive value because this amount was incremented to the users balance
         change_reason: "refund",
-        change_id: dataItemId,
+        change_id: reservationId,
       };
       await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
     });
