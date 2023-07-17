@@ -1,5 +1,5 @@
+import { PublicArweaveAddress } from "../types";
 import { WC } from "../types/arc";
-import { PublicArweaveAddress } from "../types/types";
 
 export type UserAddress = string | PublicArweaveAddress;
 export type UserAddressType = string | "arweave";
@@ -84,6 +84,20 @@ export interface UserDBInsert {
   user_address: string;
   user_address_type: string;
   winston_credit_balance: string;
+}
+
+export type AuditChangeReason =
+  | "upload"
+  | "payment"
+  | "account_creation"
+  | "chargeback"
+  | "refund";
+
+export interface AuditLogInsert {
+  user_address: string;
+  winston_credit_amount: string;
+  change_reason: AuditChangeReason;
+  change_id?: string;
 }
 
 export interface UserDBResult extends UserDBInsert {

@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 
+export const stubTxId1 = "0000000000000000000000000000000000000000001";
+
 interface StubPaymentIntentParams {
   id?: string;
   status?: Stripe.PaymentIntent.Status;

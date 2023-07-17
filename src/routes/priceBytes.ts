@@ -2,7 +2,7 @@ import { Next } from "koa";
 
 import { oneMinuteInSeconds } from "../constants";
 import { KoaContext } from "../server";
-import { ByteCount } from "../types/types";
+import { ByteCount } from "../types";
 
 export async function priceBytesHandler(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;

@@ -14,6 +14,14 @@ export class Schema {
     return new Schema(pg).rollbackInitialSchema();
   }
 
+  public static migrateToAuditLog(pg: Knex): Promise<void> {
+    return new Schema(pg).migrateToAuditLog();
+  }
+
+  public static rollbackFromAuditLog(pg: Knex): Promise<void> {
+    return new Schema(pg).rollbackFromAuditLog();
+  }
+
   private async initializeSchema(): Promise<void> {
     logger.info("Starting initial migration...");
     const migrationStartTime = Date.now();
@@ -41,6 +49,28 @@ export class Schema {
 
     logger.info("Schema dropped. Initial migration rollback successful!", {
       rollbackDurationMs: Date.now() - rollbackStartTime,
+    });
+  }
+
+  private async migrateToAuditLog() {
+    logger.info("Starting audit log migration...");
+    const migrationStartTime = Date.now();
+
+    await this.createAuditLogTable();
+
+    logger.info("Finished audit log migration!", {
+      migrationMs: Date.now() - migrationStartTime,
+    });
+  }
+
+  private async rollbackFromAuditLog() {
+    logger.info("Starting audit log rollback...");
+    const rollbackStartTime = Date.now();
+
+    await this.pg.schema.dropTable(auditLog);
+
+    logger.info("Finished audit log rollback!", {
+      rollbackMs: Date.now() - rollbackStartTime,
     });
   }
 
@@ -133,12 +163,26 @@ export class Schema {
     });
   }
 
+  private async createAuditLogTable(): Promise<void> {
+    return this.pg.schema.createTable(auditLog, (t) => {
+      t.increments(auditId).primary();
+      t.string(userAddress).notNullable();
+      t.timestamp(auditDate).notNullable().defaultTo(this.defaultTimestamp());
+      t.string(winstonCreditAmount).notNullable();
+      t.string(changeReason).notNullable();
+      t.string(changeId).nullable();
+
+      t.index([userAddress, auditDate], "user_audit_range");
+    });
+  }
+
   private defaultTimestamp() {
     return this.pg.fn.now();
   }
 }
 
 const {
+  auditLog,
   chargebackReceipt,
   failedTopUpQuote,
   paymentReceipt,
@@ -147,7 +191,11 @@ const {
 } = tableNames;
 
 const {
+  auditDate,
+  auditId,
   paymentAmount,
+  changeId,
+  changeReason,
   chargebackReason,
   chargebackReceiptDate,
   chargebackReceiptId,
