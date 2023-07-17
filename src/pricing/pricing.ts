@@ -191,6 +191,16 @@ export class TurboPricingService implements PricingService {
     const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize
     );
-    return winston;
+
+    const subsidizedAmount = process.env.SUBSIDIZED_WINC_PERCENTAGE
+      ? winston.times(+process.env.SUBSIDIZED_WINC_PERCENTAGE / 100)
+      : new Winston(0);
+
+    logger.info("Subsidizing amount!", {
+      subsidizedAmount,
+      subsidyPct: process.env.SUBSIDIZED_WINC_PERCENTAGE,
+    });
+
+    return winston.minus(subsidizedAmount);
   }
 }
