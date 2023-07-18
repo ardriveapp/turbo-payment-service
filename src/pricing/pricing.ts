@@ -214,7 +214,7 @@ export class TurboPricingService implements PricingService {
     byteCount: ByteCount
   ): Subsidy | undefined {
     // TODO: pull these thresholds and values from the database (PE-4183)
-    if (byteCount.isGreaterThan(defaultSubsidyByteCountThreshold)) {
+    if (byteCount.isGreaterThanOrEqualTo(defaultSubsidyByteCountThreshold)) {
       return {
         name: "FWD Research July 2023 Subsidy",
         requirements: "Applies to uploads over 500KiB",
