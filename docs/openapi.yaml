@@ -36,6 +36,8 @@ components:
             description:
               type: string
             value:
+              type: number
+            adjustedWincAmount:
               type: string
       example:
         "1":

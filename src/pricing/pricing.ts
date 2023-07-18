@@ -21,7 +21,10 @@ import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle"
 export type Adjustment = {
   name: string;
   description: string;
+  /** Value of the adjustment (Percentage to be Subsidized or Multiplier or Added Value) */
   value: number;
+  /** Amount of winc this adjustment changes (e.g -600 for 600 winc saved)  */
+  adjustedWincAmount: WC;
 };
 
 export type WincForBytesResponse = {
@@ -241,6 +244,7 @@ export class TurboPricingService implements PricingService {
             name: "FWD Research July 2023 Subsidy",
             description: "Applies to uploads over 500KiB",
             value: adjustmentMultiplier,
+            adjustedWincAmount: adjustedAmount,
           },
         }
       : {};
