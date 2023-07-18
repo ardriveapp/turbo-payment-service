@@ -34,7 +34,14 @@ export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
-  getWCForBytes: (bytes: ByteCount) => Promise<SubsidizedWinstonAmount>;
+  getWCForBytes: ({
+    bytes,
+    applyDefaultSubsidy,
+  }: {
+    bytes: ByteCount;
+    applyDefaultSubsidy?: boolean;
+  }) => Promise<SubsidizedWinstonAmount>;
+  getDefaultWinstonSubsidyForBytes(bytes: ByteCount): Subsidy | undefined;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -210,7 +217,7 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  private getDefaultWinstonSubsidyForBytes(
+  public getDefaultWinstonSubsidyForBytes(
     byteCount: ByteCount
   ): Subsidy | undefined {
     // TODO: pull these thresholds and values from the database (PE-4183)
@@ -227,13 +234,21 @@ export class TurboPricingService implements PricingService {
     return undefined;
   }
 
-  async getWCForBytes(bytes: ByteCount): Promise<SubsidizedWinstonAmount> {
+  async getWCForBytes({
+    bytes,
+    applyDefaultSubsidy = false,
+  }: {
+    bytes: ByteCount;
+    applyDefaultSubsidy?: boolean;
+  }): Promise<SubsidizedWinstonAmount> {
     const chunkSize = roundToArweaveChunkSize(bytes);
     const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize
     );
 
-    const defaultWinstonSubsidy = this.getDefaultWinstonSubsidyForBytes(bytes);
+    const defaultWinstonSubsidy = applyDefaultSubsidy
+      ? this.getDefaultWinstonSubsidyForBytes(bytes)
+      : undefined;
     const subsidyMultiplier = defaultWinstonSubsidy?.value ?? 0;
     // round down the subsidy amount to closest full integer for the subsidy amount
     const subsidizedAmount = winston

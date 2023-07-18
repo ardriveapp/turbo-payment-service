@@ -58,7 +58,10 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       byteCount,
       dataItemId,
     });
-    const priceWithSubsidies = await pricingService.getWCForBytes(byteCount);
+    const priceWithSubsidies = await pricingService.getWCForBytes({
+      bytes: byteCount,
+      applyDefaultSubsidy: true,
+    });
 
     logger.info("Reserving balance for user ", {
       walletAddress,

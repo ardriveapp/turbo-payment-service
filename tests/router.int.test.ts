@@ -32,6 +32,7 @@ import {
   chargeDisputeStub,
   expectedArPrices,
   expectedRates,
+  expectedSubsidies,
   paymentIntentStub,
   stripeStubEvent,
   stubTxId1,
@@ -160,7 +161,10 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(data).to.deep.equal(expectedRates);
+    expect(data).to.deep.equal({
+      ...expectedRates,
+      subsidiesAvailable: expectedSubsidies,
+    });
   });
 
   it("GET /price/:currency/:value", async () => {
