@@ -25,26 +25,26 @@ components:
           "$ref": "#/components/schemas/Adjustment"
 
     Adjustment:
-      type: object
+      type: array
       items:
         type: object
-        additionalProperties:
-          type: object
-          properties:
-            name:
-              type: string
-            description:
-              type: string
-            value:
-              type: number
-            adjustedWincAmount:
-              type: string
+        properties:
+          name:
+            type: string
+          description:
+            type: string
+          value:
+            type: number
+          operator:
+            type: string
+          adjustmentAmount:
+            type: string
       example:
-        "1":
-          name: "Adjustment"
+        - name: "Adjustment"
           description: "Some great subsidy"
           value: "0.6"
-          adjustedWincAmount: "-12300"
+          operator: "multiply"
+          adjustmentAmount: "-12300"
 
     CurrencyType:
       type: string
