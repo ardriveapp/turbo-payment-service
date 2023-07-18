@@ -211,9 +211,7 @@ export class TurboPricingService implements PricingService {
         ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
         : 0) / 100;
     // round down the subsidy amount to closest full integer for the subsidy amount
-    const adjustmentAmount = winston
-      .times(adjustmentMultiplier)
-      .round("ROUND_DOWN");
+    const adjustmentAmount = winston.times(adjustmentMultiplier);
 
     // TODO: pull adjustments from database
     const adjustments: Adjustment[] = [

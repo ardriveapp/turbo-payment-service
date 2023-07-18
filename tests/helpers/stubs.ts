@@ -215,7 +215,7 @@ export const expectedAdjustments: Adjustment[] = [
 ];
 
 export const expectedRates = {
-  winc: 857922282166,
+  winc: "857922282166",
   fiat: {
     aud: 10.93233205718397,
     brl: 36.638085813267686,
