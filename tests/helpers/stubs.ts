@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 
+import { Adjustment } from "../../src/database/dbTypes";
+
 export const stubTxId1 = "0000000000000000000000000000000000000000001";
 
 interface StubPaymentIntentParams {
@@ -200,22 +202,17 @@ export const expectedArPrices = {
   },
 };
 
-export const expectedAdjustments: Record<
-  string,
+export const expectedAdjustments: Adjustment[] = [
   {
-    name: string;
-    description: string;
-    value: number;
-    adjustedWincAmount: string;
-  }
-> = {
-  [1]: {
     name: "FWD Research July 2023 Subsidy",
     description: "A 0% discount for uploads over 500KiB",
     value: 0,
-    adjustedWincAmount: "0",
+    operator: "multiply",
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error : Winston type is stringified into "0" on API response
+    adjustmentAmount: "0",
   },
-};
+];
 
 export const expectedRates = {
   winc: 857922282166,

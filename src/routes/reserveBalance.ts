@@ -58,10 +58,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       byteCount,
       dataItemId,
     });
-    const priceWithAdjustments = await pricingService.getWCForBytes({
-      bytes: byteCount,
-      applyAdjustments: true,
-    });
+    const priceWithAdjustments = await pricingService.getWCForBytes(byteCount);
 
     logger.info("Reserving balance for user ", {
       walletAddress,

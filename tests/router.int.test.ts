@@ -87,7 +87,7 @@ describe("Router tests", () => {
     const wincTotal = new Winston("1234567890");
     stub(pricingService, "getWCForBytes").resolves({
       winc: wincTotal,
-      adjustments: {},
+      adjustments: [],
     });
 
     const { status, statusText, data } = await axios.get(
@@ -509,7 +509,7 @@ describe("Router tests", () => {
     const adjustedWincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
       winc: adjustedWincTotal,
-      adjustments: {},
+      adjustments: [],
     });
 
     const { status, statusText, data } = await axios.get(
@@ -540,7 +540,7 @@ describe("Router tests", () => {
     const wincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
       winc: wincTotal,
-      adjustments: {},
+      adjustments: [],
     });
 
     const { status, statusText, data } = await axios.get(

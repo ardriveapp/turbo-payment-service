@@ -16,10 +16,9 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
   try {
     // TODO: applying adjustments on the generic /rates endpoint might not be the best idea, we may want to just show the raw rates for 1 GiB unadjusted, then return
     // 'availableAdjustments' or similar and have the client show how they can be used/applied to the raw rate
-    const priceWithAdjustments = await pricingService.getWCForBytes({
-      bytes: oneGiBInBytes,
-      applyAdjustments: true,
-    });
+    const priceWithAdjustments = await pricingService.getWCForBytes(
+      oneGiBInBytes
+    );
     const fiat: Record<string, number> = {};
 
     // Calculate fiat prices for one GiB

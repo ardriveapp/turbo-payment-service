@@ -30,10 +30,7 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
     return next();
   }
   try {
-    const priceWithAdjustments = await pricingService.getWCForBytes({
-      bytes,
-      applyAdjustments: true,
-    });
+    const priceWithAdjustments = await pricingService.getWCForBytes(bytes);
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = {

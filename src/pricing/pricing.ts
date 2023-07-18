@@ -6,7 +6,7 @@ import {
   paymentAmountLimits,
   turboFeePercentageAsADecimal,
 } from "../constants";
-import { CurrencyType } from "../database/dbTypes";
+import { Adjustment, CurrencyType } from "../database/dbTypes";
 import defaultLogger from "../logger";
 import { ByteCount, WC, Winston } from "../types";
 import { Payment } from "../types/payment";
@@ -18,31 +18,16 @@ import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
-export type Adjustment = {
-  name: string;
-  description: string;
-  /** Value of the adjustment (Percentage to be Subsidized or Multiplier or Added Value) */
-  value: number;
-  /** Amount of winc this adjustment changes (e.g -600 for 600 winc saved)  */
-  adjustedWincAmount: WC;
-};
-
 export type WincForBytesResponse = {
   winc: WC;
-  adjustments: Record<string, Adjustment>;
+  adjustments: Adjustment[];
 };
 
 export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
-  getWCForBytes: ({
-    bytes,
-    applyAdjustments,
-  }: {
-    bytes: ByteCount;
-    applyAdjustments?: boolean;
-  }) => Promise<WincForBytesResponse>;
+  getWCForBytes: (bytes: ByteCount) => Promise<WincForBytesResponse>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -215,41 +200,33 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  async getWCForBytes({
-    bytes,
-    applyAdjustments = false,
-  }: {
-    bytes: ByteCount;
-    applyAdjustments?: boolean;
-  }): Promise<WincForBytesResponse> {
+  async getWCForBytes(bytes: ByteCount): Promise<WincForBytesResponse> {
     const chunkSize = roundToArweaveChunkSize(bytes);
     const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize
     );
 
-    const adjustmentMultiplier = applyAdjustments
-      ? (process.env.SUBSIDIZED_WINC_PERCENTAGE
-          ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
-          : 0) / 100
-      : 0;
+    const adjustmentMultiplier =
+      (process.env.SUBSIDIZED_WINC_PERCENTAGE
+        ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
+        : 0) / 100;
     // round down the subsidy amount to closest full integer for the subsidy amount
     const adjustmentAmount = winston
       .times(adjustmentMultiplier)
       .round("ROUND_DOWN");
 
     // TODO: pull adjustments from database
-    const adjustments: Record<number, Adjustment> = applyAdjustments
-      ? {
-          [1]: {
-            name: "FWD Research July 2023 Subsidy",
-            description: `A ${
-              adjustmentMultiplier * 100
-            }% discount for uploads over 500KiB`,
-            value: adjustmentMultiplier,
-            adjustedWincAmount: new Winston(`-${adjustmentAmount}`),
-          },
-        }
-      : {};
+    const adjustments: Adjustment[] = [
+      {
+        name: "FWD Research July 2023 Subsidy",
+        description: `A ${
+          adjustmentMultiplier * 100
+        }% discount for uploads over 500KiB`,
+        operator: "multiply",
+        value: adjustmentMultiplier,
+        adjustmentAmount: new Winston(`-${adjustmentAmount}`),
+      },
+    ];
     this.logger.info("Calculated adjustments for bytes.", {
       bytes,
       originalAmount: winston.toString(),

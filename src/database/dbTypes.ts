@@ -1,6 +1,16 @@
 import { PublicArweaveAddress } from "../types";
 import { WC } from "../types/arc";
 
+export type Adjustment = {
+  name: string;
+  description: string;
+  /** value to calculate adjustment ( Multiplier or Added Value ) */
+  value: number;
+  operator: "multiply" | "add";
+  /** Amount of winc this adjustment changes (e.g -600 for 600 winc saved)  */
+  adjustmentAmount: WC;
+};
+
 export type UserAddress = string | PublicArweaveAddress;
 export type UserAddressType = string | "arweave";
 
