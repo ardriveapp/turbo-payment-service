@@ -43,7 +43,8 @@ components:
         "1":
           name: "Adjustment"
           description: "Some great subsidy"
-          value: "-12300"
+          value: "0.6"
+          adjustedWincAmount: "-12300"
 
     CurrencyType:
       type: string
