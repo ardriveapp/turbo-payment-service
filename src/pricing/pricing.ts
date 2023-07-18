@@ -37,11 +37,6 @@ const maxStripeDigits = 8;
 /** This is a cleaner representation of the actual max: 999_999_99 */
 const maxStripeAmount = 990_000_00;
 
-// TODO: store the subsidized amount in the database
-const subsidizedWinstonCreditPercentage = process.env.SUBSIDIZED_WINC_PERCENTAGE
-  ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
-  : 0;
-
 export class TurboPricingService implements PricingService {
   private logger: winston.Logger;
   private readonly bytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
@@ -206,34 +201,41 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
+  private getWinstonSubsidy(): { description: string; value: number } {
+    // TODO: store the subsidized amount in the database
+    return {
+      // TODO: pull these from the database (PE-4183)
+      description: "FWD Research July 2023 Subsidy",
+      value:
+        (process.env.SUBSIDIZED_WINC_PERCENTAGE
+          ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
+          : 0) / 100,
+    };
+  }
+
   async getWCForBytes(bytes: ByteCount): Promise<SubsidizedWinstonAmount> {
     const chunkSize = roundToArweaveChunkSize(bytes);
     const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize
     );
 
-    const subsidizedMultiplier = subsidizedWinstonCreditPercentage / 100;
-    // round down to closest full integer for the subsidy amount
+    const initialWinstonSubsidy = this.getWinstonSubsidy();
+    // round down the subsidy amount to closest full integer for the subsidy amount
     const subsidizedAmount = winston
-      .times(subsidizedMultiplier)
+      .times(initialWinstonSubsidy.value)
       .round("ROUND_DOWN");
 
-    this.logger.info("Applying subsidy to upload", {
+    this.logger.info("Calculated subsidy for bytes.", {
+      bytes,
       originalAmount: winston.toString(),
       subsidizedAmount,
-      subsidyPct: process.env.SUBSIDIZED_WINC_PERCENTAGE,
+      subsidyPct: this.getWinstonSubsidy(),
     });
 
     return {
       originalWincTotal: winston,
       subsidizedWincTotal: winston.minus(subsidizedAmount),
-      subsidies: [
-        {
-          // TODO: pull these from the database (PE-4183)
-          description: "FWD Research July 2023 Subsidy",
-          value: subsidizedMultiplier,
-        },
-      ],
+      subsidies: [initialWinstonSubsidy],
     };
   }
 }

@@ -12,9 +12,8 @@ const stripeSecretKeyName = "stripe-secret-key";
 const privateRouteSecretName = "private-route-secret";
 const jwtSecretName = "jwt-secret";
 const dbPasswordSecretName = "payment-db-password";
-
 const wincSubsidizedPercentageParamName =
-  "/payment-service/winc-subsidized-percentage";
+  "/payment-service/subsidized-winc-percentage";
 
 export async function loadSecretsToEnv() {
   try {
