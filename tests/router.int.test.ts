@@ -160,10 +160,7 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(data).to.deep.equal({
-      ...expectedRates,
-      adjustmentsAvailable: expectedAdjustments[1],
-    });
+    expect(data).to.deep.equal(expectedRates);
   });
 
   it("GET /price/:currency/:value", async () => {

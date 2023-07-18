@@ -14,9 +14,11 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
   const { pricingService } = ctx.state;
 
   try {
-    const priceWithoutAdjustments = await pricingService.getWCForBytes({
+    // TODO: applying adjustments on the generic /rates endpoint might not be the best idea, we may want to just show the raw rates for 1 GiB unadjusted, then return
+    // 'availableAdjustments' or similar and have the client show how they can be used/applied to the raw rate
+    const priceWithAdjustments = await pricingService.getWCForBytes({
       bytes: oneGiBInBytes,
-      applyAdjustments: false,
+      applyAdjustments: true,
     });
     const fiat: Record<string, number> = {};
 
@@ -28,7 +30,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
         );
 
         const fiatPriceForOneGiB =
-          priceWithoutAdjustments.winc.times(fiatPriceForOneAR);
+          priceWithAdjustments.winc.times(fiatPriceForOneAR);
         const fiatValue =
           (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
           (1 + turboFeePercentageAsADecimal);
@@ -38,9 +40,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     );
 
     const rates = {
-      winc: priceWithoutAdjustments.winc.toBigNumber().toNumber(),
-      adjustmentsAvailable:
-        pricingService.getDefaultWinstonAdjustmentForBytes(oneGiBInBytes),
+      winc: priceWithAdjustments.winc.toBigNumber().toNumber(),
       fiat,
     };
     ctx.response.status = 200;
