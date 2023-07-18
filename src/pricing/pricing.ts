@@ -233,7 +233,7 @@ export class TurboPricingService implements PricingService {
           : 0) / 100
       : 0;
     // round down the subsidy amount to closest full integer for the subsidy amount
-    const adjustedAmount = winston
+    const adjustmentAmount = winston
       .times(adjustmentMultiplier)
       .round("ROUND_DOWN");
 
@@ -246,19 +246,19 @@ export class TurboPricingService implements PricingService {
               adjustmentMultiplier * 100
             }% discount for uploads over 500KiB`,
             value: adjustmentMultiplier,
-            adjustedWincAmount: new Winston(`-${adjustedAmount}`),
+            adjustedWincAmount: new Winston(`-${adjustmentAmount}`),
           },
         }
       : {};
     this.logger.info("Calculated adjustments for bytes.", {
       bytes,
       originalAmount: winston.toString(),
-      adjustedAmount,
+      adjustedAmount: adjustmentAmount,
       adjustments,
     });
 
     return {
-      winc: winston.minus(adjustedAmount),
+      winc: winston.minus(adjustmentAmount),
       adjustments,
     };
   }
