@@ -20,14 +20,13 @@ import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle"
 
 export type Subsidy = {
   name: string;
-  requirements: string;
+  description: string;
   value: number;
 };
 
-export type SubsidizedWinstonAmount = {
-  originalWincTotal: WC;
-  subsidizedWincTotal: WC;
-  subsidies: Subsidy[];
+export type WincForBytesResponse = {
+  winc: WC;
+  adjustments: Record<number, Subsidy>;
 };
 
 export interface PricingService {
@@ -36,12 +35,12 @@ export interface PricingService {
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
   getWCForBytes: ({
     bytes,
-    applyDefaultSubsidy,
+    applyAdjustments,
   }: {
     bytes: ByteCount;
-    applyDefaultSubsidy?: boolean;
-  }) => Promise<SubsidizedWinstonAmount>;
-  getDefaultWinstonSubsidyForBytes(bytes: ByteCount): Subsidy | undefined;
+    applyAdjustments?: boolean;
+  }) => Promise<WincForBytesResponse>;
+  getDefaultWinstonAdjustmentForBytes(bytes: ByteCount): Subsidy | undefined;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -217,14 +216,14 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  public getDefaultWinstonSubsidyForBytes(
+  public getDefaultWinstonAdjustmentForBytes(
     byteCount: ByteCount
   ): Subsidy | undefined {
     // TODO: pull these thresholds and values from the database (PE-4183)
     if (byteCount.isGreaterThanOrEqualTo(defaultSubsidyByteCountThreshold)) {
       return {
         name: "FWD Research July 2023 Subsidy",
-        requirements: "Applies to uploads over 500KiB",
+        description: "Applies to uploads over 500KiB",
         value:
           (process.env.SUBSIDIZED_WINC_PERCENTAGE
             ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
@@ -236,37 +235,40 @@ export class TurboPricingService implements PricingService {
 
   async getWCForBytes({
     bytes,
-    applyDefaultSubsidy = false,
+    applyAdjustments = false,
   }: {
     bytes: ByteCount;
-    applyDefaultSubsidy?: boolean;
-  }): Promise<SubsidizedWinstonAmount> {
+    applyAdjustments?: boolean;
+  }): Promise<WincForBytesResponse> {
     const chunkSize = roundToArweaveChunkSize(bytes);
     const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize
     );
 
-    const defaultWinstonSubsidy = applyDefaultSubsidy
-      ? this.getDefaultWinstonSubsidyForBytes(bytes)
+    const defaultWinstonSubsidy = applyAdjustments
+      ? this.getDefaultWinstonAdjustmentForBytes(bytes)
       : undefined;
-    const subsidyMultiplier = defaultWinstonSubsidy?.value ?? 0;
+    const adjustmentMultiplier = defaultWinstonSubsidy?.value ?? 0;
     // round down the subsidy amount to closest full integer for the subsidy amount
-    const subsidizedAmount = winston
-      .times(subsidyMultiplier)
+    const adjustedAmount = winston
+      .times(adjustmentMultiplier)
       .round("ROUND_DOWN");
 
-    const subsidies = defaultWinstonSubsidy ? [defaultWinstonSubsidy] : [];
+    const adjustments: Record<number, Subsidy> = defaultWinstonSubsidy
+      ? {
+          1: defaultWinstonSubsidy,
+        }
+      : {};
     this.logger.info("Calculated subsidy for bytes.", {
       bytes,
       originalAmount: winston.toString(),
-      subsidizedAmount,
-      subsidies,
+      adjustedAmount,
+      adjustments,
     });
 
     return {
-      originalWincTotal: winston,
-      subsidizedWincTotal: winston.minus(subsidizedAmount),
-      subsidies,
+      winc: winston.minus(adjustedAmount),
+      adjustments,
     };
   }
 }

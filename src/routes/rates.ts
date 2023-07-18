@@ -14,9 +14,9 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
   const { pricingService } = ctx.state;
 
   try {
-    const priceWithSubsidies = await pricingService.getWCForBytes({
+    const priceWithoutAdjustments = await pricingService.getWCForBytes({
       bytes: oneGiBInBytes,
-      applyDefaultSubsidy: false,
+      applyAdjustments: false,
     });
     const fiat: Record<string, number> = {};
 
@@ -28,7 +28,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
         );
 
         const fiatPriceForOneGiB =
-          priceWithSubsidies.subsidizedWincTotal.times(fiatPriceForOneAR);
+          priceWithoutAdjustments.winc.times(fiatPriceForOneAR);
         const fiatValue =
           (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
           (1 + turboFeePercentageAsADecimal);
@@ -38,11 +38,10 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     );
 
     const rates = {
-      winc: priceWithSubsidies.subsidizedWincTotal.toBigNumber().toNumber(),
+      winc: priceWithoutAdjustments.winc.toBigNumber().toNumber(),
       fiat: { ...fiat },
-      subsidiesAvailable: [
-        pricingService.getDefaultWinstonSubsidyForBytes(oneGiBInBytes),
-      ],
+      adjustmentsAvailable:
+        pricingService.getDefaultWinstonAdjustmentForBytes(oneGiBInBytes),
     };
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
