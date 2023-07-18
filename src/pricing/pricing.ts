@@ -222,7 +222,8 @@ export class TurboPricingService implements PricingService {
         }% discount for uploads over 500KiB`,
         operator: "multiply",
         value: adjustmentMultiplier,
-        adjustmentAmount: new Winston(`-${adjustmentAmount}`),
+        // We DEDUCT the adjustment in this flow so we give the inverse by multiplying by negative one
+        adjustmentAmount: adjustmentAmount.times(-1),
       },
     ];
     this.logger.info("Calculated adjustments for bytes.", {
