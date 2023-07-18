@@ -246,7 +246,7 @@ export class TurboPricingService implements PricingService {
               adjustmentMultiplier * 100
             }% discount for uploads over 500KiB`,
             value: adjustmentMultiplier,
-            adjustedWincAmount: adjustedAmount,
+            adjustedWincAmount: new Winston(`-${adjustedAmount}`),
           },
         }
       : {};
