@@ -200,6 +200,21 @@ export const expectedArPrices = {
   },
 };
 
+export const expectedAdjustments: Record<
+  string,
+  {
+    name: string;
+    description: string;
+    value: number;
+  }
+> = {
+  [1]: {
+    name: "FWD Research July 2023 Subsidy",
+    description: "A 0% discount for uploads over 500KiB",
+    value: 0,
+  },
+};
+
 export const expectedRates = {
   winc: 857922282166,
   fiat: {

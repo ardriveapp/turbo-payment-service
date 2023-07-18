@@ -29,7 +29,7 @@ export type Adjustment = {
 
 export type WincForBytesResponse = {
   winc: WC;
-  adjustments: Record<number, Adjustment>;
+  adjustments: Record<string, Adjustment>;
 };
 
 export interface PricingService {
@@ -242,7 +242,9 @@ export class TurboPricingService implements PricingService {
       ? {
           [1]: {
             name: "FWD Research July 2023 Subsidy",
-            description: "Applies to uploads over 500KiB",
+            description: `A ${
+              adjustmentMultiplier * 100
+            }% discount for uploads over 500KiB`,
             value: adjustmentMultiplier,
             adjustedWincAmount: adjustedAmount,
           },
