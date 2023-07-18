@@ -30,9 +30,9 @@ import { loadSecretsToEnv } from "../src/utils/loadSecretsToEnv";
 import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
 import {
   chargeDisputeStub,
+  expectedAdjustments,
   expectedArPrices,
   expectedRates,
-  expectedSubsidies,
   paymentIntentStub,
   stripeStubEvent,
   stubTxId1,
@@ -86,9 +86,8 @@ describe("Router tests", () => {
   it("GET /price/bytes", async () => {
     const wincTotal = new Winston("1234567890");
     stub(pricingService, "getWCForBytes").resolves({
-      subsidizedWincTotal: wincTotal,
-      originalWincTotal: wincTotal,
-      subsidies: [],
+      winc: wincTotal,
+      adjustments: {},
     });
 
     const { status, statusText, data } = await axios.get(
@@ -163,7 +162,7 @@ describe("Router tests", () => {
 
     expect(data).to.deep.equal({
       ...expectedRates,
-      subsidiesAvailable: expectedSubsidies,
+      adjustmentsAvailable: expectedAdjustments[1],
     });
   });
 
@@ -507,11 +506,10 @@ describe("Router tests", () => {
       expiresIn: "1h",
     });
 
-    const stubbedWincTotal = new Winston("100");
+    const adjustedWincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
-      subsidizedWincTotal: stubbedWincTotal,
-      originalWincTotal: stubbedWincTotal,
-      subsidies: [],
+      winc: adjustedWincTotal,
+      adjustments: {},
     });
 
     const { status, statusText, data } = await axios.get(
@@ -541,9 +539,8 @@ describe("Router tests", () => {
 
     const wincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
-      subsidizedWincTotal: wincTotal,
-      originalWincTotal: wincTotal,
-      subsidies: [],
+      winc: wincTotal,
+      adjustments: {},
     });
 
     const { status, statusText, data } = await axios.get(

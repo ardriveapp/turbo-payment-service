@@ -39,9 +39,9 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
 
     const rates = {
       winc: priceWithoutAdjustments.winc.toBigNumber().toNumber(),
-      fiat: { ...fiat },
       adjustmentsAvailable:
         pricingService.getDefaultWinstonAdjustmentForBytes(oneGiBInBytes),
+      fiat,
     };
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
