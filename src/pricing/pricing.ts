@@ -229,7 +229,6 @@ export class TurboPricingService implements PricingService {
     this.logger.info("Calculated adjustments for bytes.", {
       bytes,
       originalAmount: winston.toString(),
-      adjustedAmount: adjustmentAmount,
       adjustments,
     });
 
