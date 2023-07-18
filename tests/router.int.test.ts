@@ -30,6 +30,7 @@ import { loadSecretsToEnv } from "../src/utils/loadSecretsToEnv";
 import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
 import {
   chargeDisputeStub,
+  expectedAdjustments,
   expectedArPrices,
   expectedRates,
   paymentIntentStub,
@@ -83,7 +84,11 @@ describe("Router tests", () => {
   });
 
   it("GET /price/bytes", async () => {
-    stub(pricingService, "getWCForBytes").resolves(new Winston("1234567890"));
+    const wincTotal = new Winston("1234567890");
+    stub(pricingService, "getWCForBytes").resolves({
+      winc: wincTotal,
+      adjustments: [],
+    });
 
     const { status, statusText, data } = await axios.get(
       `/v1/price/bytes/1024`
@@ -155,7 +160,10 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(data).to.deep.equal(expectedRates);
+    expect(data).to.deep.equal({
+      ...expectedRates,
+      adjustments: expectedAdjustments,
+    });
   });
 
   it("GET /price/:currency/:value", async () => {
@@ -498,7 +506,11 @@ describe("Router tests", () => {
       expiresIn: "1h",
     });
 
-    stub(pricingService, "getWCForBytes").resolves(new Winston("100"));
+    const adjustedWincTotal = new Winston("100");
+    stub(pricingService, "getWCForBytes").resolves({
+      winc: adjustedWincTotal,
+      adjustments: [],
+    });
 
     const { status, statusText, data } = await axios.get(
       `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
@@ -525,7 +537,11 @@ describe("Router tests", () => {
       expiresIn: "1h",
     });
 
-    stub(pricingService, "getWCForBytes").resolves(new Winston("100"));
+    const wincTotal = new Winston("100");
+    stub(pricingService, "getWCForBytes").resolves({
+      winc: wincTotal,
+      adjustments: [],
+    });
 
     const { status, statusText, data } = await axios.get(
       `/v1/reserve-balance/${testAddress}/${byteCount}`,
