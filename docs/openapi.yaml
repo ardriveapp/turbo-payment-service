@@ -101,7 +101,7 @@ components:
       type: object
       properties:
         winc:
-          type: number
+          type: string
           description: A big number representing the amount of credits in winc that 1GB of storage costs based on current market rates. One credit is equivalent to 1,000,000,000,000 winc.
           example: 332824926
         fiat:
