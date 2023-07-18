@@ -31,15 +31,15 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
         const fiatPriceForOneGiB =
           priceWithAdjustments.winc.times(fiatPriceForOneAR);
         const fiatValue =
+          // TODO: `toNumber()` on this is tech debt. We could lose precision in the future if this value is higher than MAX_SAFE_INT
           (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
           (1 + turboFeePercentageAsADecimal);
 
         fiat[currency] = fiatValue;
       })
     );
-
     const rates = {
-      winc: priceWithAdjustments.winc.toBigNumber().toNumber(),
+      winc: priceWithAdjustments.winc.toString(),
       fiat,
       adjustments: priceWithAdjustments.adjustments,
     };
