@@ -18,10 +18,16 @@ import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
+export type Subsidy = {
+  name: string;
+  requirements: string;
+  value: number;
+};
+
 export type SubsidizedWinstonAmount = {
   originalWincTotal: WC;
   subsidizedWincTotal: WC;
-  subsidies: { description: string; value: number }[];
+  subsidies: Subsidy[];
 };
 
 export interface PricingService {
@@ -36,6 +42,9 @@ const maxStripeDigits = 8;
 
 /** This is a cleaner representation of the actual max: 999_999_99 */
 const maxStripeAmount = 990_000_00;
+
+/** Subsidize uploads over 500KiB */
+const defaultSubsidyByteCountThreshold = ByteCount(500 * 1024);
 
 export class TurboPricingService implements PricingService {
   private logger: winston.Logger;
@@ -201,16 +210,21 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  private getWinstonSubsidy(): { description: string; value: number } {
-    // TODO: store the subsidized amount in the database
-    return {
-      // TODO: pull these from the database (PE-4183)
-      description: "FWD Research July 2023 Subsidy",
-      value:
-        (process.env.SUBSIDIZED_WINC_PERCENTAGE
-          ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
-          : 0) / 100,
-    };
+  private getDefaultWinstonSubsidyForBytes(
+    byteCount: ByteCount
+  ): Subsidy | undefined {
+    // TODO: pull these thresholds and values from the database (PE-4183)
+    if (byteCount.isGreaterThan(defaultSubsidyByteCountThreshold)) {
+      return {
+        name: "FWD Research July 2023 Subsidy",
+        requirements: "Applies to uploads over 500KiB",
+        value:
+          (process.env.SUBSIDIZED_WINC_PERCENTAGE
+            ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
+            : 0) / 100,
+      };
+    }
+    return undefined;
   }
 
   async getWCForBytes(bytes: ByteCount): Promise<SubsidizedWinstonAmount> {
@@ -219,23 +233,25 @@ export class TurboPricingService implements PricingService {
       chunkSize
     );
 
-    const initialWinstonSubsidy = this.getWinstonSubsidy();
+    const defaultWinstonSubsidy = this.getDefaultWinstonSubsidyForBytes(bytes);
+    const subsidyMultiplier = defaultWinstonSubsidy?.value ?? 0;
     // round down the subsidy amount to closest full integer for the subsidy amount
     const subsidizedAmount = winston
-      .times(initialWinstonSubsidy.value)
+      .times(subsidyMultiplier)
       .round("ROUND_DOWN");
 
+    const subsidies = defaultWinstonSubsidy ? [defaultWinstonSubsidy] : [];
     this.logger.info("Calculated subsidy for bytes.", {
       bytes,
       originalAmount: winston.toString(),
       subsidizedAmount,
-      subsidies: [initialWinstonSubsidy],
+      subsidies,
     });
 
     return {
       originalWincTotal: winston,
       subsidizedWincTotal: winston.minus(subsidizedAmount),
-      subsidies: [initialWinstonSubsidy],
+      subsidies,
     };
   }
 }

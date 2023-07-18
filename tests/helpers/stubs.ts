@@ -200,6 +200,14 @@ export const expectedArPrices = {
   },
 };
 
+export const expectedSubsidies = [
+  {
+    name: "FWD Research July 2023 Subsidy",
+    requirements: "Applies to uploads over 500KiB",
+    value: 0,
+  },
+];
+
 export const expectedRates = {
   winc: 857922282166,
   fiat: {
@@ -214,10 +222,5 @@ export const expectedRates = {
     sgd: 9.82432542976695,
     usd: 7.407815737590149,
   },
-  subsidies: [
-    {
-      description: "FWD Research July 2023 Subsidy",
-      value: 0,
-    },
-  ],
+  subsidies: expectedSubsidies,
 };
