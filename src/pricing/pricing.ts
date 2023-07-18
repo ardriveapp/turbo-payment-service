@@ -245,6 +245,7 @@ export class TurboPricingService implements PricingService {
       chunkSize
     );
 
+    // TODO: pull all of these from the database rather than hard coding them
     const defaultWinstonSubsidy = applyAdjustments
       ? this.getDefaultWinstonAdjustmentForBytes(bytes)
       : undefined;
@@ -254,12 +255,14 @@ export class TurboPricingService implements PricingService {
       .times(adjustmentMultiplier)
       .round("ROUND_DOWN");
 
+    // TODO: pull all of these from the database
     const adjustments: Record<number, Subsidy> = defaultWinstonSubsidy
       ? {
           1: defaultWinstonSubsidy,
         }
       : {};
-    this.logger.info("Calculated subsidy for bytes.", {
+
+    this.logger.info("Calculated adjustments for bytes.", {
       bytes,
       originalAmount: winston.toString(),
       adjustedAmount,
