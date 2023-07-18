@@ -18,7 +18,7 @@ import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
-export type Subsidy = {
+export type Adjustment = {
   name: string;
   description: string;
   value: number;
@@ -26,7 +26,7 @@ export type Subsidy = {
 
 export type WincForBytesResponse = {
   winc: WC;
-  adjustments: Record<number, Subsidy>;
+  adjustments: Record<number, Adjustment>;
 };
 
 export interface PricingService {
@@ -40,7 +40,6 @@ export interface PricingService {
     bytes: ByteCount;
     applyAdjustments?: boolean;
   }) => Promise<WincForBytesResponse>;
-  getDefaultWinstonAdjustmentForBytes(bytes: ByteCount): Subsidy | undefined;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -48,9 +47,6 @@ const maxStripeDigits = 8;
 
 /** This is a cleaner representation of the actual max: 999_999_99 */
 const maxStripeAmount = 990_000_00;
-
-/** Subsidize uploads over 500KiB */
-const defaultSubsidyByteCountThreshold = ByteCount(500 * 1024);
 
 export class TurboPricingService implements PricingService {
   private logger: winston.Logger;
@@ -216,23 +212,6 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  public getDefaultWinstonAdjustmentForBytes(
-    byteCount: ByteCount
-  ): Subsidy | undefined {
-    // TODO: pull these thresholds and values from the database (PE-4183)
-    if (byteCount.isGreaterThanOrEqualTo(defaultSubsidyByteCountThreshold)) {
-      return {
-        name: "FWD Research July 2023 Subsidy",
-        description: "Applies to uploads over 500KiB",
-        value:
-          (process.env.SUBSIDIZED_WINC_PERCENTAGE
-            ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
-            : 0) / 100,
-      };
-    }
-    return undefined;
-  }
-
   async getWCForBytes({
     bytes,
     applyAdjustments = false,
@@ -245,21 +224,27 @@ export class TurboPricingService implements PricingService {
       chunkSize
     );
 
-    const defaultWinstonSubsidy = applyAdjustments
-      ? this.getDefaultWinstonAdjustmentForBytes(bytes)
-      : undefined;
-    const adjustmentMultiplier = defaultWinstonSubsidy?.value ?? 0;
+    const adjustmentMultiplier = applyAdjustments
+      ? (process.env.SUBSIDIZED_WINC_PERCENTAGE
+          ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
+          : 0) / 100
+      : 0;
     // round down the subsidy amount to closest full integer for the subsidy amount
     const adjustedAmount = winston
       .times(adjustmentMultiplier)
       .round("ROUND_DOWN");
 
-    const adjustments: Record<number, Subsidy> = defaultWinstonSubsidy
+    // TODO: pull adjustments from database
+    const adjustments: Record<number, Adjustment> = applyAdjustments
       ? {
-          1: defaultWinstonSubsidy,
+          [1]: {
+            name: "FWD Research July 2023 Subsidy",
+            description: "Applies to uploads over 500KiB",
+            value: adjustmentMultiplier,
+          },
         }
       : {};
-    this.logger.info("Calculated subsidy for bytes.", {
+    this.logger.info("Calculated adjustments for bytes.", {
       bytes,
       originalAmount: winston.toString(),
       adjustedAmount,
