@@ -206,12 +206,14 @@ export const expectedAdjustments: Record<
     name: string;
     description: string;
     value: number;
+    adjustedWincAmount: string;
   }
 > = {
   [1]: {
     name: "FWD Research July 2023 Subsidy",
     description: "A 0% discount for uploads over 500KiB",
     value: 0,
+    adjustedWincAmount: "0",
   },
 };
 
