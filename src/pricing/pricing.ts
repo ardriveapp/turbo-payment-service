@@ -229,7 +229,7 @@ export class TurboPricingService implements PricingService {
       bytes,
       originalAmount: winston.toString(),
       subsidizedAmount,
-      subsidyPct: this.getWinstonSubsidy(),
+      subsidies: [initialWinstonSubsidy],
     });
 
     return {
