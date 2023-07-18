@@ -1,11 +1,13 @@
+import winston from "winston";
+
 import {
   CurrencyLimitation,
   CurrencyLimitations,
   paymentAmountLimits,
   turboFeePercentageAsADecimal,
 } from "../constants";
-import { CurrencyType } from "../database/dbTypes";
-import logger from "../logger";
+import { Adjustment, CurrencyType } from "../database/dbTypes";
+import defaultLogger from "../logger";
 import { ByteCount, WC, Winston } from "../types";
 import { Payment } from "../types/payment";
 import {
@@ -16,11 +18,16 @@ import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
+export type WincForBytesResponse = {
+  winc: WC;
+  adjustments: Adjustment[];
+};
+
 export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
-  getWCForBytes: (bytes: ByteCount) => Promise<WC>;
+  getWCForBytes: (bytes: ByteCount) => Promise<WincForBytesResponse>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -30,16 +37,20 @@ const maxStripeDigits = 8;
 const maxStripeAmount = 990_000_00;
 
 export class TurboPricingService implements PricingService {
+  private logger: winston.Logger;
   private readonly bytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
   private readonly arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
 
   constructor({
     bytesToWinstonOracle,
     arweaveToFiatOracle,
+    logger = defaultLogger,
   }: {
     bytesToWinstonOracle?: ReadThroughBytesToWinstonOracle;
     arweaveToFiatOracle?: ReadThroughArweaveToFiatOracle;
+    logger?: winston.Logger;
   }) {
+    this.logger = logger.child({ class: this.constructor.name });
     this.bytesToWinstonOracle =
       bytesToWinstonOracle ?? new ReadThroughBytesToWinstonOracle({});
     this.arweaveToFiatOracle =
@@ -135,12 +146,15 @@ export class TurboPricingService implements PricingService {
       ? currSuggested
       : dynamicSuggested;
 
-    logger.debug("Dynamic Prices:", {
-      curr,
-      dynamicMinimum,
-      dynamicMaximum,
-      dynamicSuggested,
-    });
+    this.logger.info(
+      "Successfully fetched dynamic prices for supported currencies",
+      {
+        curr,
+        dynamicMinimum,
+        dynamicMaximum,
+        dynamicSuggested,
+      }
+    );
 
     return {
       maximumPaymentAmount,
@@ -186,11 +200,41 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  async getWCForBytes(bytes: ByteCount): Promise<Winston> {
+  async getWCForBytes(bytes: ByteCount): Promise<WincForBytesResponse> {
     const chunkSize = roundToArweaveChunkSize(bytes);
     const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize
     );
-    return winston;
+
+    const adjustmentMultiplier =
+      (process.env.SUBSIDIZED_WINC_PERCENTAGE
+        ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
+        : 0) / 100;
+    // round down the subsidy amount to closest full integer for the subsidy amount
+    const adjustmentAmount = winston.times(adjustmentMultiplier);
+
+    // TODO: pull adjustments from database
+    const adjustments: Adjustment[] = [
+      {
+        name: "FWD Research July 2023 Subsidy",
+        description: `A ${
+          adjustmentMultiplier * 100
+        }% discount for uploads over 500KiB`,
+        operator: "multiply",
+        value: adjustmentMultiplier,
+        // We DEDUCT the adjustment in this flow so we give the inverse by multiplying by negative one
+        adjustmentAmount: adjustmentAmount.times(-1),
+      },
+    ];
+    this.logger.info("Calculated adjustments for bytes.", {
+      bytes,
+      originalAmount: winston.toString(),
+      adjustments,
+    });
+
+    return {
+      winc: winston.minus(adjustmentAmount),
+      adjustments,
+    };
   }
 }

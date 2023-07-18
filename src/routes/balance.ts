@@ -12,7 +12,7 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
   if (!walletAddress) {
     ctx.status = 403;
     ctx.body = "Invalid signature or missing required headers";
-    return next;
+    return next();
   }
 
   logger.info("Balance requested", { walletAddress });
@@ -33,5 +33,5 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
     }
   }
 
-  return next;
+  return next();
 }

@@ -63,13 +63,13 @@ router.get("/v1/rates", ratesHandler);
 // Health
 router.get("/health", async (ctx: KoaContext, next: Next) => {
   ctx.body = "OK";
-  return next;
+  return next();
 });
 
 // Prometheus
 router.get("/metrics", async (ctx: KoaContext, next: Next) => {
   ctx.body = await metricsRegistry.metrics();
-  return next;
+  return next();
 });
 
 router.get("/openapi.json", swaggerDocsJSON);

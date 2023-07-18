@@ -39,5 +39,5 @@ export async function currenciesRoute(ctx: KoaContext, next: Next) {
     ctx.status = 502;
   }
 
-  return next;
+  return next();
 }
