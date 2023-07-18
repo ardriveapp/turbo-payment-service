@@ -58,31 +58,31 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       byteCount,
       dataItemId,
     });
-    const priceWithSubsidies = await pricingService.getWCForBytes({
+    const priceWithAdjustments = await pricingService.getWCForBytes({
       bytes: byteCount,
-      applyDefaultSubsidy: true,
+      applyAdjustments: true,
     });
 
     logger.info("Reserving balance for user ", {
       walletAddress,
       byteCount,
       dataItemId,
-      ...priceWithSubsidies,
+      ...priceWithAdjustments,
     });
     await paymentDatabase.reserveBalance(
       walletAddress,
-      priceWithSubsidies.subsidizedWincTotal,
+      priceWithAdjustments.winc,
       dataItemId
     );
     ctx.response.status = 200;
     ctx.response.message = "Balance reserved";
     // TODO: add subsidy amounts to this response
-    ctx.response.body = priceWithSubsidies.subsidizedWincTotal;
+    ctx.response.body = priceWithAdjustments.winc;
     logger.info("Balance reserved for user!", {
       walletAddress,
       byteCount,
       dataItemId,
-      ...priceWithSubsidies,
+      ...priceWithAdjustments,
     });
 
     return next();

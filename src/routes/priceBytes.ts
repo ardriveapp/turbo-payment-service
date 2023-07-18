@@ -30,19 +30,18 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
     return next();
   }
   try {
-    const priceWithSubsidies = await pricingService.getWCForBytes({
+    const priceWithAdjustments = await pricingService.getWCForBytes({
       bytes,
-      applyDefaultSubsidy: true,
+      applyAdjustments: true,
     });
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = {
-      winc: priceWithSubsidies.subsidizedWincTotal.toString(),
-      originalWincTotal: priceWithSubsidies.originalWincTotal.toString(),
-      subsidiesApplied: priceWithSubsidies.subsidies,
+      winc: priceWithAdjustments.winc.toString(),
+      adjustments: priceWithAdjustments.adjustments,
     };
     logger.info("Successfully calculated price for byte count", {
-      ...priceWithSubsidies,
+      ...priceWithAdjustments,
     });
   } catch (error) {
     ctx.response.status = 502;
