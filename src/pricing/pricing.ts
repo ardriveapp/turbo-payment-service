@@ -146,7 +146,7 @@ export class TurboPricingService implements PricingService {
       ? currSuggested
       : dynamicSuggested;
 
-    this.logger.debug(
+    this.logger.info(
       "Successfully fetched dynamic prices for supported currencies",
       {
         curr,
