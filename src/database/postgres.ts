@@ -421,6 +421,8 @@ export class PostgresDatabase implements Database {
       await knexTransaction<BalanceReservationDBResult>(
         tableNames.balanceReservation
       ).insert({
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore : TODO
         adjustments,
         reservation_id: reservationId,
         reserved_winc_amount: reservedWincAmount.toString(),

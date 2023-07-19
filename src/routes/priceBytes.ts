@@ -18,7 +18,7 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
     ctx.response.status = 400;
     ctx.body = "Byte count too large";
     logger.info("Byte count too large", { bytesValue });
-    return next;
+    return next();
   }
   let bytes: ByteCount;
   try {
@@ -27,18 +27,23 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
     ctx.response.status = 400;
     ctx.body = "Invalid byte count";
     logger.error("Invalid byte count", { bytesValue }, error);
-    return next;
+    return next();
   }
   try {
-    const { winc } = await pricingService.getWCForBytes(bytes);
+    const priceWithAdjustments = await pricingService.getWCForBytes(bytes);
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
-    ctx.body = { winc };
-    logger.info("Price found for byte count!", { winc, bytesValue });
+    ctx.body = {
+      winc: priceWithAdjustments.winc.toString(),
+      adjustments: priceWithAdjustments.adjustments,
+    };
+    logger.info("Successfully calculated price for byte count", {
+      ...priceWithAdjustments,
+    });
   } catch (error) {
     ctx.response.status = 502;
     ctx.body = "Pricing Oracle Unavailable";
     logger.error("Pricing Oracle Unavailable", { bytesValue });
   }
-  return next;
+  return next();
 }

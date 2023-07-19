@@ -21,6 +21,30 @@ components:
           type: string
           description: A big number string representing an amount of credits in winc. One credit is equivalent to 1,000,000,000,000 winc
           example: "332824926"
+        adjustments:
+          "$ref": "#/components/schemas/Adjustment"
+
+    Adjustment:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          description:
+            type: string
+          value:
+            type: number
+          operator:
+            type: string
+          adjustmentAmount:
+            type: string
+      example:
+        - name: "Adjustment"
+          description: "Some great subsidy"
+          value: "0.6"
+          operator: "multiply"
+          adjustmentAmount: "-12300"
 
     CurrencyType:
       type: string
@@ -77,7 +101,7 @@ components:
       type: object
       properties:
         winc:
-          type: number
+          type: string
           description: A big number representing the amount of credits in winc that 1GB of storage costs based on current market rates. One credit is equivalent to 1,000,000,000,000 winc.
           example: 332824926
         fiat:
@@ -96,6 +120,8 @@ components:
               sgd: 7.3197929114399995,
               usd: 5.4049103776452005,
             }
+        adjustments:
+          "$ref": "#/components/schemas/Adjustment"
 
     PaymentSession:
       type: object

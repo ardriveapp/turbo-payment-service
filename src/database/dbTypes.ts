@@ -1,6 +1,15 @@
-import { AdjustmentResult } from "../pricing/pricing";
 import { PublicArweaveAddress } from "../types";
 import { WC } from "../types/arc";
+
+export type Adjustment = {
+  name: string;
+  description: string;
+  /** value to calculate adjustment ( Multiplier or Added Value ) */
+  value: number;
+  operator: "multiply" | "add";
+  /** Amount of winc this adjustment changes (e.g -600 for 600 winc saved)  */
+  adjustmentAmount: WC;
+};
 
 export type UserAddress = string | PublicArweaveAddress;
 export type UserAddressType = string | "arweave";
@@ -89,14 +98,14 @@ export interface BalanceReservation {
   userAddress: UserAddress;
   reservedDate: Timestamp;
   reservedWincAmount: WC;
-  adjustments: AdjustmentResult;
+  adjustments: Adjustment[];
 }
 
 export type CreateBalanceReservationParams = {
   reservationId: ReservationId;
   userAddress: UserAddress;
   reservedWincAmount: WC;
-  adjustments?: AdjustmentResult;
+  adjustments?: Adjustment[];
 };
 
 export interface FinalizedReservation extends BalanceReservation {
@@ -200,7 +209,7 @@ export interface BalanceReservationDBInsert {
   reservation_id: string;
   user_address: string;
   reserved_winc_amount: string;
-  adjustments?: AdjustmentResult;
+  adjustments?: Record<string, Adjustment>;
 }
 
 export interface BalanceReservationDBResult extends BalanceReservationDBInsert {

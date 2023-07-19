@@ -1,3 +1,5 @@
+import winston from "winston";
+
 import {
   CurrencyLimitation,
   CurrencyLimitations,
@@ -5,9 +7,9 @@ import {
   turboFeePercentageAsADecimal,
 } from "../constants";
 import { Database } from "../database/database";
-import { AdjustmentId, CurrencyType } from "../database/dbTypes";
+import { Adjustment, CurrencyType } from "../database/dbTypes";
 import { PostgresDatabase } from "../database/postgres";
-import logger from "../logger";
+import defaultLogger from "../logger";
 import { ByteCount, WC, Winston } from "../types";
 import { Payment } from "../types/payment";
 import {
@@ -18,21 +20,16 @@ import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 
-export type AdjustmentResult = Record<
-  AdjustmentId,
-  { adjustedWincAmount: WC; adjustmentName: string }
->[];
-
-export interface GetWincForBytesResult {
+export type WincForBytesResponse = {
   winc: WC;
-  adjustments?: AdjustmentResult;
-}
+  adjustments: Adjustment[];
+};
 
 export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
-  getWCForBytes: (bytes: ByteCount) => Promise<GetWincForBytesResult>;
+  getWCForBytes: (bytes: ByteCount) => Promise<WincForBytesResponse>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -42,6 +39,7 @@ const maxStripeDigits = 8;
 const maxStripeAmount = 990_000_00;
 
 export class TurboPricingService implements PricingService {
+  private logger: winston.Logger;
   private readonly bytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
   private readonly arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
   private readonly paymentDatabase: Database;
@@ -50,11 +48,14 @@ export class TurboPricingService implements PricingService {
     bytesToWinstonOracle,
     arweaveToFiatOracle,
     paymentDatabase,
+    logger = defaultLogger,
   }: {
     bytesToWinstonOracle?: ReadThroughBytesToWinstonOracle;
     arweaveToFiatOracle?: ReadThroughArweaveToFiatOracle;
+    logger?: winston.Logger;
     paymentDatabase?: Database;
   }) {
+    this.logger = logger.child({ class: this.constructor.name });
     this.bytesToWinstonOracle =
       bytesToWinstonOracle ?? new ReadThroughBytesToWinstonOracle({});
     this.arweaveToFiatOracle =
@@ -151,12 +152,15 @@ export class TurboPricingService implements PricingService {
       ? currSuggested
       : dynamicSuggested;
 
-    logger.debug("Dynamic Prices:", {
-      curr,
-      dynamicMinimum,
-      dynamicMaximum,
-      dynamicSuggested,
-    });
+    this.logger.info(
+      "Successfully fetched dynamic prices for supported currencies",
+      {
+        curr,
+        dynamicMinimum,
+        dynamicMaximum,
+        dynamicSuggested,
+      }
+    );
 
     return {
       maximumPaymentAmount,
@@ -202,83 +206,121 @@ export class TurboPricingService implements PricingService {
     return baseWinstonCreditsFromPayment;
   }
 
-  async getWCForBytes(bytes: ByteCount): Promise<GetWincForBytesResult> {
+  // async getWCForBytes(bytes: ByteCount): Promise<GetWincForBytesResult> {
+  //   const chunkSize = roundToArweaveChunkSize(bytes);
+  //   const winc = await this.bytesToWinstonOracle.getWinstonForBytes(chunkSize);
+
+  //   return {
+  //     winc: adjustedWinc.isNonZeroNegativeInteger()
+  //       ? new Winston(0) // Return as 0 if negative value is calculated so we don't pay users to upload
+  //       : adjustedWinc,
+  //   };
+  // }
+
+  async getWCForBytes(bytes: ByteCount): Promise<WincForBytesResponse> {
     const chunkSize = roundToArweaveChunkSize(bytes);
-    const winc = await this.bytesToWinstonOracle.getWinstonForBytes(chunkSize);
+    const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
+      chunkSize
+    );
+
+    const adjustmentMultiplier =
+      (process.env.SUBSIDIZED_WINC_PERCENTAGE
+        ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
+        : 0) / 100;
+    // round down the subsidy amount to closest full integer for the subsidy amount
+    const adjustmentAmount = winston.times(adjustmentMultiplier);
+
+    // TODO: pull adjustments from database
+    const adjustments: Adjustment[] = [
+      {
+        name: "FWD Research July 2023 Subsidy",
+        description: `A ${
+          adjustmentMultiplier * 100
+        }% discount for uploads over 500KiB`,
+        operator: "multiply",
+        value: adjustmentMultiplier,
+        // We DEDUCT the adjustment in this flow so we give the inverse by multiplying by negative one
+        adjustmentAmount: adjustmentAmount.times(-1),
+      },
+    ];
 
     const currentUploadAdjustments = (
       await this.paymentDatabase.getCurrentUploadAdjustments()
     ).sort((a, b) => a.adjustmentPriority - b.adjustmentPriority);
+    this.logger.info(currentUploadAdjustments.toString());
+    // let adjustedWinc = winc;
 
-    let adjustedWinc = winc;
-    let adjustments: AdjustmentResult | undefined = undefined;
+    // let adjustedValue: Winston = new Winston(0);
+    // let adjustedWincAmount: Winston = new Winston(0);
+    // for (const adjustment of currentUploadAdjustments) {
+    //   const {
+    //     adjustmentId,
+    //     adjustmentName,
+    //     adjustmentOperator,
+    //     adjustmentValue,
+    //   } = adjustment;
+    //   switch (adjustmentOperator) {
+    //     case "add":
+    //       adjustedWinc = adjustedWinc.plus(new Winston(adjustmentValue));
+    //       adjustments = Object.assign(
+    //         {
+    //           [adjustmentId]: {
+    //             adjustmentName,
+    //             adjustedWincAmount: adjustmentValue,
+    //           },
+    //         },
+    //         adjustments
+    //       );
+    //       break;
 
-    let adjustedValue: Winston = new Winston(0);
-    let adjustedWincAmount: Winston = new Winston(0);
-    for (const adjustment of currentUploadAdjustments) {
-      const {
-        adjustmentId,
-        adjustmentName,
-        adjustmentOperator,
-        adjustmentValue,
-      } = adjustment;
-      switch (adjustmentOperator) {
-        case "add":
-          adjustedWinc = adjustedWinc.plus(new Winston(adjustmentValue));
-          adjustments = Object.assign(
-            {
-              [adjustmentId]: {
-                adjustmentName,
-                adjustedWincAmount: adjustmentValue,
-              },
-            },
-            adjustments
-          );
-          break;
+    //     case "multiply":
+    //       adjustedValue = adjustedWinc.times(adjustmentValue);
+    //       adjustedWincAmount = adjustedWinc.minus(adjustedValue);
 
-        case "multiply":
-          adjustedValue = adjustedWinc.times(adjustmentValue);
-          adjustedWincAmount = adjustedWinc.minus(adjustedValue);
+    //       adjustedWinc = adjustedValue;
+    //       adjustments.push({name: adjustmentName, description: /*  TODO */})
 
-          adjustedWinc = adjustedValue;
-          adjustments = Object.assign(
-            {
-              [adjustmentId]: {
-                adjustmentName,
-                adjustedWincAmount,
-              },
-            },
-            adjustments
-          );
+    //       Object.assign(
+    //         {
+    //           [adjustmentId]: {
+    //             adjustmentName,
+    //             adjustedWincAmount,
+    //           },
+    //         },
+    //         adjustments
+    //       );
 
-          break;
+    //       break;
 
-        case "subsidy":
-          adjustedValue = adjustedWinc.times(adjustmentValue);
+    //     case "subsidy":
+    //       adjustedValue = adjustedWinc.times(adjustmentValue);
 
-          adjustedWinc = adjustedWinc.minus(adjustedValue);
-          adjustments = Object.assign(
-            {
-              [adjustmentId]: {
-                adjustmentName,
-                adjustedWincAmount: adjustedValue,
-              },
-            },
-            adjustments
-          );
+    //       adjustedWinc = adjustedWinc.minus(adjustedValue);
+    //       adjustments = Object.assign(
+    //         {
+    //           [adjustmentId]: {
+    //             adjustmentName,
+    //             adjustedWincAmount: adjustedValue,
+    //           },
+    //         },
+    //         adjustments
+    //       );
 
-          break;
+    //       break;
 
-        default:
-          logger.error("Unknown Adjustment Operator!", { adjustment });
-          break;
-      }
-    }
+    //     default:
+    //       logger.error("Unknown Adjustment Operator!", { adjustment });
+    //       break;
+    //   }
+
+    this.logger.info("Calculated adjustments for bytes.", {
+      bytes,
+      originalAmount: winston.toString(),
+      adjustments,
+    });
 
     return {
-      winc: adjustedWinc.isNonZeroNegativeInteger()
-        ? new Winston(0) // Return as 0 if negative value is calculated so we don't pay users to upload
-        : adjustedWinc,
+      winc: winston.minus(adjustmentAmount),
       adjustments,
     };
   }

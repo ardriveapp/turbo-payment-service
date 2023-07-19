@@ -18,7 +18,7 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
   } catch (error) {
     ctx.response.status = 400;
     ctx.body = (error as PaymentValidationError).message;
-    return next;
+    return next();
   }
   logger.info("Payment Price GET Route :", { payment });
 
@@ -39,5 +39,5 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
     ctx.body = "Fiat Oracle Unavailable";
   }
 
-  return next;
+  return next();
 }
