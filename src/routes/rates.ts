@@ -1,3 +1,4 @@
+import BigNumber from "bignumber.js";
 import { Next } from "koa";
 
 import {
@@ -19,27 +20,29 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     const priceWithAdjustments = await pricingService.getWCForBytes(
       oneGiBInBytes
     );
-    const fiat: Record<string, number> = {};
+    const fiat: Record<string, BigNumber.Value> = {};
 
-    // Calculate fiat prices for one GiB
+    // Calculate fiat prices for one GiB with our fees applied
     await Promise.all(
       supportedPaymentCurrencyTypes.map(async (currency) => {
         const fiatPriceForOneAR = await pricingService.getFiatPriceForOneAR(
           currency
         );
+        const fiatPriceForOneGiB: BigNumber = priceWithAdjustments.winc
+          .toBigNumber()
+          .times(fiatPriceForOneAR);
 
-        const fiatPriceForOneGiB =
-          priceWithAdjustments.winc.times(fiatPriceForOneAR);
-        const fiatValue =
-          // TODO: `toNumber()` on this is tech debt. We could lose precision in the future if this value is higher than MAX_SAFE_INT
-          (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
-          (1 + turboFeePercentageAsADecimal);
+        const fiatValue: BigNumber =
+          fiatPriceForOneGiB.dividedBy(oneARInWinston);
 
-        fiat[currency] = fiatValue;
+        const fiatValueAfterFees: BigNumber = fiatValue.multipliedBy(
+          1 + turboFeePercentageAsADecimal
+        );
+        fiat[currency] = fiatValueAfterFees.toString();
       })
     );
     const rates = {
-      winc: priceWithAdjustments.winc.toString(),
+      winc: priceWithAdjustments.winc,
       fiat,
       adjustments: priceWithAdjustments.adjustments,
     };
