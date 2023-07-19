@@ -66,6 +66,8 @@ export async function createServer(
   app.use(router.routes());
 
   const server = app.listen(port);
+  server.keepAliveTimeout = 120; // intentionally longer than the ALB timeout
+  server.requestTimeout = 120; // no requests should take longer than 2 minutes
 
   logger.info(`Listening on port ${port}...`);
   return server;
