@@ -102,6 +102,8 @@ export type CurrencyLimitations = Record<
 >;
 
 export const recognizedCountries = [
+  "United States",
+  "United Kingdom",
   "Afghanistan",
   "Albania",
   "Algeria",
@@ -283,8 +285,6 @@ export const recognizedCountries = [
   "Uganda",
   "Ukraine",
   "United Arab Emirates",
-  "United Kingdom",
-  "United States",
   "Uruguay",
   "Uzbekistan",
   "Vanuatu",
