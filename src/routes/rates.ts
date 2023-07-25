@@ -10,8 +10,7 @@ import { KoaContext } from "../server";
 import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
 
 export async function ratesHandler(ctx: KoaContext, next: Next) {
-  const logger = ctx.state.logger;
-  const { pricingService } = ctx.state;
+  const { pricingService, logger } = ctx.state;
 
   try {
     // TODO: applying adjustments on the generic /rates endpoint might not be the best idea, we may want to just show the raw rates for 1 GiB unadjusted, then return
@@ -43,12 +42,12 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
       fiat,
       adjustments: priceWithAdjustments.adjustments,
     };
-    ctx.response.status = 200;
+    ctx.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = rates;
     logger.info("Successfully calculated rates.", { rates });
   } catch (error) {
-    ctx.response.status = 502;
+    ctx.status = 502;
     ctx.body = "Failed to calculate rates.";
     logger.error("Failed to calculate rates.", error);
   }
@@ -63,7 +62,7 @@ export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
     currency,
   });
   if (!supportedPaymentCurrencyTypes.includes(currency)) {
-    ctx.response.status = 404;
+    ctx.status = 404;
     ctx.body = "Invalid currency.";
     return next();
   }
@@ -82,7 +81,7 @@ export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
       rate: fiatPriceForOneAR.toString(),
     };
   } catch (error) {
-    ctx.response.status = 502;
+    ctx.status = 502;
     ctx.body = "Failed to calculate raw fiat conversion for 1 AR.";
     logger.error("Failed to calculate raw fiat conversion for 1 AR.", error);
   }
