@@ -45,7 +45,6 @@ export const columnNames = {
 
   // Balance reservation
   reservationId: "reservation_id", // Corresponding ID of Balance Used ( e.g: DataItemId )
-  // user address
   reservedDate: "reserved_date",
   reservedWincAmount: "reserved_winc_amount", // amount reserved after adjustments
   adjustments: "adjustments", // array of AdjustmentID: AdjustmentAmount
