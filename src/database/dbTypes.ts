@@ -165,48 +165,6 @@ export interface PriceAdjustment {
   expirationDate?: Timestamp;
 }
 
-// export type ScopedPriceAdjustment = AdjustmentBase &
-//   (
-//     | {
-//         scope: "upload";
-//         threshold?: {
-//           unit: "bytes" | "winc";
-//           value: WC | ByteCount;
-//           operator: ThresholdOperator;
-//         };
-//       }
-//     | {
-//         scope: "payment";
-//         threshold?: {
-//           unit: "payment_amount" | "winc";
-//           value: WC | PaymentAmount;
-//           operator: ThresholdOperator;
-//         };
-//       }
-//   );
-
-// export type PriceAdjustment = ScopedPriceAdjustment &
-//   (
-//     | {
-//         applicability: "apply_to_all" | "privileged_users" | "disabled";
-//         applicabilityInfo?: undefined;
-//       }
-//     | {
-//         applicability: "quantity_limit";
-//         applicabilityInfo: {
-//           max_quantity: string;
-//           reset_interval_days: number;
-//         };
-//       }
-//     | {
-//         applicability: "redeemed_code";
-//         applicabilityInfo: {
-//           available_codes: string[];
-//           used_codes: string[];
-//         };
-//       }
-//   );
-
 export interface UserDBInsert {
   user_address: string;
   user_address_type: string;
