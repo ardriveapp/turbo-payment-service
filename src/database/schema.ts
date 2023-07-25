@@ -314,7 +314,9 @@ export class Schema {
         .notNullable()
         .defaultTo(this.defaultTimestamp());
       t.string(reservedWincAmount).notNullable();
-      t.jsonb(adjustments).defaultTo([]);
+      t.jsonb(adjustments).defaultTo({});
+
+      // TODO: will we query enough by adjustment id to warrant indexing here within the adjustments jsonb?
       t.index(["adjustments"], "adjustment_idx", "gin");
     });
   }
