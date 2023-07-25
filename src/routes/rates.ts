@@ -33,10 +33,14 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
         const winstonPriceForOneGiBInAR =
           priceWithAdjustments.winc.times(fiatPriceForOneAR);
 
-        // divide the AR price by the number of winston in AR, and add turbo fee
-        const fiatPriceForOneGiBofArAfterFees = winstonPriceForOneGiBInAR
-          .dividedBy(oneARInWinston)
-          .times(1 + turboFeePercentageAsADecimal);
+        // divide the AR price by the number of winston in AR, before any turbo fees
+        const fiatPriceForOneGiBofAr =
+          winstonPriceForOneGiBInAR.dividedBy(oneARInWinston);
+
+        // add in turbo adjustment fees (note: this is against the adjusted fee, not the raw fee)
+        const fiatPriceForOneGiBofArAfterFees = fiatPriceForOneGiBofAr.times(
+          1 + turboFeePercentageAsADecimal
+        );
 
         fiat[currency] = fiatPriceForOneGiBofArAfterFees.toString();
       })
