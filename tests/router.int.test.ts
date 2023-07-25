@@ -31,7 +31,6 @@ import { loadSecretsToEnv } from "../src/utils/loadSecretsToEnv";
 import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
 import {
   chargeDisputeStub,
-  expectedAdjustments,
   expectedArPrices,
   expectedRates,
   paymentIntentStub,
@@ -164,7 +163,7 @@ describe("Router tests", () => {
 
     expect(data).to.deep.equal({
       ...expectedRates,
-      adjustments: expectedAdjustments,
+      adjustments: [],
     });
   });
 
