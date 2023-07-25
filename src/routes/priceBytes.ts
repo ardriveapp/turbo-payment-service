@@ -1,6 +1,7 @@
 import { Next } from "koa";
 
 import { oneMinuteInSeconds } from "../constants";
+import { adjustmentApiMap } from "../database/dbMaps";
 import { KoaContext } from "../server";
 import { ByteCount } from "../types";
 
@@ -35,7 +36,7 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = {
       winc: priceWithAdjustments.winc.toString(),
-      adjustments: priceWithAdjustments.adjustments,
+      adjustments: priceWithAdjustments.adjustments.map(adjustmentApiMap),
     };
     logger.info("Successfully calculated price for byte count", {
       ...priceWithAdjustments,

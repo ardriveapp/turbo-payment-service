@@ -12,6 +12,8 @@ export type Adjustment = {
   adjustmentAmount: WC;
 };
 
+export type APIAdjustment = Omit<Adjustment, "id">;
+
 export type KeyedAdjustments = Record<string, Adjustment>;
 
 export type UserAddress = string | PublicArweaveAddress;

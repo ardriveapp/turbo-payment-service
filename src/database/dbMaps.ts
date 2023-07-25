@@ -1,5 +1,7 @@
 import { Winston } from "../types/winston";
 import {
+  APIAdjustment,
+  Adjustment,
   AdjustmentApplicability,
   AdjustmentOperator,
   AdjustmentScope,
@@ -124,5 +126,21 @@ export function priceAdjustmentDBMap({
     priority: adjustment_priority,
     startDate: adjustment_start_date,
     value: adjustment_value,
+  };
+}
+
+export function adjustmentApiMap({
+  adjustmentAmount,
+  name,
+  description,
+  operator,
+  value,
+}: Adjustment): APIAdjustment {
+  return {
+    adjustmentAmount,
+    name,
+    description,
+    operator,
+    value,
   };
 }

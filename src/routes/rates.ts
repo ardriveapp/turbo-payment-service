@@ -6,6 +6,7 @@ import {
   oneMinuteInSeconds,
   turboFeePercentageAsADecimal,
 } from "../constants";
+import { adjustmentApiMap } from "../database/dbMaps";
 import { KoaContext } from "../server";
 import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
 
@@ -41,7 +42,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     const rates = {
       winc: priceWithAdjustments.winc.toString(),
       fiat,
-      adjustments: priceWithAdjustments.adjustments,
+      adjustments: priceWithAdjustments.adjustments.map(adjustmentApiMap),
     };
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
