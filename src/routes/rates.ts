@@ -54,3 +54,37 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
   }
   return next();
 }
+
+export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
+  const { logger, pricingService } = ctx.state;
+  const { currency } = ctx.params;
+
+  logger.info("Fetching raw conversion rate for 1 AR", {
+    currency,
+  });
+  if (!supportedPaymentCurrencyTypes.includes(currency)) {
+    ctx.response.status = 404;
+    ctx.body = "Invalid currency.";
+    return next();
+  }
+
+  try {
+    const fiatPriceForOneAR = await pricingService.getFiatPriceForOneAR(
+      currency
+    );
+    logger.info("Successfully fetched raw fiat conversion rate for 1 AR", {
+      currency,
+      rate: fiatPriceForOneAR.toString(),
+    });
+    ctx.status = 200;
+    ctx.body = {
+      currency,
+      rate: fiatPriceForOneAR.toString(),
+    };
+  } catch (error) {
+    ctx.response.status = 502;
+    ctx.body = "Failed to calculate raw fiat conversion for 1 AR.";
+    logger.error("Failed to calculate raw fiat conversion for 1 AR.", error);
+  }
+  return next();
+}
