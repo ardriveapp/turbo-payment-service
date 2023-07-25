@@ -306,22 +306,22 @@ export interface RefundReservationDBResult extends RefundReservationDBInsert {
 export interface PriceAdjustmentDBResult {
   adjustment_id: string;
   adjustment_name: string;
-  adjustment_description?: string;
+  adjustment_description: string | null;
 
   adjustment_scope: string;
   adjustment_applicability: string;
-  adjustment_applicability_info?: JsonSerializable;
+  adjustment_applicability_info: JsonSerializable | null;
 
   adjustment_operator: string;
   adjustment_value: number;
   adjustment_priority: number;
 
   adjustment_start_date: string;
-  adjustment_expiration_date?: string;
+  adjustment_expiration_date: string | null;
 
   adjustment_threshold?: {
     value: string;
     operator: string;
     unit: string;
-  };
+  } | null;
 }

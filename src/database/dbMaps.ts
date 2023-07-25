@@ -109,8 +109,8 @@ export function priceAdjustmentDBMap({
     id: adjustment_id,
     name: adjustment_name,
     applicability: adjustment_applicability as AdjustmentApplicability,
-    description: adjustment_description,
-    applicabilityInfo: adjustment_applicability_info,
+    description: adjustment_description ?? undefined,
+    applicabilityInfo: adjustment_applicability_info ?? undefined,
     scope: adjustment_scope as AdjustmentScope,
     threshold: adjustment_threshold
       ? {
@@ -119,7 +119,7 @@ export function priceAdjustmentDBMap({
           value: adjustment_threshold.value,
         }
       : undefined,
-    expirationDate: adjustment_expiration_date,
+    expirationDate: adjustment_expiration_date ?? undefined,
     operator: adjustment_operator as AdjustmentOperator,
     priority: adjustment_priority,
     startDate: adjustment_start_date,
