@@ -1,7 +1,9 @@
 import { Winston } from "../types/winston";
 import {
+  AdjustmentApplicability,
   AdjustmentOperator,
-  AdjustmentTarget,
+  AdjustmentScope,
+  AdjustmentUnit,
   ChargebackReceipt,
   ChargebackReceiptDBResult,
   FailedTopUpQuote,
@@ -11,6 +13,7 @@ import {
   PriceAdjustment,
   PriceAdjustmentDBResult,
   PromotionalInfo,
+  ThresholdOperator,
   TopUpQuote,
   TopUpQuoteDBResult,
   User,
@@ -89,23 +92,37 @@ export function chargebackReceiptDBMap(
 }
 
 export function priceAdjustmentDBMap({
+  adjustment_applicability,
+  adjustment_description,
+  adjustment_applicability_info,
+  adjustment_threshold,
   adjustment_expiration_date,
   adjustment_id,
   adjustment_name,
   adjustment_operator,
   adjustment_priority,
   adjustment_start_date,
-  adjustment_target,
+  adjustment_scope,
   adjustment_value,
 }: PriceAdjustmentDBResult): PriceAdjustment {
   return {
-    adjustmentExpirationDate: adjustment_expiration_date,
-    adjustmentId: adjustment_id,
-    adjustmentName: adjustment_name,
-    adjustmentOperator: adjustment_operator as AdjustmentOperator,
-    adjustmentPriority: adjustment_priority,
-    adjustmentStartDate: adjustment_start_date,
-    adjustmentTarget: adjustment_target as AdjustmentTarget,
-    adjustmentValue: adjustment_value,
+    id: adjustment_id,
+    name: adjustment_name,
+    applicability: adjustment_applicability as AdjustmentApplicability,
+    description: adjustment_description,
+    applicabilityInfo: adjustment_applicability_info,
+    scope: adjustment_scope as AdjustmentScope,
+    threshold: adjustment_threshold
+      ? {
+          operator: adjustment_threshold.operator as ThresholdOperator,
+          unit: adjustment_threshold.unit as AdjustmentUnit,
+          value: adjustment_threshold.value,
+        }
+      : undefined,
+    expirationDate: adjustment_expiration_date,
+    operator: adjustment_operator as AdjustmentOperator,
+    priority: adjustment_priority,
+    startDate: adjustment_start_date,
+    value: adjustment_value,
   };
 }

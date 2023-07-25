@@ -7,10 +7,10 @@ import {
   turboFeePercentageAsADecimal,
 } from "../constants";
 import { Database } from "../database/database";
-import { Adjustment, CurrencyType } from "../database/dbTypes";
+import { Adjustment, CurrencyType, UserAddress } from "../database/dbTypes";
 import { PostgresDatabase } from "../database/postgres";
 import defaultLogger from "../logger";
-import { ByteCount, WC, Winston } from "../types";
+import { ByteCount, PositiveFiniteInteger, WC, Winston } from "../types";
 import { Payment } from "../types/payment";
 import {
   SupportedPaymentCurrencyTypes,
@@ -29,7 +29,10 @@ export interface PricingService {
   getWCForPayment: (payment: Payment) => Promise<WC>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
-  getWCForBytes: (bytes: ByteCount) => Promise<WincForBytesResponse>;
+  getWCForBytes: (
+    bytes: ByteCount,
+    userAddress?: UserAddress
+  ) => Promise<WincForBytesResponse>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -217,110 +220,107 @@ export class TurboPricingService implements PricingService {
   //   };
   // }
 
-  async getWCForBytes(bytes: ByteCount): Promise<WincForBytesResponse> {
+  async getWCForBytes(
+    bytes: ByteCount,
+    userAddress?: UserAddress
+  ): Promise<WincForBytesResponse> {
     const chunkSize = roundToArweaveChunkSize(bytes);
-    const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
+    const wincFromOracle = await this.bytesToWinstonOracle.getWinstonForBytes(
       chunkSize
     );
 
-    const adjustmentMultiplier =
-      (process.env.SUBSIDIZED_WINC_PERCENTAGE
-        ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
-        : 0) / 100;
-    // round down the subsidy amount to closest full integer for the subsidy amount
-    const adjustmentAmount = winston.times(adjustmentMultiplier);
+    // const adjustmentMultiplier =
+    //   (process.env.SUBSIDIZED_WINC_PERCENTAGE
+    //     ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
+    //     : 0) / 100;
+    // // round down the subsidy amount to closest full integer for the subsidy amount
+    // const adjustmentAmount = winston.times(adjustmentMultiplier);
 
-    // TODO: pull adjustments from database
-    const adjustments: Adjustment[] = [
-      {
-        name: "FWD Research July 2023 Subsidy",
-        description: `A ${
-          adjustmentMultiplier * 100
-        }% discount for uploads over 500KiB`,
-        operator: "multiply",
-        value: adjustmentMultiplier,
-        // We DEDUCT the adjustment in this flow so we give the inverse by multiplying by negative one
-        adjustmentAmount: adjustmentAmount.times(-1),
-      },
-    ];
+    // // TODO: pull adjustments from database
+    // const adjustments: Adjustment[] = [
+    //   {
+    //     name: "FWD Research July 2023 Subsidy",
+    //     description: `A ${
+    //       adjustmentMultiplier * 100
+    //     }% discount for uploads over 500KiB`,
+    //     operator: "multiply",
+    //     value: adjustmentMultiplier,
+    //     // We DEDUCT the adjustment in this flow so we give the inverse by multiplying by negative one
+    //     adjustmentAmount: adjustmentAmount.times(-1),
+    //   },
+    // ];
 
     const currentUploadAdjustments = (
-      await this.paymentDatabase.getCurrentUploadAdjustments()
-    ).sort((a, b) => a.adjustmentPriority - b.adjustmentPriority);
+      await this.paymentDatabase.getCurrentUploadAdjustments(userAddress)
+    ).sort((a, b) => a.priority - b.priority);
     this.logger.info(currentUploadAdjustments.toString());
-    // let adjustedWinc = winc;
 
-    // let adjustedValue: Winston = new Winston(0);
-    // let adjustedWincAmount: Winston = new Winston(0);
-    // for (const adjustment of currentUploadAdjustments) {
-    //   const {
-    //     adjustmentId,
-    //     adjustmentName,
-    //     adjustmentOperator,
-    //     adjustmentValue,
-    //   } = adjustment;
-    //   switch (adjustmentOperator) {
-    //     case "add":
-    //       adjustedWinc = adjustedWinc.plus(new Winston(adjustmentValue));
-    //       adjustments = Object.assign(
-    //         {
-    //           [adjustmentId]: {
-    //             adjustmentName,
-    //             adjustedWincAmount: adjustmentValue,
-    //           },
-    //         },
-    //         adjustments
-    //       );
-    //       break;
+    let adjustedWinc = wincFromOracle;
 
-    //     case "multiply":
-    //       adjustedValue = adjustedWinc.times(adjustmentValue);
-    //       adjustedWincAmount = adjustedWinc.minus(adjustedValue);
+    const adjustments: Adjustment[] = [];
 
-    //       adjustedWinc = adjustedValue;
-    //       adjustments.push({name: adjustmentName, description: /*  TODO */})
+    for (const adjustment of currentUploadAdjustments) {
+      const { description, id, name, operator, value, threshold } = adjustment;
 
-    //       Object.assign(
-    //         {
-    //           [adjustmentId]: {
-    //             adjustmentName,
-    //             adjustedWincAmount,
-    //           },
-    //         },
-    //         adjustments
-    //       );
+      if (threshold) {
+        const { unit: thresholdUnit, operator: thresholdOperator } = threshold;
+        if (thresholdUnit === "bytes") {
+          const thresholdValue = new PositiveFiniteInteger(+threshold.value);
 
-    //       break;
+          if (
+            thresholdOperator === "less_than" &&
+            bytes.isGreaterThan(thresholdValue)
+          ) {
+            continue;
+          }
+          if (
+            thresholdOperator === "greater_than" &&
+            thresholdValue.isGreaterThan(bytes)
+          ) {
+            continue;
+          }
+        }
+        if (thresholdUnit === "winc") {
+          const thresholdValue = new Winston(threshold.value);
 
-    //     case "subsidy":
-    //       adjustedValue = adjustedWinc.times(adjustmentValue);
+          if (
+            thresholdOperator === "less_than" &&
+            adjustedWinc.isGreaterThan(thresholdValue)
+          ) {
+            continue;
+          }
+          if (
+            thresholdOperator === "greater_than" &&
+            thresholdValue.isGreaterThan(adjustedWinc)
+          ) {
+            continue;
+          }
+        }
+      }
 
-    //       adjustedWinc = adjustedWinc.minus(adjustedValue);
-    //       adjustments = Object.assign(
-    //         {
-    //           [adjustmentId]: {
-    //             adjustmentName,
-    //             adjustedWincAmount: adjustedValue,
-    //           },
-    //         },
-    //         adjustments
-    //       );
+      if (operator === "multiply") {
+        // Apply the "upload" and "multiply" adjustment as a discount or subsidy
+        const adjustmentAmount = adjustedWinc.times(value);
+        adjustedWinc = adjustedWinc.minus(adjustmentAmount);
 
-    //       break;
-
-    //     default:
-    //       logger.error("Unknown Adjustment Operator!", { adjustment });
-    //       break;
-    //   }
-
+        adjustments.push({
+          id,
+          name,
+          description,
+          adjustmentAmount,
+          operator,
+          value,
+        });
+      }
+    }
     this.logger.info("Calculated adjustments for bytes.", {
       bytes,
-      originalAmount: winston.toString(),
+      userAddress,
+      originalAmount: wincFromOracle.toString(),
       adjustments,
     });
-
     return {
-      winc: winston.minus(adjustmentAmount),
+      winc: adjustedWinc,
       adjustments,
     };
   }

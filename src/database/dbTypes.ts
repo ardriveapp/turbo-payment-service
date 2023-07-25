@@ -2,14 +2,17 @@ import { PublicArweaveAddress } from "../types";
 import { WC } from "../types/arc";
 
 export type Adjustment = {
+  id: string;
   name: string;
-  description: string;
+  description?: string;
   /** value to calculate adjustment ( Multiplier or Added Value ) */
   value: number;
   operator: "multiply" | "add";
   /** Amount of winc this adjustment changes (e.g -600 for 600 winc saved)  */
   adjustmentAmount: WC;
 };
+
+export type KeyedAdjustments = Record<string, Adjustment>;
 
 export type UserAddress = string | PublicArweaveAddress;
 export type UserAddressType = string | "arweave";
@@ -26,7 +29,7 @@ export type JsonSerializable =
   | JsonSerializable[];
 
 // TODO: Promotional Info Schema. We will use JSON object
-export type PromotionalInfo = Record<string, JsonSerializable>;
+export type PromotionalInfo = Record<AdjustmentId, JsonSerializable>;
 
 type IdType = string;
 
@@ -123,18 +126,84 @@ export type CreateRefundReservationParams = {
   refundedReason: string;
 };
 
-export type AdjustmentTarget = "upload" | "payment";
-export type AdjustmentOperator = "add" | "multiply" | "subsidy";
+export type AdjustmentScope = "upload" | "payment";
+export type AdjustmentOperator = "add" | "multiply";
+export type ThresholdOperator = "greater_than" | "less_than";
+export type AdjustmentUnit = "bytes" | "winc" | "payment_amount";
+
+export type AdjustmentApplicability =
+  | "apply_to_all" // e.g FWD Research allows all users to use this adjustment
+  | "quantity_limited" // e.g PDS subsidy allows X bytes per month
+  | "redeemed_code" // e.g Only allowed to use this adjustment if user has redeemed a code (e.g free GiB from a promotion)
+  | "privileged_users" // e.g Only allowed to use this adjustment if user has corresponding adjustment id in their promotional info
+  | "disabled"; // e.g Disabled adjustment (e.g event ended or for security reasons)
+
+export type AdjustmentThreshold = {
+  unit: AdjustmentUnit;
+  value: string;
+  operator: ThresholdOperator;
+};
+
 export interface PriceAdjustment {
-  adjustmentId: AdjustmentId;
-  adjustmentName: string;
-  adjustmentTarget: AdjustmentTarget;
-  adjustmentOperator: AdjustmentOperator;
-  adjustmentValue: number;
-  adjustmentPriority: number;
-  adjustmentStartDate: Timestamp;
-  adjustmentExpirationDate: Timestamp;
+  id: AdjustmentId;
+  name: string;
+  description?: string;
+
+  applicability: AdjustmentApplicability;
+  applicabilityInfo?: JsonSerializable;
+
+  scope: AdjustmentScope;
+  threshold?: AdjustmentThreshold;
+
+  priority: number;
+  operator: AdjustmentOperator;
+  value: number;
+
+  startDate: Timestamp;
+  expirationDate?: Timestamp;
 }
+
+// export type ScopedPriceAdjustment = AdjustmentBase &
+//   (
+//     | {
+//         scope: "upload";
+//         threshold?: {
+//           unit: "bytes" | "winc";
+//           value: WC | ByteCount;
+//           operator: ThresholdOperator;
+//         };
+//       }
+//     | {
+//         scope: "payment";
+//         threshold?: {
+//           unit: "payment_amount" | "winc";
+//           value: WC | PaymentAmount;
+//           operator: ThresholdOperator;
+//         };
+//       }
+//   );
+
+// export type PriceAdjustment = ScopedPriceAdjustment &
+//   (
+//     | {
+//         applicability: "apply_to_all" | "privileged_users" | "disabled";
+//         applicabilityInfo?: undefined;
+//       }
+//     | {
+//         applicability: "quantity_limit";
+//         applicabilityInfo: {
+//           max_quantity: string;
+//           reset_interval_days: number;
+//         };
+//       }
+//     | {
+//         applicability: "redeemed_code";
+//         applicabilityInfo: {
+//           available_codes: string[];
+//           used_codes: string[];
+//         };
+//       }
+//   );
 
 export interface UserDBInsert {
   user_address: string;
@@ -237,10 +306,22 @@ export interface RefundReservationDBResult extends RefundReservationDBInsert {
 export interface PriceAdjustmentDBResult {
   adjustment_id: string;
   adjustment_name: string;
-  adjustment_target: string;
+  adjustment_description?: string;
+
+  adjustment_scope: string;
+  adjustment_applicability: string;
+  adjustment_applicability_info?: JsonSerializable;
+
   adjustment_operator: string;
   adjustment_value: number;
   adjustment_priority: number;
+
   adjustment_start_date: string;
-  adjustment_expiration_date: string;
+  adjustment_expiration_date?: string;
+
+  adjustment_threshold?: {
+    value: string;
+    operator: string;
+    unit: string;
+  };
 }

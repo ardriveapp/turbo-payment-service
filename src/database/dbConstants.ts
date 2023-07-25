@@ -61,12 +61,17 @@ export const columnNames = {
   // Price Adjustment
   adjustmentId: "adjustment_id",
   adjustmentName: "adjustment_name",
-  adjustmentTarget: "adjustment_target", // e.g "upload" for on data uploads or "payment" on credit purchases
+  adjustmentDescription: "adjustment_description",
+  adjustmentScope: "adjustment_scope", // e.g "upload" for on data uploads or "payment" on credit purchases
+  adjustmentApplicability: "adjustment_applicability", // e.g "apply_to_all" || "quantity_limited" || "privileged_users" || "redeemed_promo_codes" || "disabled"
+  adjustmentApplicabilityInfo: "adjustment_applicability_info", // e.g { quantity: "100", reset_interval_days: 30 } || { available_codes: ["code1", "code2"], used_codes: ["code3"] }
   adjustmentOperator: "adjustment_operator", // e.g "add" || "multiply"
+
   adjustmentValue: "adjustment_value", // e.g "200000" || "0.6"
   adjustmentPriority: "adjustment_priority", // Integer representing the order in which this adjustment should be applied. e.g: 0 for FIRST
   adjustmentStartDate: "adjustment_start_date",
   adjustmentExpirationDate: "adjustment_expiration_date",
+  adjustmentThreshold: "adjustment_threshold", // e.g: { "unit": "bytes", "threshold": "1000000", "operator": "less_than" }
 
   // Audit Log
   auditId: "audit_id",

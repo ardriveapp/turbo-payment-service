@@ -402,7 +402,7 @@ export class PostgresDatabase implements Database {
   }
 
   public async reserveBalance({
-    adjustments,
+    adjustments = [],
     reservationId,
     reservedWincAmount,
     userAddress,
@@ -421,9 +421,9 @@ export class PostgresDatabase implements Database {
       await knexTransaction<BalanceReservationDBResult>(
         tableNames.balanceReservation
       ).insert({
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore : TODO
-        adjustments,
+        adjustments: adjustments.reduce((acc, adjustment) => {
+          return { ...acc, [adjustment.id]: adjustment };
+        }, {}),
         reservation_id: reservationId,
         reserved_winc_amount: reservedWincAmount.toString(),
         user_address: userAddress,
@@ -533,7 +533,7 @@ export class PostgresDatabase implements Database {
       await this.knexReader<PriceAdjustmentDBResult>(tableNames.priceAdjustment)
         .where(columnNames.adjustmentStartDate, "<", currentDate)
         .andWhere(columnNames.adjustmentExpirationDate, ">", currentDate)
-    ).filter((a) => a.adjustment_target === "upload");
+    ).filter((a) => a.adjustment_scope === "upload");
     return currentAdjustments.map(priceAdjustmentDBMap);
   }
 }

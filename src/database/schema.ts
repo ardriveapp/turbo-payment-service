@@ -113,73 +113,89 @@ export class Schema {
     if (process.env.NODE_ENV !== "test") {
       // FWD Research Promotions
       await this.pg<PriceAdjustmentDBResult>(priceAdjustment).insert({
+        adjustment_applicability: "apply_to_all",
+        adjustment_id: "fwd_research_july_2023_upload_subsidy",
         adjustment_start_date: new Date("2023-07-15").toISOString(),
         adjustment_expiration_date: new Date("2023-08-15").toISOString(),
-        adjustment_name: "FWD Research July '23 Upload Subsidy",
-        adjustment_target: "upload",
+        adjustment_name: "FWD Research July 2023 Upload Subsidy",
+        adjustment_scope: "upload",
         adjustment_operator: "subsidy",
         adjustment_value: 0.6,
       });
 
       await this.pg<PriceAdjustmentDBResult>(priceAdjustment).insert({
+        adjustment_applicability: "apply_to_all",
+        adjustment_id: "fwd_research_august_2023_upload_subsidy",
         adjustment_start_date: new Date("2023-08-15").toISOString(),
         adjustment_expiration_date: new Date("2023-09-15").toISOString(),
         adjustment_name: "FWD Research August '23 Upload Subsidy",
-        adjustment_target: "upload",
+        adjustment_scope: "upload",
         adjustment_operator: "subsidy",
         adjustment_value: 0.525,
       });
 
       await this.pg<PriceAdjustmentDBResult>(priceAdjustment).insert({
+        adjustment_applicability: "apply_to_all",
+        adjustment_id: "fwd_research_september_2023_upload_subsidy",
         adjustment_start_date: new Date("2023-09-15").toISOString(),
         adjustment_expiration_date: new Date("2023-10-15").toISOString(),
         adjustment_name: "FWD Research September '23 Upload Subsidy",
-        adjustment_target: "upload",
+        adjustment_scope: "upload",
         adjustment_operator: "subsidy",
         adjustment_value: 0.45,
       });
 
       await this.pg<PriceAdjustmentDBResult>(priceAdjustment).insert({
+        adjustment_applicability: "apply_to_all",
+        adjustment_id: "fwd_research_october_2023_upload_subsidy",
         adjustment_start_date: new Date("2023-10-15").toISOString(),
         adjustment_expiration_date: new Date("2023-11-15").toISOString(),
         adjustment_name: "FWD Research October '23 Upload Subsidy",
-        adjustment_target: "upload",
+        adjustment_scope: "upload",
         adjustment_operator: "subsidy",
         adjustment_value: 0.375,
       });
 
       await this.pg<PriceAdjustmentDBResult>(priceAdjustment).insert({
+        adjustment_applicability: "apply_to_all",
+        adjustment_id: "fwd_research_november_2023_upload_subsidy",
         adjustment_start_date: new Date("2023-11-15").toISOString(),
         adjustment_expiration_date: new Date("2023-12-15").toISOString(),
         adjustment_name: "FWD Research November '23 Upload Subsidy",
-        adjustment_target: "upload",
+        adjustment_scope: "upload",
         adjustment_operator: "subsidy",
         adjustment_value: 0.3,
       });
 
       await this.pg<PriceAdjustmentDBResult>(priceAdjustment).insert({
+        adjustment_applicability: "apply_to_all",
+        adjustment_id: "fwd_research_december_2023_upload_subsidy",
         adjustment_start_date: new Date("2023-12-15").toISOString(),
         adjustment_expiration_date: new Date("2024-01-15").toISOString(),
         adjustment_name: "FWD Research December '23 Upload Subsidy",
-        adjustment_target: "upload",
+        adjustment_scope: "upload",
         adjustment_operator: "subsidy",
         adjustment_value: 0.225,
       });
 
       await this.pg<PriceAdjustmentDBResult>(priceAdjustment).insert({
+        adjustment_applicability: "apply_to_all",
+        adjustment_id: "fwd_research_january_2023_upload_subsidy",
         adjustment_start_date: new Date("2024-01-15").toISOString(),
         adjustment_expiration_date: new Date("2024-02-15").toISOString(),
         adjustment_name: "FWD Research January '24 Upload Subsidy",
-        adjustment_target: "upload",
+        adjustment_scope: "upload",
         adjustment_operator: "subsidy",
         adjustment_value: 0.15,
       });
 
       await this.pg<PriceAdjustmentDBResult>(priceAdjustment).insert({
+        adjustment_applicability: "apply_to_all",
+        adjustment_id: "fwd_research_february_2023_upload_subsidy",
         adjustment_start_date: new Date("2024-02-15").toISOString(),
         adjustment_expiration_date: new Date("2024-03-15").toISOString(),
         adjustment_name: "FWD Research February '24 Upload Subsidy",
-        adjustment_target: "upload",
+        adjustment_scope: "upload",
         adjustment_operator: "subsidy",
         adjustment_value: 0.075,
       });
@@ -428,16 +444,23 @@ export class Schema {
 
   private async createPriceAdjustmentTable(): Promise<void> {
     return this.pg.schema.createTable(priceAdjustment, (t) => {
-      t.increments(adjustmentId).primary();
+      t.string(adjustmentId).primary();
       t.string(adjustmentName).notNullable();
-      t.string(adjustmentTarget).notNullable();
+      t.string(adjustmentDescription).nullable();
+
+      t.string(adjustmentScope).notNullable();
+      t.string(adjustmentApplicability).notNullable();
+      t.jsonb(adjustmentApplicabilityInfo).nullable();
+      t.jsonb(adjustmentThreshold).nullable();
+
       t.string(adjustmentOperator).notNullable();
-      t.integer(adjustmentPriority).notNullable().defaultTo(1);
+      t.integer(adjustmentPriority).notNullable().defaultTo(5);
       t.decimal(adjustmentValue).notNullable();
+
       t.timestamp(adjustmentStartDate)
         .notNullable()
         .defaultTo(this.defaultTimestamp());
-      t.timestamp(adjustmentExpirationDate).notNullable();
+      t.timestamp(adjustmentExpirationDate).nullable();
     });
   }
 
@@ -460,13 +483,17 @@ const {
 } = tableNames;
 
 const {
+  adjustmentApplicability,
+  adjustmentApplicabilityInfo,
+  adjustmentDescription,
   adjustmentExpirationDate,
   adjustmentId,
   adjustmentName,
   adjustmentOperator,
   adjustmentPriority,
   adjustmentStartDate,
-  adjustmentTarget,
+  adjustmentScope,
+  adjustmentThreshold,
   adjustmentValue,
   adjustments,
   amortizedWincAmount,

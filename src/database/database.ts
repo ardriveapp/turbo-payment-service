@@ -51,5 +51,7 @@ export interface Database {
   checkForExistingPaymentByTopUpQuoteId: (
     topUpQuoteId: TopUpQuoteId
   ) => Promise<boolean>;
-  getCurrentUploadAdjustments: () => Promise<PriceAdjustment[]>;
+  getCurrentUploadAdjustments: (
+    userAddress?: UserAddress
+  ) => Promise<PriceAdjustment[]>;
 }
