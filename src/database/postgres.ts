@@ -1,6 +1,7 @@
 import knexConstructor, { Knex } from "knex";
 import winston from "winston";
 
+import { applicabilityAll, uploadScope } from "../constants";
 import logger from "../logger";
 import { WC, Winston } from "../types";
 import { Database } from "./database";
@@ -529,11 +530,21 @@ export class PostgresDatabase implements Database {
 
   public async getCurrentUploadAdjustments(): Promise<PriceAdjustment[]> {
     const currentDate = new Date();
-    const currentAdjustments = (
-      await this.knexReader<PriceAdjustmentDBResult>(tableNames.priceAdjustment)
-        .where(columnNames.adjustmentStartDate, "<", currentDate)
-        .andWhere(columnNames.adjustmentExpirationDate, ">", currentDate)
-    ).filter((a) => a.adjustment_scope === "upload");
-    return currentAdjustments.map(priceAdjustmentDBMap);
+    const currentAdjustments = await this.knexReader<PriceAdjustmentDBResult>(
+      tableNames.priceAdjustment
+    )
+      .where(columnNames.adjustmentStartDate, "<", currentDate)
+      .andWhere(columnNames.adjustmentExpirationDate, ">", currentDate);
+
+    // TODO: Get user promo info to apply any scoped adjustments like "quantity_limited" or "privileged_users"
+    // await this.getPromoInfo(userAddress);
+
+    const currentAdjustmentsAppliedToAllUploads = currentAdjustments.filter(
+      (a) =>
+        a.adjustment_scope === uploadScope &&
+        a.adjustment_applicability === applicabilityAll
+    );
+
+    return currentAdjustmentsAppliedToAllUploads.map(priceAdjustmentDBMap);
   }
 }

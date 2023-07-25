@@ -25,6 +25,53 @@ export const TEST_PRIVATE_ROUTE_SECRET = "test-secret";
 
 export const turboFeePercentageAsADecimal = 0.23;
 
+/**  e.g FWD Research allows all users to use this adjustment */
+export const applicabilityAll = "all" as const;
+/**  e.g PDS subsidy allows X bytes per month */
+export const applicabilityQuantityLimited = "quantity_limited" as const;
+/**  eg Only allowed to use this adjustment if user has redeemed a code (e.g free GiB from a promotion) */
+export const applicabilityRedeemedCode = "redeemed_code" as const;
+/**  e.g Only allowed to use this adjustment if user has corresponding adjustment id in their promotional info */
+export const applicabilityPrivilegedUsers = "privileged_users" as const;
+/**  e.g Disabled adjustment (e.g event ended or for security reasons) */
+export const applicabilityDisabled = "disabled" as const;
+
+export const applicabilityTypes = [
+  applicabilityAll,
+  applicabilityQuantityLimited,
+  applicabilityRedeemedCode,
+  applicabilityPrivilegedUsers,
+  applicabilityDisabled,
+] as const;
+
+export const uploadScope = "upload" as const;
+export const paymentScope = "payment" as const;
+
+export const scopeTypes = [uploadScope, paymentScope] as const;
+
+export const addOperator = "add" as const;
+export const multiplyOperator = "multiply" as const;
+
+export const operatorTypes = [addOperator, multiplyOperator] as const;
+
+export const bytesAdjustmentUnit = "bytes" as const;
+export const wincAdjustmentUnit = "winc" as const;
+export const paymentAmountAdjustmentUnit = "payment_amount" as const;
+
+export const adjustmentUnitTypes = [
+  bytesAdjustmentUnit,
+  wincAdjustmentUnit,
+  paymentAmountAdjustmentUnit,
+] as const;
+
+export const greaterThanThresholdOperator = "greater_than" as const;
+export const lessThanThresholdOperator = "less_than" as const;
+
+export const thresholdOperatorTypes = [
+  greaterThanThresholdOperator,
+  lessThanThresholdOperator,
+] as const;
+
 // cspell:disable
 export const electronicallySuppliedServicesTaxCode = "txcd_10000000"; //cspell:disable
 

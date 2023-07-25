@@ -1,3 +1,10 @@
+import {
+  adjustmentUnitTypes,
+  applicabilityTypes,
+  operatorTypes,
+  scopeTypes,
+  thresholdOperatorTypes,
+} from "../constants";
 import { PublicArweaveAddress } from "../types";
 import { WC } from "../types/arc";
 
@@ -128,17 +135,12 @@ export type CreateRefundReservationParams = {
   refundedReason: string;
 };
 
-export type AdjustmentScope = "upload" | "payment";
-export type AdjustmentOperator = "add" | "multiply";
-export type ThresholdOperator = "greater_than" | "less_than";
-export type AdjustmentUnit = "bytes" | "winc" | "payment_amount";
+export type AdjustmentScope = (typeof scopeTypes)[number];
+export type AdjustmentOperator = (typeof operatorTypes)[number];
+export type ThresholdOperator = (typeof thresholdOperatorTypes)[number];
+export type AdjustmentUnit = (typeof adjustmentUnitTypes)[number];
 
-export type AdjustmentApplicability =
-  | "apply_to_all" // e.g FWD Research allows all users to use this adjustment
-  | "quantity_limited" // e.g PDS subsidy allows X bytes per month
-  | "redeemed_code" // e.g Only allowed to use this adjustment if user has redeemed a code (e.g free GiB from a promotion)
-  | "privileged_users" // e.g Only allowed to use this adjustment if user has corresponding adjustment id in their promotional info
-  | "disabled"; // e.g Disabled adjustment (e.g event ended or for security reasons)
+export type AdjustmentApplicability = (typeof applicabilityTypes)[number];
 
 export type AdjustmentThreshold = {
   unit: AdjustmentUnit;
