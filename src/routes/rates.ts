@@ -1,3 +1,4 @@
+import BigNumber from "bignumber.js";
 import { Next } from "koa";
 
 import {
@@ -19,23 +20,25 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     const priceWithAdjustments = await pricingService.getWCForBytes(
       oneGiBInBytes
     );
-    const fiat: Record<string, number> = {};
+    const fiat: Record<string, BigNumber.Value> = {};
 
     // Calculate fiat prices for one GiB
     await Promise.all(
       supportedPaymentCurrencyTypes.map(async (currency) => {
+        // Get fiat price for one AR
         const fiatPriceForOneAR = await pricingService.getFiatPriceForOneAR(
           currency
         );
-
-        const fiatPriceForOneGiB =
+        // get the amount of AR required to purchase 1 GiB
+        const winstonPriceForOneGiBInAR =
           priceWithAdjustments.winc.times(fiatPriceForOneAR);
-        const fiatValue =
-          // TODO: `toNumber()` on this is tech debt. We could lose precision in the future if this value is higher than MAX_SAFE_INT
-          (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
-          (1 + turboFeePercentageAsADecimal);
 
-        fiat[currency] = fiatValue;
+        // divide the AR price by the number of winston in AR, and add turbo fee
+        const fiatPriceForOneGiBofArAfterFees = winstonPriceForOneGiBInAR
+          .dividedBy(oneARInWinston)
+          .times(1 + turboFeePercentageAsADecimal);
+
+        fiat[currency] = fiatPriceForOneGiBofArAfterFees.toString();
       })
     );
     const rates = {
