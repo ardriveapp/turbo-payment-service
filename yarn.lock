@@ -3920,6 +3920,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"eslint-plugin-header@npm:^3.1.1":
+  version: 3.1.1
+  resolution: "eslint-plugin-header@npm:3.1.1"
+  peerDependencies:
+    eslint: ">=7.7.0"
+  checksum: 2353e4ba011be81d5c27fbd79929e18dce118d7673a2f717b1ac5a0bceb33e06ec9a7c80a01dddc5804df75e2cc8eb475d268cd1abef5eab5088ede62e5ad246
+  languageName: node
+  linkType: hard
+
 "eslint-scope@npm:^5.1.1":
   version: 5.1.1
   resolution: "eslint-scope@npm:5.1.1"
@@ -6298,6 +6307,7 @@ __metadata:
     chai: ^4.3.6
     dotenv: ^16.0.3
     eslint: ^8.15.0
+    eslint-plugin-header: ^3.1.1
     husky: ^8.0.1
     jsonwebtoken: ^9.0.0
     knex: 2.4.0
