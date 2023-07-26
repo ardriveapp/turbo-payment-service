@@ -1,0 +1,56 @@
+/**
+ * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import KnexDialect from "knex/lib/dialects/postgres";
+
+const baseConfig = {
+  client: KnexDialect,
+  version: "13.8",
+  migrations: {
+    tableName: "knex_migrations",
+    directory: "../../migrations",
+  },
+};
+
+function getDbConnection(host: string) {
+  const dbPort = +(process.env.DB_PORT || 5432);
+  const dbPassword = process.env.DB_PASSWORD || "postgres";
+
+  return `postgres://postgres:${dbPassword}@${host}:${dbPort}/postgres?sslmode=disable`;
+}
+
+export function getWriterConfig() {
+  const dbHost =
+    process.env.DB_WRITER_ENDPOINT || process.env.DB_HOST || "127.0.0.1";
+  return {
+    ...baseConfig,
+    connection: getDbConnection(dbHost),
+  };
+}
+
+export function getReaderConfig() {
+  const dbHost =
+    process.env.DB_READER_ENDPOINT ||
+    process.env.DB_WRITER_ENDPOINT ||
+    process.env.DB_HOST ||
+    "127.0.0.1";
+  return {
+    ...baseConfig,
+    connection: getDbConnection(dbHost),
+  };
+}

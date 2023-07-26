@@ -1,0 +1,451 @@
+openapi: 3.0.0
+info:
+  title: Payment Service
+  version: 0.1.0
+
+servers:
+  - url: /v1
+
+components:
+  schemas:
+    ByteCount:
+      type: integer
+      description: A positive integer representing a byte count of data items
+      pattern: "^[0-9]+$"
+      example: 5242880
+
+    CreditResponse:
+      type: object
+      properties:
+        winc:
+          type: string
+          description: A big number string representing an amount of credits in winc. One credit is equivalent to 1,000,000,000,000 winc
+          example: "332824926"
+        adjustments:
+          "$ref": "#/components/schemas/Adjustment"
+
+    Adjustment:
+      type: array
+      items:
+        type: object
+        properties:
+          name:
+            type: string
+          description:
+            type: string
+          value:
+            type: number
+          operator:
+            type: string
+          adjustmentAmount:
+            type: string
+      example:
+        - name: "Adjustment"
+          description: "Some great subsidy"
+          value: "0.6"
+          operator: "multiply"
+          adjustmentAmount: "-12300"
+
+    CurrencyType:
+      type: string
+      description: Currency type for a given payment amount
+      example: usd
+
+    PaymentAmount:
+      type: integer
+      description: Payment amount in a given currency's smallest unit value. For example, $10 USD is 1000
+      example: 1000
+
+    SignatureHeader:
+      type: string
+      description: The signature value derived from signing the request's data concatenated with the provided nonce using the private key from the provided public key
+
+    NonceHeader:
+      type: string
+      description: The nonce value concatenated with the request's data when deriving the provided the signature
+
+    PublicKeyHeader:
+      type: string
+      description: The "modulus" of the JWK used to create the signature header
+
+    TopUpQuote:
+      type: object
+      description: A copy of the top up quote that was saved to the service's database
+      properties:
+        topUpQuoteId:
+          type: string
+          example: caa8b54a-eb5e-4134-8ae2-a3946a428ec7
+        destinationAddress:
+          type: string
+          example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+        destinationAddressType:
+          type: string
+          example: arweave
+        paymentAmount:
+          type: integer
+          example: 1000
+        currencyType:
+          type: string
+          example: usd
+        winstonCreditAmount:
+          type: string
+          example: 1000000000
+        quoteExpirationDate:
+          type: string
+          example: 2023-05-17T21:46:38.404Z
+        paymentProvider:
+          type: string
+          example: stripe
+
+    ConversionRates:
+      type: object
+      properties:
+        winc:
+          type: string
+          description: A big number representing the amount of credits in winc that 1GB of storage costs based on current market rates. One credit is equivalent to 1,000,000,000,000 winc.
+          example: 332824926
+        fiat:
+          type: object
+          description: The amount of fiat currencies that 1GB of storage costs based on current market rates.
+          example:
+            {
+              aud: 8.1228081675468,
+              brl: 26.0465204865588,
+              cad: 7.1550718332636,
+              eur: 4.9519274126615995,
+              gbp: 4.251862830414,
+              hkd: 42.3539072259708,
+              inr: 443.50120792114916,
+              jpy: 781.2411885860027,
+              sgd: 7.3197929114399995,
+              usd: 5.4049103776452005,
+            }
+        adjustments:
+          "$ref": "#/components/schemas/Adjustment"
+
+    PaymentSession:
+      type: object
+      description: The full payment-intent or checkout-session from a payment provider
+      properties:
+        id:
+          type: string
+          description: The payment provider's given ID for this payment intent # cspell:disable
+          example: cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy # cspell:enable
+        client_secret:
+          type: string
+          description: Available on the payment-intent top up flow, this is the client secret that must be provided in order to confirm the payment intent with a payment method # cspell:disable
+          example: cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl # cspell:enable
+        url:
+          type: string
+          description: Available on a checkout-session top up flow, this is the URL in which to fulfill the quote
+          example: https://checkout.stripe.com/c/pay/cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl
+
+paths:
+  # winc Price for ByteCount of Data Items
+  /price/bytes/{byteCount}:
+    get:
+      summary: Get Amount of Credits in winc for Byte Count
+      description: Returns the current amount of winc it will cost to upload a given byte count worth of data items
+
+      parameters:
+        - name: byteCount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/ByteCount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreditResponse"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Invalid byte count"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Pricing Oracle Unavailable"
+
+  # winc for payment endpoint
+  /price/{type}/{amount}:
+    get:
+      summary: Get winc for Payment Type and Amount
+      description: Returns the current amount of winc this service will quote for a given payment type and amount
+
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/CurrencyType"
+        - name: amount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/PaymentAmount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreditResponse"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Payment Amount is Invalid"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Fiat Oracle Unavailable"
+
+  # Balance endpoint
+  /balance:
+    parameters:
+      - name: x-signature
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/SignatureHeader"
+
+      - name: x-nonce
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/NonceHeader"
+
+      - name: x-public-key
+        in: header
+        required: true
+        schema:
+          "$ref": "#/components/schemas/PublicKeyHeader"
+
+    get:
+      summary: Get Current Balance of winc
+      description: Use a signed request or a previously obtained JWT to get the the signing wallet's current service balance in winc
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/CreditResponse"
+
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Invalid signature or missing required headers"
+
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "User Not Found"
+
+        "503":
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Cloud Database Unavailable"
+
+  /top-up/{method}/{address}/{currency}/{amount}:
+    get:
+      summary: Get Top Up Quote for Credits
+      description: Get a top up quote and payment session for a given method (payment-intent or checkout-session), destination address, currency type, and payment amount
+
+      parameters:
+        - name: method
+          in: path
+          required: true
+          schema:
+            type: string
+            example: checkout-session
+
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            description: Destination wallet address
+
+        - name: currency
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/CurrencyType"
+
+        - name: amount
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/PaymentAmount"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  paymentSession:
+                    allOf:
+                      - "$ref": "#/components/schemas/PaymentSession"
+                  topUpQuote:
+                    allOf:
+                      - "$ref": "#/components/schemas/TopUpQuote"
+
+        "403":
+          description: Forbidden
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Destination address is not a valid Arweave native address!"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Payment Amount is Invalid!"
+
+        "502":
+          description: Bad Gateway
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Fiat Oracle Unavailable"
+
+  /currencies:
+    get:
+      summary: Get Supported Currencies
+      description: Returns the current list of currency types supported by this service
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  supportedCurrencies:
+                    type: array
+                    example: ["usd", "jpy"]
+                    items:
+                      type: string
+                  limits:
+                    type: object
+                    example:
+                      {
+                        usd:
+                          {
+                            minimumPaymentAmount: 1000,
+                            maximumPaymentAmount: 1000000,
+                            suggestedPaymentAmounts: [2500, 5000, 10000],
+                            zeroDecimalCurrency: false,
+                          },
+                        jpy:
+                          {
+                            minimumPaymentAmount: 1500,
+                            maximumPaymentAmount: 1500000,
+                            suggestedPaymentAmounts: [3500, 6500, 15000],
+                            zeroDecimalCurrency: true,
+                          },
+                      }
+
+  /countries:
+    get:
+      summary: Get Supported Countries
+      description: Returns the current list of currency types supported by this service
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                example: ["United Kingdom", "United States"]
+                items:
+                  type: string
+
+  /rates:
+    get:
+      summary: Get conversion rates for 1GB of storage
+      description: Returns the supported fiat currency conversion rates for 1GB of storage based on current market prices.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ConversionRates"
+
+  /rates/{currency}:
+    get:
+      summary: Get current conversion rate for 1 AR for a given currency
+      description: Returns the supported fiat currency conversion rate for 1AR based on current market prices.
+
+      parameters:
+        - name: currency
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/CurrencyType"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currency:
+                    type: string
+                    example: usd
+                  rate:
+                    type: number
+                    example: 5.61
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Invalid currency"
