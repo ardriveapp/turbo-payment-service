@@ -10,8 +10,7 @@ import { KoaContext } from "../server";
 import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
 
 export async function ratesHandler(ctx: KoaContext, next: Next) {
-  const logger = ctx.state.logger;
-  const { pricingService } = ctx.state;
+  const { pricingService, logger } = ctx.state;
 
   try {
     // TODO: applying adjustments on the generic /rates endpoint might not be the best idea, we may want to just show the raw rates for 1 GiB unadjusted, then return
@@ -43,14 +42,51 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
       fiat,
       adjustments: priceWithAdjustments.adjustments,
     };
-    ctx.response.status = 200;
+    ctx.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = rates;
     logger.info("Successfully calculated rates.", { rates });
   } catch (error) {
-    ctx.response.status = 502;
+    ctx.status = 502;
     ctx.body = "Failed to calculate rates.";
     logger.error("Failed to calculate rates.", error);
+  }
+  return next();
+}
+
+export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
+  const { logger, pricingService } = ctx.state;
+  const { currency } = ctx.params;
+
+  logger.info("Fetching raw conversion rate for 1 AR", {
+    currency,
+  });
+  if (!supportedPaymentCurrencyTypes.includes(currency)) {
+    ctx.status = 404;
+    ctx.body = "Invalid currency.";
+    return next();
+  }
+
+  try {
+    const fiatPriceForOneAR = await pricingService.getFiatPriceForOneAR(
+      currency
+    );
+    logger.info("Successfully fetched raw fiat conversion rate for 1 AR", {
+      currency,
+      rate: fiatPriceForOneAR,
+    });
+    ctx.status = 200;
+    ctx.body = {
+      currency,
+      rate: fiatPriceForOneAR,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    ctx.status = 502;
+    ctx.body = "Failed to fetch fiat conversion for 1 AR.";
+    logger.error("Failed to fetch fiat conversion for 1 AR.", {
+      error: message,
+    });
   }
   return next();
 }
