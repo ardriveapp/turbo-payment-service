@@ -415,3 +415,37 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ConversionRates"
+
+  /rates/{currency}:
+    get:
+      summary: Get current conversion rate for 1 AR for a given currency
+      description: Returns the supported fiat currency conversion rate for 1AR based on current market prices.
+
+      parameters:
+        - name: currency
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/CurrencyType"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  currency:
+                    type: string
+                    example: usd
+                  rate:
+                    type: number
+                    example: 5.61
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Invalid currency"

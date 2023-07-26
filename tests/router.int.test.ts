@@ -166,6 +166,35 @@ describe("Router tests", () => {
     });
   });
 
+  it("GET /rates/:currency returns 404 for non supported currency", async () => {
+    const { status, statusText, data } = await axios.get(`/v1/rates/abc`);
+    expect(status).to.equal(404);
+    expect(statusText).to.equal("Not Found");
+    expect(data).to.equal("Invalid currency.");
+  });
+
+  it("GET /rates/:currency returns 502 if unable to fetch prices", async () => {
+    stub(pricingService, "getFiatPriceForOneAR").throws();
+    const { status, statusText } = await axios.get(`/v1/rates/usd`);
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+  });
+
+  it("GET /rates/:currency returns the correct response for supported currency", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { data, status, statusText } = await axios.get(`/v1/rates/usd`);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    expect(data).to.deep.equal({
+      currency: "usd",
+      rate: expectedArPrices.arweave.usd,
+    });
+  });
+
   it("GET /price/:currency/:value", async () => {
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave

@@ -73,17 +73,20 @@ export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
     );
     logger.info("Successfully fetched raw fiat conversion rate for 1 AR", {
       currency,
-      rate: fiatPriceForOneAR.toString(),
+      rate: fiatPriceForOneAR,
     });
     ctx.status = 200;
     ctx.body = {
       currency,
-      rate: fiatPriceForOneAR.toString(),
+      rate: fiatPriceForOneAR,
     };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     ctx.status = 502;
-    ctx.body = "Failed to calculate raw fiat conversion for 1 AR.";
-    logger.error("Failed to calculate raw fiat conversion for 1 AR.", error);
+    ctx.body = "Failed to fetch fiat conversion for 1 AR.";
+    logger.error("Failed to fetch fiat conversion for 1 AR.", {
+      error: message,
+    });
   }
   return next();
 }
