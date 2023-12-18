@@ -14,6 +14,13 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import validator from "validator";
+
+import { maxGiftMessageLength } from "../constants";
+import {
+  DestinationAddressType,
+  destinationAddressTypes,
+} from "../database/dbTypes";
 import { MetricRegistry } from "../metricRegistry";
 import { KoaContext } from "../server";
 import { ByteCount, Winston } from "../types";
@@ -89,4 +96,70 @@ export function validateWinstonCreditAmount(
     });
     return false;
   }
+}
+
+export function validateSingularQueryParameter(
+  ctx: KoaContext,
+  queryParameter: string | string[] | undefined
+): string | false {
+  if (
+    !queryParameter ||
+    (Array.isArray(queryParameter) && queryParameter.length > 1)
+  ) {
+    ctx.response.status = 400;
+    ctx.body = "Invalid or missing parameters";
+    ctx.state.logger.error("Invalid parameters provided for route!", {
+      query: ctx.query,
+      params: ctx.params,
+    });
+    return false;
+  }
+
+  return Array.isArray(queryParameter) ? queryParameter[0] : queryParameter;
+}
+
+function isDestinationAddressType(
+  destinationAddressType: string
+): destinationAddressType is DestinationAddressType {
+  return destinationAddressTypes.includes(
+    destinationAddressType as DestinationAddressType
+  );
+}
+
+export function validateDestinationAddressType(
+  ctx: KoaContext,
+  destinationAddressType: string | string[]
+): DestinationAddressType | false {
+  const destType = validateSingularQueryParameter(ctx, destinationAddressType);
+
+  if (!destType || !isDestinationAddressType(destType)) {
+    ctx.response.status = 400;
+    ctx.body = `Invalid destination address type: ${destType}`;
+    ctx.state.logger.error("Invalid destination address type!", {
+      ...ctx.params,
+      ...ctx.query,
+    });
+    return false;
+  }
+
+  return destType;
+}
+
+export function validateGiftMessage(
+  ctx: KoaContext,
+  giftMessage: string | string[]
+): string | false {
+  const message = validateSingularQueryParameter(ctx, giftMessage);
+
+  if (!message || message.length > maxGiftMessageLength) {
+    ctx.response.status = 400;
+    ctx.body = "Invalid gift message!";
+    ctx.state.logger.error("Invalid gift message!", {
+      query: ctx.query,
+      params: ctx.params,
+    });
+    return false;
+  }
+
+  return validator.escape(message);
 }

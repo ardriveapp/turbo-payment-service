@@ -30,6 +30,7 @@ const jwtSecretName = "jwt-secret";
 const dbPasswordSecretName = "payment-db-password";
 const wincSubsidizedPercentageParamName =
   "/payment-service/subsidized-winc-percentage";
+const mandrillApiKeySecretName = "mandrill-api-key";
 
 export async function loadSecretsToEnv() {
   try {
@@ -83,6 +84,9 @@ export async function loadSecretsToEnv() {
   );
   process.env.JWT_SECRET ??= await getSecretValueCommand(jwtSecretName);
   process.env.DB_PASSWORD ??= await getSecretValueCommand(dbPasswordSecretName);
+  process.env.MANDRILL_API_KEY ??= await getSecretValueCommand(
+    mandrillApiKeySecretName
+  );
 
   process.env.SUBSIDIZED_WINC_PERCENTAGE ??= await getSSMParameterCommand(
     wincSubsidizedPercentageParamName

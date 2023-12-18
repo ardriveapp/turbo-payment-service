@@ -31,6 +31,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
   }
 
   const stripe = ctx.state.stripe;
+  const emailProvider = ctx.state.emailProvider;
 
   // get the webhook signature and raw body for verification
   const sig = ctx.request.headers["stripe-signature"] as string;
@@ -76,7 +77,8 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
         handlePaymentSuccessEvent(
           data.object as Stripe.PaymentIntent,
           ctx.state.paymentDatabase,
-          stripe
+          stripe,
+          emailProvider
         );
       } catch (error) {
         logger.error(

@@ -18,13 +18,16 @@ import { randomUUID } from "crypto";
 import { Stripe } from "stripe";
 
 import { Database } from "../../../database/database";
+import { EmailProvider } from "../../../emailProvider";
 import logger from "../../../logger";
 import { MetricRegistry } from "../../../metricRegistry";
+import { triggerEmail } from "../../../triggerEmail";
 
 export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
   paymentDatabase: Database,
-  stripe: Stripe
+  stripe: Stripe,
+  emailProvider?: EmailProvider
 ) {
   logger.info("💰 Payment Success Event Triggered", pi.metadata);
 
@@ -44,17 +47,22 @@ export async function handlePaymentSuccessEvent(
 
     logger.info("Creating payment receipt...", loggerObject);
 
-    await paymentDatabase.createPaymentReceipt({
+    const maybeUnredeemedGift = await paymentDatabase.createPaymentReceipt({
       paymentReceiptId,
       paymentAmount: pi.amount,
       currencyType: pi.currency,
       topUpQuoteId,
+      senderEmail: pi.receipt_email ?? undefined,
     });
 
     logger.info(`💸 Payment Receipt created!`, loggerObject);
 
     MetricRegistry.paymentSuccessCounter.inc();
     MetricRegistry.topUpsCounter.inc(Number(winstonCreditAmount));
+
+    if (maybeUnredeemedGift) {
+      await triggerEmail(maybeUnredeemedGift, emailProvider);
+    }
   } catch (error) {
     logger.error("❌ Payment receipt creation has failed!", loggerObject);
     logger.error(error);

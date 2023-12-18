@@ -31,6 +31,9 @@ export const tableNames = {
   paymentAdjustmentCatalog: "payment_adjustment_catalog",
   singleUseCodePaymentAdjustmentCatalog:
     "single_use_code_payment_adjustment_catalog",
+
+  unredeemedGift: "unredeemed_gift",
+  redeemedGift: "redeemed_gift",
 } as const;
 
 export const columnNames = {
@@ -52,6 +55,7 @@ export const columnNames = {
   quoteExpirationDate: "quote_expiration_date",
   quoteCreationDate: "quote_creation_date",
   paymentProvider: "payment_provider",
+  giftMessage: "gift_message", // Optional gift message, ignored in non-gift top-ups for now
 
   // Failed top up quote
   failedReason: "failed_reason",
@@ -105,4 +109,14 @@ export const columnNames = {
 
   operator: "operator",
   operatorMagnitude: "operator_magnitude",
+
+  // Unredeemed Gift
+  giftedWincAmount: "gifted_winc_amount",
+  recipientEmail: "recipient_email",
+  senderEmail: "sender_email",
+  creationDate: "creation_date",
+  expirationDate: "expiration_date",
+
+  // Redeemed Gift
+  redemptionDate: "redemption_date",
 } as const;

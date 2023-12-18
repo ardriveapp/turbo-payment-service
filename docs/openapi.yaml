@@ -544,3 +544,68 @@ paths:
               schema:
                 type: string
                 default: "Invalid currency"
+
+  /redeem:
+    get:
+      summary: Redeem credits gifted via email
+      description: Redeem credits gifted via email by providing the destination wallet address for the credits, the redemption ID, and recipient email address
+
+      parameters:
+        - name: destinationAddress
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Destination wallet address
+
+        - name: id
+          in: query
+          required: true
+          schema:
+            type: string
+            description: ID for the redemption
+
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Recipient email address for the redemption
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Payment receipt redeemed for 1000 winc!
+                  userBalance:
+                    type: string
+                    example: 1000
+                  userAddress:
+                    type: string
+                    example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+                  userCreationDate:
+                    type: string
+                    example: 2023-05-17T21:46:38.404Z
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Failure to redeem payment receipt!"
+
+        "503":
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Error while redeeming payment receipt. Unable to reach Database!"

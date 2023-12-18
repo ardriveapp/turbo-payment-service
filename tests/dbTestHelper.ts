@@ -31,8 +31,10 @@ import { PostgresDatabase } from "../src/database/postgres";
 export const stubArweaveUserAddress: UserAddress =
   "1234567890123456789012345678901231234567890";
 
-const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60).toISOString();
-const oneHourFromNow = new Date(Date.now() + 1000 * 60 * 60).toISOString();
+export const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60).toISOString();
+export const oneHourFromNow = new Date(
+  Date.now() + 1000 * 60 * 60
+).toISOString();
 
 type StubTopUpQuoteParams = Partial<TopUpQuoteDBInsert>;
 
@@ -46,6 +48,7 @@ function stubTopUpQuoteInsert({
   winston_credit_amount = "1337",
   quote_expiration_date = oneHourFromNow,
   payment_provider = "stripe",
+  gift_message,
 }: StubTopUpQuoteParams): TopUpQuoteDBInsert {
   return {
     top_up_quote_id,
@@ -57,6 +60,7 @@ function stubTopUpQuoteInsert({
     winston_credit_amount,
     quote_expiration_date,
     payment_provider,
+    gift_message,
   };
 }
 

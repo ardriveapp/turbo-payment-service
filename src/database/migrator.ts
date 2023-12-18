@@ -154,3 +154,80 @@ export class MaxDiscountMigrator extends Migrator {
     });
   }
 }
+
+export class GiftByEmailMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  private topUpQuoteTableNames = [
+    tableNames.topUpQuote,
+    tableNames.paymentReceipt,
+    tableNames.failedTopUpQuote,
+    tableNames.chargebackReceipt,
+  ];
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to gift by email",
+      operation: async () => {
+        await Promise.all(
+          this.topUpQuoteTableNames.map((table) =>
+            this.knex.schema.alterTable(table, (table) => {
+              table.string(columnNames.giftMessage).nullable();
+            })
+          )
+        );
+
+        await this.knex.schema.createTable(
+          tableNames.unredeemedGift,
+          (table) => {
+            table.string(columnNames.paymentReceiptId).primary();
+            table.string(columnNames.recipientEmail).notNullable();
+            table
+              .timestamp(columnNames.creationDate)
+              .notNullable()
+              .defaultTo(this.knex.fn.now());
+            table
+              .timestamp(columnNames.expirationDate)
+              .notNullable()
+              .defaultTo(this.knex.raw("now() + interval '1 year'"));
+            table.string(columnNames.giftedWincAmount).notNullable();
+            table.string(columnNames.giftMessage).nullable();
+            table.string(columnNames.senderEmail).nullable();
+          }
+        );
+
+        await this.knex.schema.createTableLike(
+          tableNames.redeemedGift,
+          tableNames.unredeemedGift,
+          (table) => {
+            table
+              .timestamp(columnNames.redemptionDate)
+              .notNullable()
+              .defaultTo(this.knex.fn.now());
+            table.string(columnNames.destinationAddress).notNullable();
+          }
+        );
+      },
+    });
+  }
+
+  public rollback() {
+    return this.operate({
+      name: "rollback from gift by email",
+      operation: async () => {
+        await Promise.all(
+          this.topUpQuoteTableNames.map((table) =>
+            this.knex.schema.alterTable(table, (table) => {
+              table.dropColumn(columnNames.giftMessage);
+            })
+          )
+        );
+
+        await this.knex.schema.dropTable(tableNames.unredeemedGift);
+        await this.knex.schema.dropTable(tableNames.redeemedGift);
+      },
+    });
+  }
+}

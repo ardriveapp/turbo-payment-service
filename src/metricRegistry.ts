@@ -67,6 +67,11 @@ export class MetricRegistry {
     help: "Count of unauthorized activity on protected routes",
   });
 
+  public static giftEmailTriggerFailure = new promClient.Counter({
+    name: "gift_email_trigger_failure",
+    help: "Count of gift email trigger failures for unredeemed gifts",
+  });
+
   private constructor() {
     this.registry = new promClient.Registry();
 
@@ -83,6 +88,7 @@ export class MetricRegistry {
     this.registry.registerMetric(
       MetricRegistry.unauthorizedProtectedRouteActivity
     );
+    this.registry.registerMetric(MetricRegistry.giftEmailTriggerFailure);
   }
 
   public static getInstance(): MetricRegistry {

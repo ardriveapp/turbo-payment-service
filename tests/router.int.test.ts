@@ -30,9 +30,14 @@ import {
 import { tableNames } from "../src/database/dbConstants";
 import {
   ChargebackReceiptDBResult,
+  PaymentReceiptDBInsert,
   PaymentReceiptDBResult,
+  RedeemedGiftDBResult,
   SingleUseCodePaymentCatalogDBResult,
   TopUpQuote,
+  TopUpQuoteDBResult,
+  UnredeemedGiftDBInsert,
+  UnredeemedGiftDBResult,
   UserDBResult,
 } from "../src/database/dbTypes.js";
 import logger from "../src/logger";
@@ -47,6 +52,7 @@ import { supportedPaymentCurrencyTypes } from "../src/types/supportedCurrencies"
 import { Winston } from "../src/types/winston";
 import { arweaveRSAModulusToAddress } from "../src/utils/jwkUtils";
 import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
+import { oneHourAgo, oneHourFromNow } from "./dbTestHelper";
 import {
   chargeDisputeStub,
   checkoutSessionStub,
@@ -61,9 +67,9 @@ import {
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import {
   axios,
-  coinGeckoAxios,
   coinGeckoOracle,
   dbTestHelper,
+  emailProvider,
   localTestUrl,
   paymentDatabase,
   pricingService,
@@ -83,8 +89,24 @@ describe("Router tests", () => {
   const routerTestPromoCode = "routerTestPromoCode";
   const routerTestPromoCodeCatalogId = "routerTestPromoCodeCatalogId";
 
+  beforeEach(() => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+  });
+
   before(async () => {
-    server = await createServer({ pricingService, paymentDatabase, stripe });
+    await dbTestHelper.insertStubUser({
+      user_address: testAddress,
+      winston_credit_balance: "5000000",
+    });
+
+    server = await createServer({
+      pricingService,
+      paymentDatabase,
+      stripe,
+      emailProvider,
+    });
     await paymentDatabase["writer"]<SingleUseCodePaymentCatalogDBResult>(
       tableNames.singleUseCodePaymentAdjustmentCatalog
     ).insert({
@@ -192,14 +214,7 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value returns 502 if fiat pricing oracle response is unexpected", async () => {
-    stub(coinGeckoAxios, "get").resolves({
-      data: {
-        arweave: {
-          weird: "types",
-          from: ["c", 0, "in", "ge", "ck", 0],
-        },
-      },
-    });
+    stub(pricingService, "getWCForPayment").throws();
     const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
 
     expect(status).to.equal(502);
@@ -208,7 +223,8 @@ describe("Router tests", () => {
   });
 
   it("GET /rates returns 502 if unable to fetch prices", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").throws();
+    stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
+
     const { status, statusText } = await axios.get(`/v1/rates`);
 
     expect(status).to.equal(502);
@@ -221,9 +237,6 @@ describe("Router tests", () => {
     );
     const clock = useFakeTimers(fakeDateBeforeSubsidyAndInfraFee.getTime());
 
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { data, status, statusText } = await axios.get(`/v1/rates`);
 
     expect(status).to.equal(200);
@@ -256,9 +269,6 @@ describe("Router tests", () => {
     );
     const clock = useFakeTimers(fakeDateDuringTwentyPctInfraFee.getTime());
 
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { data, status, statusText } = await axios.get(`/v1/rates`);
 
     expect(status).to.equal(200);
@@ -291,9 +301,6 @@ describe("Router tests", () => {
       fakeDateDuringTwentyThreeFourPctInfraFeeAndSepOctSubsidyEvent.getTime()
     );
 
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { data, status, statusText } = await axios.get(`/v1/rates`);
 
     expect(status).to.equal(200);
@@ -334,9 +341,6 @@ describe("Router tests", () => {
   });
 
   it("GET /rates/:currency returns the correct response for supported currency", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { data, status, statusText } = await axios.get(`/v1/rates/usd`);
 
     expect(status).to.equal(200);
@@ -349,9 +353,6 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { status, statusText, data } = await axios.get(`/v1/price/USD/100`);
 
     expect(status).to.equal(200);
@@ -383,9 +384,6 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value with a 20% off promoCode in query params returns expected result", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { status, statusText, data } = await axiosPackage
       .create({
         baseURL: localTestUrl,
@@ -434,10 +432,6 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value with a 20% off promoCode and destinationAddress in query params  returns expected result", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
-
     const destinationAddress = "43CharactersABCDEFGHIJKLMNOPQRSTUVWXYZ12345";
     const { status, statusText, data } = await axiosPackage
       .create({
@@ -487,9 +481,6 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value with duplicate 20% off promoCodes in query params returns expected result", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { status, statusText, data } = await axiosPackage
       .create({
         baseURL: localTestUrl,
@@ -541,9 +532,6 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value with INVALID promoCode in query params returns a 400", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { status, statusText, data } = await axiosPackage
       .create({
         baseURL: localTestUrl,
@@ -559,9 +547,6 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value with INELIGIBLE promoCode in query params returns a 400", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const jwk = await Arweave.crypto.generateJWK();
     const userAddress = arweaveRSAModulusToAddress(jwk.n);
 
@@ -594,9 +579,6 @@ describe("Router tests", () => {
   });
 
   it("GET /price/:currency/:value with promoCode in query params but an unauthenticated request and lacking a destinationAddress returns a 400", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { status, statusText, data } = await axiosPackage
       .create({
         baseURL: localTestUrl,
@@ -638,13 +620,6 @@ describe("Router tests", () => {
     expect(status).to.equal(502);
     expect(statusText).to.equal("Bad Gateway");
     expect(data).to.equal("Fiat Oracle Unavailable");
-  });
-
-  before(async () => {
-    await dbTestHelper.insertStubUser({
-      user_address: testAddress,
-      winston_credit_balance: "5000000",
-    });
   });
 
   it("GET /balance returns 200 for correct signature", async () => {
@@ -699,6 +674,111 @@ describe("Router tests", () => {
     expect(data).to.equal("Cloud Database Unavailable");
   });
 
+  it("GET /top-up/checkout-session with an email in query params returns the correct response", async () => {
+    const amount = 1000;
+    const email = "test@example.inc";
+    const checkoutStub = stub(stripe.checkout.sessions, "create").resolves(
+      stripeResponseStub({
+        ...checkoutSessionSuccessStub,
+        amount_total: amount,
+      })
+    );
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/top-up/checkout-session/${email}/usd/${amount}?destinationAddressType=email&giftMessage=hello%20world`
+    );
+
+    expect(data).to.have.property("topUpQuote");
+    expect(data).to.have.property("paymentSession");
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    const { paymentSession, topUpQuote, adjustments, fees } = data;
+    const { object, payment_method_types, amount_total, url } = paymentSession;
+
+    expect(object).to.equal("checkout.session");
+    expect(payment_method_types).to.deep.equal(["card"]);
+    expect(amount_total).to.equal(amount);
+    expect(url).to.be.a.string;
+
+    const {
+      quotedPaymentAmount,
+      paymentAmount,
+      topUpQuoteId,
+      destinationAddress,
+      destinationAddressType,
+      quoteExpirationDate,
+    } = topUpQuote;
+
+    expect(quotedPaymentAmount).to.equal(1000);
+    expect(paymentAmount).to.equal(1000);
+    expect(topUpQuoteId).to.be.a.string;
+    expect(destinationAddress).to.equal(email);
+    expect(destinationAddressType).to.equal("email");
+    expect(quoteExpirationDate).to.be.a.string;
+
+    expect(fees).to.deep.equal([
+      {
+        adjustmentAmount: -234,
+        currencyType: "usd",
+        description:
+          "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+        name: "Turbo Infrastructure Fee",
+        operator: "multiply",
+        operatorMagnitude: 0.766,
+      },
+    ]);
+    expect(adjustments).to.deep.equal([]);
+
+    const dbResult = await paymentDatabase["writer"]<TopUpQuoteDBResult>(
+      tableNames.topUpQuote
+    )
+      .where({ top_up_quote_id: topUpQuoteId })
+      .first();
+
+    expect(dbResult).to.not.be.undefined;
+    const {
+      currency_type,
+      top_up_quote_id,
+      payment_provider,
+      quoted_payment_amount,
+      payment_amount,
+      destination_address,
+      destination_address_type,
+      winston_credit_amount,
+      quote_expiration_date,
+      quote_creation_date,
+      gift_message,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    } = dbResult!;
+
+    expect(currency_type).to.equal("usd");
+    expect(top_up_quote_id).to.be.a.string;
+    expect(payment_provider).to.equal("stripe");
+    expect(quoted_payment_amount).to.equal("1000");
+    expect(payment_amount).to.equal("1000");
+    expect(destination_address).to.equal(email);
+    expect(destination_address_type).to.equal("email");
+    expect(winston_credit_amount).to.equal("1091168091168");
+    expect(new Date(quote_expiration_date).toISOString()).to.equal(
+      quoteExpirationDate.toString()
+    );
+    expect(quote_creation_date).to.be.a.string;
+    expect(gift_message).to.equal("hello world");
+
+    checkoutStub.restore();
+  });
+
+  it("GET /top-up/checkout-session with an invalid destination address type returns 400 response", async () => {
+    const { status, statusText, data } = await axios.get(
+      `/v1/top-up/checkout-session/hello-test/usd/4231?destinationAddressType=notReal`
+    );
+
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal("Invalid destination address type: notReal");
+  });
+
   it("GET /top-up/checkout-session returns 200 and correct response for correct signature", async () => {
     const amount = 1000;
     const checkoutStub = stub(stripe.checkout.sessions, "create").resolves(
@@ -706,9 +786,6 @@ describe("Router tests", () => {
         ...checkoutSessionSuccessStub,
         amount_total: amount,
       })
-    );
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
     );
 
     const { status, statusText, data } = await axios.get(
@@ -739,10 +816,6 @@ describe("Router tests", () => {
           status: "requires_payment_method",
         }),
       })
-    );
-
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
     );
 
     const { status, statusText, data } = await axios.get(
@@ -809,10 +882,6 @@ describe("Router tests", () => {
           status: "requires_payment_method",
         }),
       })
-    );
-
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
     );
 
     const { status, statusText, data } = await axiosPackage
@@ -889,9 +958,6 @@ describe("Router tests", () => {
   });
 
   it("GET /top-up with INVALID promoCode in query params returns a 400", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const { status, statusText, data } = await axiosPackage
       .create({
         baseURL: localTestUrl,
@@ -910,9 +976,6 @@ describe("Router tests", () => {
   });
 
   it("GET /top-up with INELIGIBLE promoCode in query params returns a 400", async () => {
-    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-      expectedArPrices.arweave
-    );
     const jwk = await Arweave.crypto.generateJWK();
     const userAddress = arweaveRSAModulusToAddress(jwk.n);
 
@@ -956,6 +1019,15 @@ describe("Router tests", () => {
       "Destination address is not a valid Arweave native address!"
     );
     expect(statusText).to.equal("Forbidden");
+  });
+
+  it("GET /top-up returns 400 for bad email address", async () => {
+    const { status, statusText, data } = await axios.get(
+      `/v1/top-up/checkout-session/THISisNotEmail/usd/100?destinationAddressType=email`
+    );
+    expect(status).to.equal(400);
+    expect(data).to.equal("Destination address is not a valid email!");
+    expect(statusText).to.equal("Bad Request");
   });
 
   it("GET /top-up returns 400 for invalid payment method", async () => {
@@ -1019,9 +1091,6 @@ describe("Router tests", () => {
         stripe.checkout.sessions,
         "create"
       ).resolves(stripeResponseStub(checkoutSessionStub({})));
-      stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-        expectedArPrices.arweave
-      );
 
       // Get maximum price for each supported currency concurrently
       const maxPriceResponses = await Promise.all(
@@ -1050,10 +1119,6 @@ describe("Router tests", () => {
     });
 
     it("GET /top-up returns 400 for a payment amount too large in each supported currency", async () => {
-      stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-        expectedArPrices.arweave
-      );
-
       for (const currencyType of supportedPaymentCurrencyTypes) {
         const maxAmountAllowed =
           currencyLimitations[currencyType].maximumPaymentAmount;
@@ -1075,10 +1140,6 @@ describe("Router tests", () => {
     });
 
     it("GET /top-up returns 400 for a payment amount too small in each supported currency", async () => {
-      stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
-        expectedArPrices.arweave
-      );
-
       for (const currencyType of supportedPaymentCurrencyTypes) {
         const minAmountAllowed =
           currencyLimitations[currencyType].minimumPaymentAmount;
@@ -1557,6 +1618,113 @@ describe("Router tests", () => {
     expect(destination_address_type).to.equal("arweave");
     expect(payment_provider).to.equal("stripe");
 
+    const user = await paymentDatabase["reader"]<UserDBResult>(
+      tableNames.user
+    ).where({
+      user_address: paymentReceivedUserAddress,
+    });
+    expect(user[0].winston_credit_balance).to.equal("500");
+
+    webhookStub.restore();
+  });
+
+  it("POST /stripe-webhook returns 200 for valid stripe payment success event resulting in an unredeemed gift and the database contains the correct payment receipt and unredeemed gift entities", async () => {
+    stub(emailProvider, "sendEmail").resolves();
+
+    const paymentReceivedEventId = "A Unique ID!!!";
+    const testEmailAddress = "test@example.inc";
+    const paymentSuccessTopUpQuoteId = "0x0987654321091";
+
+    await dbTestHelper.insertStubTopUpQuote({
+      top_up_quote_id: paymentSuccessTopUpQuoteId,
+      winston_credit_amount: "500",
+      payment_amount: "100",
+      quoted_payment_amount: "100",
+      destination_address: testEmailAddress,
+      destination_address_type: "email",
+      gift_message: "A gift message",
+    });
+
+    const successStub = paymentIntentStub({
+      id: paymentReceivedEventId,
+      metadata: {
+        topUpQuoteId: paymentSuccessTopUpQuoteId,
+      },
+      amount: 100,
+      currency: "usd",
+    });
+
+    const stubEvent = stripeStubEvent({
+      type: "payment_intent.succeeded",
+      eventObject: successStub,
+    });
+
+    const webhookStub = stub(stripe.webhooks, "constructEvent").returns(
+      stubEvent
+    );
+
+    const { status, statusText, data } = await axios.post(`/v1/stripe-webhook`);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+    expect(data).to.equal("OK");
+
+    // wait a few seconds for the database to update since we return the response right away
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const paymentReceipt = await paymentDatabase[
+      "writer"
+    ]<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
+      top_up_quote_id: paymentSuccessTopUpQuoteId,
+    });
+    expect(paymentReceipt.length).to.equal(1);
+
+    const {
+      payment_amount,
+      quoted_payment_amount,
+      currency_type,
+      destination_address,
+      destination_address_type,
+      payment_provider,
+    } = paymentReceipt[0];
+
+    expect(payment_amount).to.equal("100");
+    expect(quoted_payment_amount).to.equal("100");
+    expect(currency_type).to.equal("usd");
+    expect(destination_address).to.equal(testEmailAddress);
+    expect(destination_address_type).to.equal("email");
+    expect(payment_provider).to.equal("stripe");
+
+    const gift = await paymentDatabase["writer"]<UnredeemedGiftDBResult>(
+      tableNames.unredeemedGift
+    ).where({
+      payment_receipt_id: paymentReceipt[0].payment_receipt_id,
+    });
+    expect(gift.length).to.equal(1);
+
+    const {
+      creation_date,
+      expiration_date,
+      gifted_winc_amount,
+      payment_receipt_id,
+      recipient_email,
+      gift_message,
+    } = gift[0];
+
+    expect(creation_date).to.exist;
+    // expect expiration to be gift creation plus 1 year
+    expect(new Date(expiration_date).toISOString()).to.equal(
+      new Date(
+        new Date(creation_date).setFullYear(
+          new Date(creation_date).getFullYear() + 1
+        )
+      ).toISOString()
+    );
+    expect(gifted_winc_amount).to.equal("500");
+    expect(payment_receipt_id).to.equal(paymentReceipt[0].payment_receipt_id);
+    expect(recipient_email).to.equal(testEmailAddress);
+    expect(gift_message).to.equal("A gift message");
+
     webhookStub.restore();
   });
 
@@ -1568,6 +1736,210 @@ describe("Router tests", () => {
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
     expect(data).to.equal("Webhook Error!");
+  });
+
+  it("GET /rates returns 502 if unable to fetch prices", async () => {
+    stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
+
+    const { status, statusText } = await axios.get(`/v1/rates`);
+
+    expect(status).to.equal(502);
+    expect(statusText).to.equal("Bad Gateway");
+  });
+
+  it("GET /redeem returns 200 for valid params", async () => {
+    const destinationAddress = "validArweaveAddressNeedsFortyThreeCharacter";
+    const paymentReceiptId = "unique paymentReceiptId";
+    const emailAddress = "test@example.inc";
+    const giftMessage = "hello the world!";
+
+    const paymentReceiptDBInsert: PaymentReceiptDBInsert = {
+      top_up_quote_id: "required top up id",
+      payment_receipt_id: paymentReceiptId,
+      payment_amount: "100",
+      quoted_payment_amount: "100",
+      currency_type: "email",
+      destination_address: emailAddress,
+      destination_address_type: "arweave",
+      payment_provider: "stripe",
+      quote_creation_date: oneHourAgo,
+      quote_expiration_date: oneHourFromNow,
+      winston_credit_amount: "100",
+      gift_message: giftMessage,
+    };
+    await paymentDatabase["writer"]<PaymentReceiptDBResult>(
+      tableNames.paymentReceipt
+    ).insert(paymentReceiptDBInsert);
+    const unredeemedGiftDbInsert: UnredeemedGiftDBInsert = {
+      gifted_winc_amount: "100",
+      payment_receipt_id: paymentReceiptId,
+      recipient_email: emailAddress,
+      gift_message: giftMessage,
+    };
+    await paymentDatabase["writer"]<UnredeemedGiftDBResult>(
+      tableNames.unredeemedGift
+    ).insert(unredeemedGiftDbInsert);
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/redeem?destinationAddress=${destinationAddress}&id=${paymentReceiptId}&email=${emailAddress}`
+    );
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    const { message, userBalance, userAddress, userCreationDate } = data;
+    expect(message).to.equal("Payment receipt redeemed for 100 winc!");
+    expect(userBalance).to.equal("100");
+    expect(userAddress).to.equal(destinationAddress);
+    expect(userCreationDate).to.exist;
+
+    const userDbResult = await paymentDatabase["reader"]<UserDBResult>(
+      tableNames.user
+    ).where({
+      user_address: destinationAddress,
+    });
+    expect(userDbResult.length).to.equal(1);
+    expect(userDbResult[0].winston_credit_balance).to.equal("100");
+
+    const unredeemedGiftDbResult = await paymentDatabase[
+      "reader"
+    ]<UnredeemedGiftDBResult>(tableNames.unredeemedGift).where({
+      payment_receipt_id: paymentReceiptId,
+    });
+    expect(unredeemedGiftDbResult.length).to.equal(0);
+
+    const redeemedGiftDbResult = await paymentDatabase[
+      "reader"
+    ]<RedeemedGiftDBResult>(tableNames.redeemedGift).where({
+      payment_receipt_id: paymentReceiptId,
+    });
+    expect(redeemedGiftDbResult.length).to.equal(1);
+
+    const {
+      payment_receipt_id,
+      recipient_email,
+      gift_message,
+      creation_date,
+      destination_address,
+      expiration_date,
+      gifted_winc_amount,
+      redemption_date,
+    } = redeemedGiftDbResult[0];
+
+    expect(payment_receipt_id).to.equal(paymentReceiptId);
+    expect(recipient_email).to.equal(emailAddress);
+    expect(gift_message).to.equal(giftMessage);
+    expect(creation_date).to.exist;
+    expect(destination_address).to.equal(destinationAddress);
+    expect(expiration_date).to.exist;
+    expect(gifted_winc_amount).to.equal("100");
+    expect(redemption_date).to.exist;
+  });
+
+  it("GET /redeem returns 400 for invalid email", async () => {
+    const destinationAddress = "validArweaveAddressNeedsFortyThreeCharacter";
+    const paymentReceiptId = "unique paymentReceiptId 21e12";
+    const emailAddress = "invalid email";
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/redeem?destinationAddress=${destinationAddress}&id=${paymentReceiptId}&email=${emailAddress}`
+    );
+
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal(
+      "Provided recipient email address is not a valid email!"
+    );
+  });
+
+  it("GET /redeem returns 400 for invalid destination address", async () => {
+    const destinationAddress = "invalidArweaveAddressNeedsFortyThreeCharacter";
+    const paymentReceiptId = "unique das paymentReceiptId 21e12";
+    const emailAddress = "fake@example.inc";
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/redeem?destinationAddress=${destinationAddress}&id=${paymentReceiptId}&email=${emailAddress}`
+    );
+
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal(
+      "Provided destination address is not a valid Arweave native address!"
+    );
+  });
+
+  it("GET /redeem returns 400 for non matching recipient email", async () => {
+    const destinationAddress = "validArweaveAddressNeedsFortyThreeCharacter";
+    const paymentReceiptId = "unique paymentReceiptId 231";
+    const emailAddress = "fake@inc.com";
+
+    const paymentReceiptDBInsert: PaymentReceiptDBInsert = {
+      top_up_quote_id: "required top up id!",
+      payment_receipt_id: paymentReceiptId,
+      payment_amount: "100",
+      quoted_payment_amount: "100",
+      currency_type: "email",
+      destination_address: emailAddress,
+      destination_address_type: "arweave",
+      payment_provider: "stripe",
+      quote_creation_date: oneHourAgo,
+      quote_expiration_date: oneHourFromNow,
+      winston_credit_amount: "100",
+      gift_message: "A gift message",
+    };
+    await paymentDatabase["writer"]<PaymentReceiptDBResult>(
+      tableNames.paymentReceipt
+    ).insert(paymentReceiptDBInsert);
+
+    const unredeemedGiftDbInsert: UnredeemedGiftDBInsert = {
+      gifted_winc_amount: "100",
+      payment_receipt_id: paymentReceiptId,
+      recipient_email: emailAddress,
+      gift_message: "A gift message",
+    };
+    await paymentDatabase["writer"]<UnredeemedGiftDBResult>(
+      tableNames.unredeemedGift
+    ).insert(unredeemedGiftDbInsert);
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/redeem?destinationAddress=${destinationAddress}&id=${paymentReceiptId}&email=wrong@email.test`
+    );
+
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal("Failure to redeem payment receipt!");
+  });
+
+  it("GET /redeem returns 400 for not found payment receipt id", async () => {
+    const destinationAddress = "validArweaveAddressNeedsFortyThreeCharacter";
+    const paymentReceiptId = "unique paymentReceiptId 221";
+    const emailAddress = "fake@unique.inc";
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/redeem?destinationAddress=${destinationAddress}&id=${paymentReceiptId}&email=${emailAddress}`
+    );
+
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal("Failure to redeem payment receipt!");
+  });
+
+  it("GET /redeem returns 503 for unexpected database error", async () => {
+    const destinationAddress = "validArweaveAddressNeedsFortyThreeCharacter";
+    const paymentReceiptId = "unique paymentReceiptId 141";
+    const emailAddress = "fake@unique.inc";
+
+    stub(paymentDatabase, "redeemGift").throws();
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/redeem?destinationAddress=${destinationAddress}&id=${paymentReceiptId}&email=${emailAddress}`
+    );
+
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
+    expect(data).to.equal(
+      "Error while redeeming payment receipt. Unable to reach Database!"
+    );
   });
 });
 

@@ -42,7 +42,12 @@ export interface PaymentAdjustment extends Adjustment {
 }
 
 export type UserAddress = string | PublicArweaveAddress;
-export type UserAddressType = string | "arweave";
+
+export const userAddressTypes = ["arweave"] as const;
+export type UserAddressType = (typeof userAddressTypes)[number];
+
+export const destinationAddressTypes = ["email", "arweave"] as const;
+export type DestinationAddressType = (typeof destinationAddressTypes)[number];
 
 /** Currently using Postgres Date type (ISO String) */
 export type Timestamp = string;
@@ -85,7 +90,7 @@ export interface User {
 export interface TopUpQuote {
   topUpQuoteId: TopUpQuoteId;
   destinationAddress: UserAddress;
-  destinationAddressType: UserAddressType;
+  destinationAddressType: DestinationAddressType;
   paymentAmount: PaymentAmount;
   quotedPaymentAmount: PaymentAmount;
   currencyType: CurrencyType;
@@ -93,6 +98,7 @@ export interface TopUpQuote {
   quoteExpirationDate: Timestamp;
   quoteCreationDate: Timestamp;
   paymentProvider: PaymentProvider;
+  giftMessage?: string;
 }
 
 export type CreateTopUpQuoteParams = Omit<TopUpQuote, "quoteCreationDate"> & {
@@ -113,6 +119,7 @@ export interface CreatePaymentReceiptParams {
   topUpQuoteId: TopUpQuoteId;
   paymentAmount: PaymentAmount;
   currencyType: CurrencyType;
+  senderEmail?: string;
 }
 
 export interface ChargebackReceipt extends PaymentReceipt {
@@ -180,7 +187,10 @@ export type AuditChangeReason =
   | "payment"
   | "account_creation"
   | "chargeback"
-  | "refund";
+  | "refund"
+  | "gifted_payment"
+  | "gifted_payment_redemption"
+  | "gifted_account_creation";
 
 export interface AuditLogInsert {
   user_address: string;
@@ -209,6 +219,7 @@ export interface TopUpQuoteDBInsert {
   winston_credit_amount: string;
   payment_provider: string;
   quote_expiration_date: string;
+  gift_message?: string;
 }
 
 export interface TopUpQuoteDBResult extends TopUpQuoteDBInsert {
@@ -338,3 +349,39 @@ export interface PaymentAdjustmentDBInsert extends AdjustmentDBInsert {
 export interface PaymentAdjustmentDBResult
   extends PaymentAdjustmentDBInsert,
     AdjustmentDBResult {}
+
+export interface UnredeemedGiftDBInsert {
+  payment_receipt_id: string;
+  gifted_winc_amount: string;
+  recipient_email: string;
+  sender_email?: string;
+  gift_message?: string;
+}
+
+export interface UnredeemedGiftDBResult extends UnredeemedGiftDBInsert {
+  creation_date: string;
+  expiration_date: string;
+}
+
+export interface RedeemedGiftDBInsert extends UnredeemedGiftDBResult {
+  destination_address: string;
+}
+
+export interface RedeemedGiftDBResult extends RedeemedGiftDBInsert {
+  redemption_date: string;
+}
+
+export interface UnredeemedGift {
+  paymentReceiptId: PaymentReceiptId;
+  giftedWincAmount: WC;
+  recipientEmail: string;
+  senderEmail?: string;
+  giftMessage?: string;
+  giftCreationDate: Timestamp;
+  giftExpirationDate: Timestamp;
+}
+
+export interface RedeemedGift extends UnredeemedGift {
+  destinationAddress: UserAddress;
+  redemptionDate: Timestamp;
+}

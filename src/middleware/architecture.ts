@@ -27,5 +27,6 @@ export async function architectureMiddleware(
   ctx.state.paymentDatabase = arch.paymentDatabase;
   ctx.state.pricingService = arch.pricingService;
   ctx.state.stripe = arch.stripe;
+  ctx.state.emailProvider = arch.emailProvider;
   return next();
 }

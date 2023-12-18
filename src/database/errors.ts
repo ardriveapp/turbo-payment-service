@@ -118,3 +118,17 @@ export class PromoCodeExceedsMaxUses extends PromoCodeError {
     this.name = "PromoCodeExceedsMaxUses";
   }
 }
+
+export class GiftRedemptionError extends Error {
+  constructor(errorMessage = "Failure to redeem payment receipt!") {
+    super(errorMessage);
+    this.name = "GiftRedemptionError";
+  }
+}
+
+export class GiftAlreadyRedeemed extends GiftRedemptionError {
+  constructor() {
+    super("Gift has already been redeemed!");
+    this.name = "GiftAlreadyRedeemed";
+  }
+}
