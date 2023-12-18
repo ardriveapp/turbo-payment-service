@@ -26,6 +26,7 @@ import { countriesHandler } from "./routes/countries";
 import { currenciesRoute } from "./routes/currencies";
 import { priceRoutes } from "./routes/priceRoutes";
 import { fiatToArRateHandler, ratesHandler } from "./routes/rates";
+import { redeem } from "./routes/redeem";
 import { refundBalance } from "./routes/refundBalance";
 import { reserveBalance } from "./routes/reserveBalance";
 import { stripeRoute } from "./routes/stripe/stripeRoute";
@@ -52,6 +53,8 @@ router.get(
   verifySignature,
   topUp
 );
+
+router.get("/v1/redeem", redeem);
 
 // TODO: Add API for admin routes that create and manage promotions
 

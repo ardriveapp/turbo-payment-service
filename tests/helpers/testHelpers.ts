@@ -21,6 +21,7 @@ import Stripe from "stripe";
 
 import { createAxiosInstance } from "../../src/axiosClient";
 import { PostgresDatabase } from "../../src/database/postgres";
+import { MandrillEmailProvider } from "../../src/emailProvider";
 import {
   CoingeckoArweaveToFiatOracle,
   ReadThroughArweaveToFiatOracle,
@@ -115,6 +116,8 @@ export const axios = axiosPackage.create({
   baseURL: localTestUrl,
   validateStatus: () => true,
 });
+export const emailProvider = new MandrillEmailProvider("test");
+
 export const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:disable-line
 
 export function removeCatalogIdMap<T extends { catalogId: string }>(

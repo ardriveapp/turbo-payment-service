@@ -20,6 +20,7 @@ import {
   AdjustmentCatalogDBResult,
   ChargebackReceipt,
   ChargebackReceiptDBResult,
+  DestinationAddressType,
   FailedTopUpQuote,
   FailedTopUpQuoteDBResult,
   PaymentAdjustmentCatalog,
@@ -31,9 +32,12 @@ import {
   SingleUseCodePaymentCatalogDBResult,
   TopUpQuote,
   TopUpQuoteDBResult,
+  UnredeemedGift,
+  UnredeemedGiftDBResult,
   UploadAdjustmentCatalog,
   UploadAdjustmentCatalogDBResult,
   User,
+  UserAddressType,
   UserDBResult,
 } from "./dbTypes";
 
@@ -47,7 +51,7 @@ export function userDBMap({
   return {
     promotionalInfo: promotional_info as PromotionalInfo,
     userAddress: user_address,
-    userAddressType: user_address_type,
+    userAddressType: user_address_type as UserAddressType,
     userCreationDate: user_creation_date,
     winstonCreditBalance: new Winston(winston_credit_balance),
   };
@@ -74,7 +78,7 @@ export function topUpQuoteDBMap({
     quoteCreationDate: quote_creation_date,
     quoteExpirationDate: quote_expiration_date,
     destinationAddress: destination_address,
-    destinationAddressType: destination_address_type,
+    destinationAddressType: destination_address_type as DestinationAddressType,
     winstonCreditAmount: new Winston(winston_credit_amount),
   };
 }
@@ -157,5 +161,19 @@ export function singleUseCodePaymentCatalogDBMap(
     maxUses: dbResult.max_uses,
     minimumPaymentAmount: dbResult.minimum_payment_amount,
     maximumDiscountAmount: dbResult.maximum_discount_amount,
+  };
+}
+
+export function unredeemedGiftDBMap(
+  dbResult: UnredeemedGiftDBResult
+): UnredeemedGift {
+  return {
+    paymentReceiptId: dbResult.payment_receipt_id,
+    giftedWincAmount: new Winston(dbResult.gifted_winc_amount),
+    recipientEmail: dbResult.recipient_email,
+    giftMessage: dbResult.gift_message,
+    giftCreationDate: dbResult.creation_date,
+    giftExpirationDate: dbResult.expiration_date,
+    senderEmail: dbResult.sender_email,
   };
 }

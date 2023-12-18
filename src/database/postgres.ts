@@ -29,6 +29,7 @@ import {
   paymentReceiptDBMap,
   singleUseCodePaymentCatalogDBMap,
   topUpQuoteDBMap,
+  unredeemedGiftDBMap,
   uploadAdjustmentCatalogDBMap,
   userDBMap,
 } from "./dbMaps";
@@ -50,18 +51,26 @@ import {
   PaymentReceipt,
   PaymentReceiptDBResult,
   PromotionalInfo,
+  RedeemedGiftDBInsert,
+  RedeemedGiftDBResult,
   SingleUseCodePaymentCatalog,
   SingleUseCodePaymentCatalogDBResult,
   TopUpQuote,
   TopUpQuoteDBInsert,
   TopUpQuoteDBResult,
+  UnredeemedGift,
+  UnredeemedGiftDBInsert,
+  UnredeemedGiftDBResult,
   UploadAdjustmentCatalog,
   UploadAdjustmentCatalogDBResult,
   UploadAdjustmentDBInsert,
   User,
+  UserDBInsert,
   UserDBResult,
 } from "./dbTypes";
 import {
+  GiftAlreadyRedeemed,
+  GiftRedemptionError,
   InsufficientBalance,
   PromoCodeExceedsMaxUses,
   PromoCodeExpired,
@@ -119,6 +128,7 @@ export class PostgresDatabase implements Database {
       quoteExpirationDate,
       topUpQuoteId,
       winstonCreditAmount,
+      giftMessage,
     } = topUpQuote;
 
     const topUpQuoteDbInsert: TopUpQuoteDBInsert = {
@@ -131,6 +141,7 @@ export class PostgresDatabase implements Database {
       quote_expiration_date: quoteExpirationDate,
       top_up_quote_id: topUpQuoteId,
       winston_credit_amount: winstonCreditAmount.toString(),
+      gift_message: giftMessage,
     };
 
     await this.writer.transaction(async (knexTransaction) => {
@@ -215,15 +226,20 @@ export class PostgresDatabase implements Database {
 
   public async createPaymentReceipt(
     paymentReceipt: CreatePaymentReceiptParams
-  ): Promise<void> {
+  ): Promise<void | UnredeemedGift> {
     this.log.info("Inserting new payment receipt...", {
       paymentReceipt,
     });
 
-    const { topUpQuoteId, paymentReceiptId, paymentAmount, currencyType } =
-      paymentReceipt;
+    const {
+      topUpQuoteId,
+      paymentReceiptId,
+      paymentAmount,
+      currencyType,
+      senderEmail,
+    } = paymentReceipt;
 
-    await this.writer.transaction(async (knexTransaction) => {
+    return this.writer.transaction(async (knexTransaction) => {
       const topUpQuoteDbResults = await knexTransaction<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       ).where({
@@ -300,59 +316,229 @@ export class PostgresDatabase implements Database {
         tableNames.paymentReceipt
       ).insert({ ...topUpQuote[0], payment_receipt_id: paymentReceiptId });
 
-      const destinationUser = (
-        await knexTransaction<UserDBResult>(tableNames.user).where({
-          user_address: destination_address,
-        })
-      )[0];
-      if (destinationUser === undefined) {
-        this.log.info("No existing user was found; creating new user...", {
-          userAddress: destination_address,
-          newBalance: winston_credit_amount,
-          paymentReceipt,
-        });
-        await knexTransaction<UserDBResult>(tableNames.user).insert({
-          user_address: destination_address,
-          user_address_type: destination_address_type,
-          winston_credit_balance: winston_credit_amount,
-        });
+      if (destination_address_type === "email") {
+        const unredeemedGiftDbInsert: UnredeemedGiftDBInsert = {
+          recipient_email: destination_address,
+          payment_receipt_id: paymentReceiptId,
+          gifted_winc_amount: winston_credit_amount,
+          gift_message: topUpQuote[0].gift_message,
+          sender_email: senderEmail,
+        };
+        const unredeemedGiftDbResult =
+          await knexTransaction<UnredeemedGiftDBResult>(
+            tableNames.unredeemedGift
+          )
+            .insert(unredeemedGiftDbInsert)
+            .returning("*");
 
         const auditLogInsert: AuditLogInsert = {
           user_address: destination_address,
-          winston_credit_amount,
-          change_reason: "account_creation",
+          winston_credit_amount: "0",
+          change_reason: "gifted_payment",
           change_id: paymentReceiptId,
         };
         await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+
+        return unredeemedGiftDbResult.map(unredeemedGiftDBMap)[0];
+      } else {
+        const destinationUser = (
+          await knexTransaction<UserDBResult>(tableNames.user).where({
+            user_address: destination_address,
+          })
+        )[0];
+
+        if (destinationUser === undefined) {
+          this.log.info("No existing user was found; creating new user...", {
+            userAddress: destination_address,
+            newBalance: winston_credit_amount,
+            paymentReceipt,
+          });
+          await knexTransaction<UserDBResult>(tableNames.user).insert({
+            user_address: destination_address,
+            user_address_type: destination_address_type,
+            winston_credit_balance: winston_credit_amount,
+          });
+
+          const auditLogInsert: AuditLogInsert = {
+            user_address: destination_address,
+            winston_credit_amount,
+            change_reason: "account_creation",
+            change_id: paymentReceiptId,
+          };
+          await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+        } else {
+          // Increment balance of existing user
+          const currentBalance = new Winston(
+            destinationUser.winston_credit_balance
+          );
+          const newBalance = currentBalance.plus(
+            new Winston(winston_credit_amount)
+          );
+
+          this.log.info("Incrementing balance...", {
+            userAddress: destination_address,
+            currentBalance,
+            newBalance,
+            paymentReceipt,
+          });
+
+          await knexTransaction<UserDBResult>(tableNames.user)
+            .where({
+              user_address: destination_address,
+            })
+            .update({ winston_credit_balance: newBalance.toString() });
+
+          const auditLogInsert: AuditLogInsert = {
+            user_address: destination_address,
+            winston_credit_amount,
+            change_reason: "payment",
+            change_id: paymentReceiptId,
+          };
+          await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+        }
+        return;
+      }
+    });
+  }
+
+  public async redeemGift({
+    destinationAddress,
+    paymentReceiptId,
+    recipientEmail,
+  }: {
+    paymentReceiptId: string;
+    recipientEmail: string;
+    destinationAddress: string;
+  }): Promise<User> {
+    return this.writer.transaction(async (knexTransaction) => {
+      const unredeemedGiftDbResults =
+        await knexTransaction<UnredeemedGiftDBResult>(
+          tableNames.unredeemedGift
+        ).where({
+          payment_receipt_id: paymentReceiptId,
+        });
+
+      if (unredeemedGiftDbResults.length === 0) {
+        logger.warn(
+          `No unredeemed gift found in database with payment receipt ID '${paymentReceiptId}'`
+        );
+
+        const redeemedDbResults = await knexTransaction<RedeemedGiftDBResult>(
+          tableNames.redeemedGift
+        ).where({
+          payment_receipt_id: paymentReceiptId,
+        });
+        if (redeemedDbResults.length > 0) {
+          logger.warn(
+            `Payment receipt ID '${paymentReceiptId}' has already been redeemed!`
+          );
+          throw new GiftAlreadyRedeemed();
+        }
+
+        throw new GiftRedemptionError();
+      }
+
+      const paymentReceiptDbResults =
+        await knexTransaction<PaymentReceiptDBResult>(
+          tableNames.paymentReceipt
+        ).where({
+          payment_receipt_id: paymentReceiptId,
+        });
+
+      if (paymentReceiptDbResults.length === 0) {
+        logger.warn(
+          `No payment receipt found in database with payment receipt ID '${paymentReceiptId}'`
+        );
+        throw new GiftRedemptionError();
+      }
+
+      const unredeemedGiftDbResult = unredeemedGiftDbResults[0];
+
+      if (unredeemedGiftDbResult.recipient_email !== recipientEmail) {
+        logger.warn(
+          `Recipient email '${recipientEmail}' does not match unredeemed gift recipient email '${unredeemedGiftDbResult.recipient_email}'`
+        );
+        throw new GiftRedemptionError();
+      }
+
+      const redeemedGiftDbInsert: RedeemedGiftDBInsert = {
+        ...unredeemedGiftDbResult,
+        destination_address: destinationAddress,
+      };
+
+      await knexTransaction(tableNames.unredeemedGift)
+        .where({
+          payment_receipt_id: paymentReceiptId,
+        })
+        .del();
+
+      await knexTransaction(tableNames.redeemedGift).insert(
+        redeemedGiftDbInsert
+      );
+
+      const destinationUser = (
+        await knexTransaction<UserDBResult>(tableNames.user).where({
+          user_address: destinationAddress,
+        })
+      )[0];
+
+      if (destinationUser === undefined) {
+        this.log.info("No existing user was found; creating new user...", {
+          userAddress: destinationAddress,
+          newBalance: unredeemedGiftDbResult.gifted_winc_amount,
+        });
+        const userDbInsert: UserDBInsert = {
+          user_address: destinationAddress,
+          user_address_type: "arweave",
+          winston_credit_balance: unredeemedGiftDbResult.gifted_winc_amount,
+        };
+        const userDbResult = await knexTransaction<UserDBResult>(
+          tableNames.user
+        )
+          .insert(userDbInsert)
+          .returning("*");
+
+        const auditLogInsert: AuditLogInsert = {
+          user_address: destinationAddress,
+          winston_credit_amount: unredeemedGiftDbResult.gifted_winc_amount,
+          change_reason: "gifted_account_creation",
+          change_id: paymentReceiptId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+        return userDbResult.map(userDBMap)[0];
       } else {
         // Increment balance of existing user
         const currentBalance = new Winston(
           destinationUser.winston_credit_balance
         );
         const newBalance = currentBalance.plus(
-          new Winston(winston_credit_amount)
+          new Winston(unredeemedGiftDbResult.gifted_winc_amount)
         );
 
         this.log.info("Incrementing balance...", {
-          userAddress: destination_address,
+          userAddress: destinationAddress,
           currentBalance,
           newBalance,
-          paymentReceipt,
         });
 
-        await knexTransaction<UserDBResult>(tableNames.user)
+        const userDbResult = await knexTransaction<UserDBResult>(
+          tableNames.user
+        )
           .where({
-            user_address: destination_address,
+            user_address: destinationAddress,
           })
-          .update({ winston_credit_balance: newBalance.toString() });
+          .update({ winston_credit_balance: newBalance.toString() })
+          .returning("*");
 
         const auditLogInsert: AuditLogInsert = {
-          user_address: destination_address,
-          winston_credit_amount,
-          change_reason: "payment",
+          user_address: destinationAddress,
+          winston_credit_amount: unredeemedGiftDbResult.gifted_winc_amount,
+          change_reason: "gifted_payment_redemption",
           change_id: paymentReceiptId,
         };
         await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+
+        return userDbResult.map(userDBMap)[0];
       }
     });
   }
@@ -432,33 +618,66 @@ export class PostgresDatabase implements Database {
         destinationAddress,
         paymentReceiptId,
         winstonCreditAmount: winstonClawbackAmount,
+        destinationAddressType,
       } = await this.getPaymentReceiptByTopUpQuoteId(
         topUpQuoteId,
         knexTransaction
       );
 
-      const user = await this.getUser(destinationAddress, knexTransaction);
+      let userAddress: string | undefined;
 
-      // Decrement balance of existing user
-      const currentBalance = user.winstonCreditBalance;
+      if (destinationAddressType === "email") {
+        const redeemedGiftDbResults =
+          await knexTransaction<RedeemedGiftDBResult>(
+            tableNames.unredeemedGift
+          ).where({
+            payment_receipt_id: paymentReceiptId,
+          });
 
-      // this could result in a negative balance for a user, will throw an error if non-integer winston balance
-      const newBalance = currentBalance.minus(winstonClawbackAmount);
+        if (redeemedGiftDbResults.length === 0) {
+          // When no redeemed exists yet, delete the unredeemed gift and leave user address undefined
+          await knexTransaction<UnredeemedGiftDBResult>(
+            tableNames.unredeemedGift
+          )
+            .where({
+              payment_receipt_id: paymentReceiptId,
+            })
+            .del();
+        } else {
+          userAddress = redeemedGiftDbResults[0].destination_address;
+        }
+      } else {
+        userAddress = destinationAddress;
+      }
 
-      // Update the users balance.
-      await knexTransaction<UserDBResult>(tableNames.user)
-        .where({
+      if (userAddress) {
+        const user = await this.getUser(userAddress, knexTransaction);
+
+        // Decrement balance of existing user
+        const currentBalance = user.winstonCreditBalance;
+
+        // this could result in a negative balance for a user, will throw an error if non-integer winston balance
+        const newBalance = currentBalance.minus(winstonClawbackAmount);
+
+        // Update the users balance.
+        await knexTransaction<UserDBResult>(tableNames.user)
+          .where({
+            user_address: destinationAddress,
+          })
+          .update({ winston_credit_balance: newBalance.toString() });
+
+        const auditLogInsert: AuditLogInsert = {
           user_address: destinationAddress,
-        })
-        .update({ winston_credit_balance: newBalance.toString() });
-
-      const auditLogInsert: AuditLogInsert = {
-        user_address: destinationAddress,
-        winston_credit_amount: `-${winstonClawbackAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
-        change_reason: "chargeback",
-        change_id: chargebackReceiptId,
-      };
-      await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+          winston_credit_amount: `-${winstonClawbackAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
+          change_reason: "chargeback",
+          change_id: chargebackReceiptId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+      } else {
+        logger.warn(
+          `Chargeback receipt created for payment receipt ID '${paymentReceiptId}' but user has not redeemed gift yet!`
+        );
+      }
 
       // Remove from payment receipt table,
       const paymentReceiptDbResult =

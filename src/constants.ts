@@ -314,3 +314,11 @@ export const recognizedCountries = [
 export const promoCodeBackfills = {
   welcomeTwentyPercentOff: "TOKEN2049",
 };
+
+export const maxGiftMessageLength = process.env.MAX_GIFT_MESSAGE_LENGTH ?? 250;
+
+export const giftingEmailAddress =
+  process.env.GIFTING_EMAILL_ADDRESS ?? "gift@ardrive.io";
+
+/** gifting on top up via email depends on GIFTING_ENABLED="true" env var */
+export const isGiftingEnabled = process.env.GIFTING_ENABLED === "true";

@@ -17,10 +17,12 @@
 import { randomUUID } from "crypto";
 import { Next } from "koa";
 import Stripe from "stripe";
+import validator from "validator";
 
 import {
   CurrencyLimitations,
   electronicallySuppliedServicesTaxCode,
+  isGiftingEnabled,
   paymentIntentTopUpMethod,
   topUpMethods,
 } from "../constants";
@@ -33,14 +35,23 @@ import { Payment } from "../types/payment";
 import { winstonToArc } from "../types/winston";
 import { isValidArweaveBase64URL } from "../utils/base64";
 import { parseQueryParams } from "../utils/parseQueryParams";
+import {
+  validateDestinationAddressType,
+  validateGiftMessage,
+} from "../utils/validators";
 
 export async function topUp(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
 
   const { pricingService, paymentDatabase, stripe } = ctx.state;
-  const { amount, currency, method, address: destinationAddress } = ctx.params;
+  const {
+    amount,
+    currency,
+    method,
+    address: rawDestinationAddress,
+  } = ctx.params;
 
-  const loggerObject = { amount, currency, method, destinationAddress };
+  const loggerObject = { amount, currency, method, rawDestinationAddress };
 
   if (!topUpMethods.includes(method)) {
     ctx.response.status = 400;
@@ -49,11 +60,52 @@ export async function topUp(ctx: KoaContext, next: Next) {
     return next();
   }
 
-  if (!isValidArweaveBase64URL(destinationAddress)) {
-    ctx.response.status = 403;
-    ctx.body = "Destination address is not a valid Arweave native address!";
-    logger.info("top-up GET -- Invalid destination address", loggerObject);
+  const {
+    destinationAddressType: rawAddressType,
+    giftMessage: rawGiftMessage,
+  } = ctx.query;
+
+  const destinationAddressType = rawAddressType
+    ? validateDestinationAddressType(ctx, rawAddressType)
+    : "arweave";
+  if (!destinationAddressType) {
     return next();
+  }
+
+  const giftMessage = rawGiftMessage
+    ? validateGiftMessage(ctx, rawGiftMessage)
+    : undefined;
+  if (giftMessage === false) {
+    return next();
+  }
+
+  let destinationAddress: string;
+  if (destinationAddressType === "arweave") {
+    if (!isValidArweaveBase64URL(rawDestinationAddress)) {
+      ctx.response.status = 403;
+      ctx.body = "Destination address is not a valid Arweave native address!";
+      logger.info("top-up GET -- Invalid destination address", loggerObject);
+      return next();
+    }
+
+    destinationAddress = rawDestinationAddress;
+  } else {
+    if (!isGiftingEnabled) {
+      ctx.response.status = 403;
+      ctx.body = "Gifting by email is disabled!";
+      logger.info("top-up GET -- Gifting is disabled", loggerObject);
+      return next();
+    }
+
+    if (!validator.isEmail(rawDestinationAddress)) {
+      ctx.response.status = 400;
+      ctx.body = "Destination address is not a valid email!";
+      logger.info("top-up GET -- Invalid destination address", loggerObject);
+      return next();
+    }
+
+    // Escape email address to prevent XSS
+    destinationAddress = validator.escape(rawDestinationAddress);
   }
 
   let currencyLimitations: CurrencyLimitations;
@@ -94,7 +146,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
   try {
     wincForPaymentResponse = await pricingService.getWCForPayment({
       payment,
-      userAddress: destinationAddress,
+      userAddress: rawDestinationAddress,
       promoCodes,
     });
   } catch (error) {
@@ -131,7 +183,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
   const topUpQuote: CreateTopUpQuoteParams = {
     topUpQuoteId: randomUUID(),
-    destinationAddressType: "arweave",
+    destinationAddressType,
     paymentAmount: actualPaymentAmount,
     quotedPaymentAmount,
     winstonCreditAmount: finalPrice.winc,
@@ -140,6 +192,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     quoteExpirationDate: fiveMinutesFromNow,
     paymentProvider: "stripe",
     adjustments,
+    giftMessage,
   };
 
   const { paymentProvider, adjustments: _a, ...stripeMetadataRaw } = topUpQuote;
@@ -169,10 +222,27 @@ export async function topUp(ctx: KoaContext, next: Next) {
         metadata: stripeMetadata,
       });
     } else {
+      const localGiftUrl = `http://localhost:5173`;
+      const prodGiftUrl = `https://gift.ardrive.io`;
+      const giftUrl =
+        process.env.NODE_ENV === "prod" || process.env.NODE_ENV === "dev"
+          ? prodGiftUrl
+          : localGiftUrl;
+
+      const urlEncodedGiftMessage = giftMessage
+        ? encodeURIComponent(giftMessage)
+        : undefined;
       intentOrCheckout = await stripe.checkout.sessions.create({
         // TODO: Success and Cancel URLS (Do we need app origin? e.g: ArDrive Widget, Top Up Page, ario-turbo-cli)
         success_url: "https://app.ardrive.io",
-        cancel_url: "https://app.ardrive.io",
+        cancel_url:
+          destinationAddressType === "email"
+            ? `${giftUrl}?email=${destinationAddress}&amount=${payment.amount}${
+                urlEncodedGiftMessage
+                  ? `&giftMessage=${urlEncodedGiftMessage}`
+                  : ""
+              }`
+            : "https://app.ardrive.io",
         currency: payment.type,
         automatic_tax: {
           enabled: !!process.env.ENABLE_AUTO_STRIPE_TAX || false,

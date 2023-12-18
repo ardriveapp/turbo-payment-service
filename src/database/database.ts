@@ -30,6 +30,7 @@ import {
   SingleUseCodePaymentCatalog,
   TopUpQuote,
   TopUpQuoteId,
+  UnredeemedGift,
   UploadAdjustmentCatalog,
   User,
   UserAddress,
@@ -47,7 +48,7 @@ export interface Database {
   getBalance: (userAddress: UserAddress) => Promise<WC>;
   createPaymentReceipt: (
     paymentReceipt: CreatePaymentReceiptParams
-  ) => Promise<void>;
+  ) => Promise<void | UnredeemedGift>;
   getPaymentReceipt: (
     paymentReceiptId: PaymentReceiptId
   ) => Promise<PaymentReceipt>;
@@ -77,4 +78,9 @@ export interface Database {
   ) => Promise<SingleUseCodePaymentCatalog[]>;
   getUploadAdjustmentCatalogs: () => Promise<UploadAdjustmentCatalog[]>;
   getPaymentAdjustmentCatalogs(): Promise<PaymentAdjustmentCatalog[]>;
+  redeemGift: (params: {
+    paymentReceiptId: string;
+    recipientEmail: string;
+    destinationAddress: string;
+  }) => Promise<User>;
 }

@@ -14,19 +14,14 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { restore } from "sinon";
+import { Knex } from "knex";
 
-process.env.NODE_ENV = "test";
-process.env.PORT ??= "1234";
-process.env.DISABLE_LOGS ??= "true";
-process.env.STRIPE_SECRET_KEY ??= "test";
-process.env.STRIPE_WEBHOOK_SECRET ??= "test";
-process.env.MANDRILL_API_KEY ??= "test";
-process.env.GIFTING_ENABLED ??= "true";
+import { GiftByEmailMigrator } from "../database/migrator";
 
-// Restores the default sandbox after every test
-exports.mochaHooks = {
-  afterEach() {
-    restore();
-  },
-};
+export async function up(knex: Knex): Promise<void> {
+  return new GiftByEmailMigrator(knex).migrate();
+}
+
+export async function down(knex: Knex): Promise<void> {
+  return new GiftByEmailMigrator(knex).rollback();
+}

@@ -24,9 +24,11 @@ import { Architecture } from "./architecture";
 import {
   TEST_PRIVATE_ROUTE_SECRET,
   defaultPort,
+  isGiftingEnabled,
   migrateOnStartup,
 } from "./constants";
 import { PostgresDatabase } from "./database/postgres";
+import { MandrillEmailProvider } from "./emailProvider";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
 import { architectureMiddleware, loggerMiddleware } from "./middleware";
@@ -52,13 +54,13 @@ export async function createServer(
 
   await loadSecretsToEnv();
   const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+  const MANDRILL_API_KEY = process.env.MANDRILL_API_KEY;
   const sharedSecret =
     process.env.PRIVATE_ROUTE_SECRET ?? TEST_PRIVATE_ROUTE_SECRET;
 
   if (!sharedSecret) {
     throw new Error("Shared secret not set");
   }
-
   if (!STRIPE_SECRET_KEY) {
     throw new Error("Stripe secret key or webhook secret not set");
   }
@@ -76,11 +78,26 @@ export async function createServer(
   const stripe =
     arch.stripe ?? new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2022-11-15" });
 
+  const emailProvider = (() => {
+    if (!isGiftingEnabled) {
+      return undefined;
+    }
+    if (arch.emailProvider) {
+      return arch.emailProvider;
+    }
+    if (!MANDRILL_API_KEY) {
+      throw new Error(
+        "MANDRILL_API_KEY environment variable is not set! Please set the key and restart the server or set GIFTING_ENABLED=false to disable gifting by email on top ups flow."
+      );
+    }
+    return new MandrillEmailProvider(MANDRILL_API_KEY, logger);
+  })();
   app.use((ctx: KoaContext, next: Next) =>
     architectureMiddleware(ctx, next, {
       pricingService,
       paymentDatabase,
       stripe,
+      emailProvider,
     })
   );
 

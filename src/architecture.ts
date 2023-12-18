@@ -17,10 +17,12 @@
 import Stripe from "stripe";
 
 import { Database } from "./database/database";
+import { EmailProvider } from "./emailProvider";
 import { PricingService } from "./pricing/pricing";
 
 export interface Architecture {
   paymentDatabase: Database;
   pricingService: PricingService;
   stripe: Stripe;
+  emailProvider?: EmailProvider;
 }
