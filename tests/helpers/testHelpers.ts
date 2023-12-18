@@ -116,3 +116,10 @@ export const axios = axiosPackage.create({
   validateStatus: () => true,
 });
 export const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:disable-line
+
+export function removeCatalogIdMap<T extends { catalogId: string }>(
+  a: T
+): Omit<T, "catalogId"> {
+  const { catalogId: _, ...allButCatalogId } = a;
+  return allButCatalogId;
+}

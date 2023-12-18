@@ -19,6 +19,8 @@ import { Knex } from "knex";
 import { tableNames } from "../src/database/dbConstants";
 import {
   ChargebackReceiptDBInsert,
+  PaymentAdjustmentDBInsert,
+  PaymentAdjustmentDBResult,
   PaymentReceiptDBInsert,
   TopUpQuoteDBInsert,
   UserAddress,
@@ -39,6 +41,7 @@ function stubTopUpQuoteInsert({
   destination_address = stubArweaveUserAddress,
   destination_address_type = "arweave",
   payment_amount = "100",
+  quoted_payment_amount = "150",
   currency_type = "usd",
   winston_credit_amount = "1337",
   quote_expiration_date = oneHourFromNow,
@@ -49,10 +52,31 @@ function stubTopUpQuoteInsert({
     destination_address,
     destination_address_type,
     payment_amount,
+    quoted_payment_amount,
     currency_type,
     winston_credit_amount,
     quote_expiration_date,
     payment_provider,
+  };
+}
+
+type StubPaymentAdjustmentParams = Partial<PaymentAdjustmentDBResult>;
+
+function stubPaymentAdjustmentInsert({
+  adjusted_currency_type = "usd",
+  adjusted_payment_amount = "100",
+  adjustment_index = 0,
+  catalog_id = "The Stubbiest Catalog",
+  top_up_quote_id = "The Stubbiest Top Up Quote",
+  user_address = stubArweaveUserAddress,
+}: StubPaymentAdjustmentParams): PaymentAdjustmentDBInsert {
+  return {
+    adjusted_currency_type,
+    adjusted_payment_amount,
+    adjustment_index,
+    catalog_id,
+    top_up_quote_id,
+    user_address,
   };
 }
 
@@ -100,7 +124,7 @@ export class DbTestHelper {
   constructor(public readonly db: PostgresDatabase) {}
 
   private get knex(): Knex {
-    return this.db["knexWriter"];
+    return this.db["writer"];
   }
 
   public async insertStubUser(insertParams: StubUserParams): Promise<void> {
@@ -112,6 +136,14 @@ export class DbTestHelper {
   ): Promise<void> {
     return this.knex(tableNames.topUpQuote).insert(
       stubTopUpQuoteInsert(insertParams)
+    );
+  }
+
+  public async insertStubPaymentAdjustment(
+    insertParams: StubPaymentAdjustmentParams
+  ): Promise<void> {
+    return this.knex(tableNames.paymentAdjustment).insert(
+      stubPaymentAdjustmentInsert(insertParams)
     );
   }
 

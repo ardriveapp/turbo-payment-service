@@ -19,7 +19,9 @@ import Router from "koa-router";
 import * as promClient from "prom-client";
 
 import { verifySignature } from "./middleware";
+import { arweaveCompatiblePrice } from "./routes/arweaveCompatiblePrice";
 import { balanceRoute } from "./routes/balance";
+import { checkBalance } from "./routes/checkBalance";
 import { countriesHandler } from "./routes/countries";
 import { currenciesRoute } from "./routes/currencies";
 import { priceRoutes } from "./routes/priceRoutes";
@@ -36,11 +38,23 @@ promClient.collectDefaultMetrics({ register: metricsRegistry });
 
 const router = new Router();
 
+/**
+ * Note: when we return next(); in our handlers we are telling koa to continue to the next route handler. if any routes having matching paths, then BOTH handlers will be called, which may not be desired.
+ */
+
+// TODO: these can be broken out into separate handlers
 router.get("/v1/price/:amount", verifySignature, priceRoutes);
-router.get("/v1/price/bytes/:amount", verifySignature, priceRoutes);
+// also handles /v1/price/bytes/:amount
 router.get("/v1/price/:currency/:amount", verifySignature, priceRoutes);
 
-router.get("/v1/top-up/:method/:address/:currency/:amount", topUp);
+router.get(
+  "/v1/top-up/:method/:address/:currency/:amount",
+  verifySignature,
+  topUp
+);
+
+// TODO: Add API for admin routes that create and manage promotions
+
 router.post("/v1/stripe-webhook", stripeRoute);
 router.get("/v1/balance", verifySignature, balanceRoute);
 router.get("/v1/currencies", currenciesRoute);
@@ -72,6 +86,8 @@ router.get(
 
 router.get("/v1/refund-balance/:walletAddress", refundBalance);
 
+router.get("/v1/check-balance/:walletAddress", checkBalance);
+
 // Health
 router.get("/health", async (ctx: KoaContext, next: Next) => {
   ctx.body = "OK";
@@ -86,5 +102,10 @@ router.get("/metrics", async (ctx: KoaContext, next: Next) => {
 
 router.get("/openapi.json", swaggerDocsJSON);
 router.get("/api-docs", swaggerDocs);
+
+// In order to integrate with existing ecosystem tools (e.g. Arconnect), we need to support the following route:
+router.get("/price/arweave/:amount", verifySignature, arweaveCompatiblePrice);
+// This endpoint will return the price in winc, as a string, without any additional metadata.
+// This is the same as the /v1/price/bytes/:amount endpoint, but without the metadata.
 
 export default router;

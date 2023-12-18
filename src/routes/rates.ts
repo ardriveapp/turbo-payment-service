@@ -16,12 +16,7 @@
  */
 import { Next } from "koa";
 
-import {
-  oneARInWinston,
-  oneGiBInBytes,
-  oneMinuteInSeconds,
-  turboFeePercentageAsADecimal,
-} from "../constants";
+import { oneMinuteInSeconds } from "../constants";
 import { KoaContext } from "../server";
 import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
 
@@ -29,35 +24,11 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
   const { pricingService, logger } = ctx.state;
 
   try {
-    const priceWithAdjustments = await pricingService.getWCForBytes(
-      oneGiBInBytes
-    );
-    const fiat: Record<string, number> = {};
-
-    // Calculate fiat prices for one GiB
-    await Promise.all(
-      supportedPaymentCurrencyTypes.map(async (currency) => {
-        const fiatPriceForOneAR = await pricingService.getFiatPriceForOneAR(
-          currency
-        );
-
-        const fiatPriceForOneGiB =
-          priceWithAdjustments.winc.times(fiatPriceForOneAR);
-        const fiatValue =
-          (fiatPriceForOneGiB.toBigNumber().toNumber() / oneARInWinston) *
-          (1 + turboFeePercentageAsADecimal);
-
-        fiat[currency] = fiatValue;
-      })
-    );
-    const rates = {
-      winc: priceWithAdjustments.winc.toString(),
-      fiat,
-      adjustments: priceWithAdjustments.adjustments,
-    };
+    // TODO: applying adjustments on the generic /rates endpoint might not be the best idea, we may want to just show the raw rates for 1 GiB unadjusted, then return
+    const rates = await pricingService.getFiatRatesForOneGiB();
     ctx.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
-    ctx.body = rates;
+    ctx.body = { ...rates, winc: rates.winc.toString() };
     logger.info("Successfully calculated rates.", { rates });
   } catch (error) {
     ctx.status = 502;

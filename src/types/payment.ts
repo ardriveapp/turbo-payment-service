@@ -14,8 +14,6 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import BigNumber from "bignumber.js";
-
 import { CurrencyLimitations } from "../constants";
 import { CurrencyType, PaymentAmount } from "../database/dbTypes";
 import {
@@ -24,13 +22,11 @@ import {
   PaymentAmountTooSmall,
   UnsupportedCurrencyType,
 } from "../database/errors";
-import { WC } from "./arc";
 import {
   SupportedPaymentCurrencyTypes,
   supportedPaymentCurrencyTypes,
   zeroDecimalCurrencyTypes,
 } from "./supportedCurrencies";
-import { Winston } from "./winston";
 
 interface PaymentConstructorParams {
   amount: PaymentAmount;
@@ -86,21 +82,9 @@ export class Payment {
     this.type = type;
   }
 
-  public winstonCreditAmountForARPrice(
-    priceForOneAR: number,
-    turboFeePercentageAsADecimal: number
-  ): WC {
-    const zeroDecimalAmount = zeroDecimalCurrencyTypes.includes(this.type)
+  public get zeroDecimalAmount(): number {
+    return zeroDecimalCurrencyTypes.includes(this.type)
       ? this.amount
       : this.amount / 100;
-
-    const paymentAmountAfterFees =
-      zeroDecimalAmount - zeroDecimalAmount * turboFeePercentageAsADecimal;
-
-    const arcForPaymentAmount = paymentAmountAfterFees / priceForOneAR;
-
-    return new Winston(
-      BigNumber(arcForPaymentAmount).times(1_000_000_000_000).toFixed(0)
-    );
   }
 }

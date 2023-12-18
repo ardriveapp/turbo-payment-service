@@ -14,36 +14,77 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import BigNumber from "bignumber.js";
 import winston from "winston";
 
 import {
   CurrencyLimitation,
   CurrencyLimitations,
+  oneARInWinston,
+  oneGiBInBytes,
   paymentAmountLimits,
-  turboFeePercentageAsADecimal,
 } from "../constants";
-import { Adjustment, CurrencyType } from "../database/dbTypes";
+import { Database } from "../database/database";
+import {
+  Adjustment,
+  CurrencyType,
+  PaymentAdjustment,
+  PaymentAdjustmentCatalog,
+  PaymentAmount,
+  SingleUseCodePaymentCatalog,
+  UploadAdjustment,
+} from "../database/dbTypes";
+import { PaymentAmountTooSmallForPromoCode } from "../database/errors";
+import { PostgresDatabase } from "../database/postgres";
 import defaultLogger from "../logger";
-import { ByteCount, WC, Winston } from "../types";
+import { ByteCount, W, Winston } from "../types";
 import { Payment } from "../types/payment";
 import {
   SupportedPaymentCurrencyTypes,
+  supportedPaymentCurrencyTypes,
   zeroDecimalCurrencyTypes,
 } from "../types/supportedCurrencies";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
+import { FinalPrice, NetworkPrice, SubtotalPrice } from "./price";
 
 export type WincForBytesResponse = {
-  winc: WC;
-  adjustments: Adjustment[];
+  finalPrice: FinalPrice;
+  networkPrice: NetworkPrice;
+  adjustments: UploadAdjustment[];
+};
+
+export type WincForPaymentResponse = {
+  finalPrice: FinalPrice;
+  quotedPaymentAmount: PaymentAmount;
+  actualPaymentAmount: PaymentAmount;
+  adjustments: PaymentAdjustment[];
+  inclusiveAdjustments: PaymentAdjustment[];
+};
+
+export type WincForPaymentParams = {
+  payment: Payment;
+  promoCodes?: string[];
+  userAddress?: string;
 };
 
 export interface PricingService {
-  getWCForPayment: (payment: Payment) => Promise<WC>;
+  getWCForPayment: (
+    params: WincForPaymentParams
+  ) => Promise<WincForPaymentResponse>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
+  getFiatRatesForOneGiB: () => Promise<{
+    winc: Winston;
+    fiat: Record<string, number>;
+    adjustments: Adjustment[];
+  }>;
   getWCForBytes: (bytes: ByteCount) => Promise<WincForBytesResponse>;
+  convertFromUSDAmount: (params: {
+    amount: number;
+    type: CurrencyType;
+  }) => Promise<number>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -56,21 +97,25 @@ export class TurboPricingService implements PricingService {
   private logger: winston.Logger;
   private readonly bytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
   private readonly arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
+  private readonly paymentDatabase: Database;
 
   constructor({
     bytesToWinstonOracle,
     arweaveToFiatOracle,
     logger = defaultLogger,
+    paymentDatabase,
   }: {
     bytesToWinstonOracle?: ReadThroughBytesToWinstonOracle;
     arweaveToFiatOracle?: ReadThroughArweaveToFiatOracle;
     logger?: winston.Logger;
+    paymentDatabase?: Database;
   }) {
     this.logger = logger.child({ class: this.constructor.name });
     this.bytesToWinstonOracle =
       bytesToWinstonOracle ?? new ReadThroughBytesToWinstonOracle({});
     this.arweaveToFiatOracle =
       arweaveToFiatOracle ?? new ReadThroughArweaveToFiatOracle({});
+    this.paymentDatabase = paymentDatabase ?? new PostgresDatabase();
   }
 
   private isWithinTenPercent(value: number, targetValue: number): boolean {
@@ -96,37 +141,57 @@ export class TurboPricingService implements PricingService {
     return this.countDigits(amount) <= maxStripeDigits;
   }
 
+  public async convertFromUSDAmount({
+    amount,
+    type,
+  }: {
+    amount: number;
+    type: CurrencyType;
+  }): Promise<number> {
+    if (type === "usd") {
+      return amount;
+    }
+    const usdPriceOfOneAR = await this.arweaveToFiatOracle.getFiatPriceForOneAR(
+      "usd"
+    );
+    const priceOfOneAR = await this.arweaveToFiatOracle.getFiatPriceForOneAR(
+      type
+    );
+    const isZeroDecimalCurrency = zeroDecimalCurrencyTypes.includes(type);
+
+    return Math.round(
+      (amount /
+        (isZeroDecimalCurrency ? usdPriceOfOneAR * 100 : usdPriceOfOneAR)) *
+        priceOfOneAR
+    );
+  }
+
   private async getDynamicCurrencyLimitation(
     curr: string,
     {
       maximumPaymentAmount: currMax,
       minimumPaymentAmount: currMin,
       suggestedPaymentAmounts: currSuggested,
-    }: CurrencyLimitation,
-    usdPriceOfOneAR: number
+    }: CurrencyLimitation
   ): Promise<CurrencyLimitation> {
-    const currencyPriceOfOneAr =
-      await this.arweaveToFiatOracle.getFiatPriceForOneAR(curr);
-
-    const convertFromUSDLimit = (amount: number) =>
-      (amount /
-        (zeroDecimalCurrencyTypes.includes(curr)
-          ? // Use the DOLLAR value for zero decimal currencies rather than CENT value
-            usdPriceOfOneAR * 100
-          : usdPriceOfOneAR)) *
-      currencyPriceOfOneAr;
+    const convertFromUSDLimit = async (amount: number) =>
+      await this.convertFromUSDAmount({
+        amount,
+        type: curr,
+      });
 
     const multiplier = (val: number) => Math.pow(10, this.countDigits(val) - 2);
 
-    const rawMin = convertFromUSDLimit(
-      paymentAmountLimits.usd.minimumPaymentAmount
+    const [rawMin, rawMax] = await Promise.all(
+      [
+        paymentAmountLimits.usd.minimumPaymentAmount,
+        paymentAmountLimits.usd.maximumPaymentAmount,
+      ].map((amt) => convertFromUSDLimit(amt))
     );
+
     const dynamicMinimum =
       Math.ceil(rawMin / multiplier(rawMin)) * multiplier(rawMin);
 
-    const rawMax = convertFromUSDLimit(
-      paymentAmountLimits.usd.maximumPaymentAmount
-    );
     const dynamicMaximum =
       Math.floor(rawMax / multiplier(rawMax)) * multiplier(rawMax);
 
@@ -180,76 +245,323 @@ export class TurboPricingService implements PricingService {
   }
 
   public async getCurrencyLimitations(): Promise<CurrencyLimitations> {
-    const usdPriceOfOneAR = await this.arweaveToFiatOracle.getFiatPriceForOneAR(
-      "usd"
-    );
-
     const limits: Partial<CurrencyLimitations> = {};
 
     await Promise.all(
       Object.entries(paymentAmountLimits).map(async ([curr, currLimits]) => {
         limits[curr as SupportedPaymentCurrencyTypes] =
-          await this.getDynamicCurrencyLimitation(
-            curr,
-            currLimits,
-            usdPriceOfOneAR
-          );
+          await this.getDynamicCurrencyLimitation(curr, currLimits);
       })
     );
 
     return limits as CurrencyLimitations;
   }
 
-  public async getFiatPriceForOneAR(currency: CurrencyType): Promise<number> {
-    return await this.arweaveToFiatOracle.getFiatPriceForOneAR(currency);
+  public getFiatPriceForOneAR(currency: CurrencyType): Promise<number> {
+    return this.arweaveToFiatOracle.getFiatPriceForOneAR(currency);
   }
 
-  public async getWCForPayment(payment: Payment): Promise<Winston> {
+  public async getFiatRatesForOneGiB() {
+    const { adjustments: uploadAdjustments, finalPrice } =
+      await this.getWCForBytes(oneGiBInBytes);
+
+    const adjustmentCatalogs: PaymentAdjustmentCatalog[] =
+      await this.paymentDatabase.getPaymentAdjustmentCatalogs();
+
+    const fiat: Record<string, number> = {};
+
+    // Calculate fiat prices for one GiB
+    await Promise.all(
+      supportedPaymentCurrencyTypes.map(async (currency) => {
+        const fiatPriceOfOneAR =
+          await this.arweaveToFiatOracle.getFiatPriceForOneAR(currency);
+
+        const { paymentAmountAfterAdjustments: fiatPriceAfterAdjustments } =
+          await this.applyPaymentAdjustments({
+            adjustmentCatalogs,
+            paymentAmount: fiatPriceOfOneAR,
+            currencyType: currency,
+            forRatesEndpoint: true,
+          });
+
+        const fiatPriceForOneGiB = finalPrice.winc.times(
+          fiatPriceAfterAdjustments
+        );
+
+        fiat[currency] = +fiatPriceForOneGiB / oneARInWinston;
+      })
+    );
+
+    return {
+      winc: finalPrice.winc,
+      fiat,
+      adjustments: uploadAdjustments,
+    };
+  }
+
+  public async getWCForPayment({
+    payment,
+    promoCodes = [],
+    userAddress,
+  }: WincForPaymentParams): Promise<WincForPaymentResponse> {
+    const adjustmentCatalogs: PaymentAdjustmentCatalog[] =
+      await this.paymentDatabase.getPaymentAdjustmentCatalogs();
+    // if there is a userAddress, we can check if they are eligible a promo code
+    if (promoCodes.length > 0 && userAddress) {
+      const singleUseCodeAdjustmentCatalogs =
+        await this.paymentDatabase.getSingleUsePromoCodeAdjustments(
+          promoCodes,
+          userAddress
+        );
+
+      if (singleUseCodeAdjustmentCatalogs.length > 0) {
+        for (const catalog of singleUseCodeAdjustmentCatalogs) {
+          if (
+            (await this.convertFromUSDAmount(payment)) <
+            catalog.minimumPaymentAmount
+          ) {
+            throw new PaymentAmountTooSmallForPromoCode(
+              catalog.codeValue,
+              catalog.minimumPaymentAmount
+            );
+          }
+          adjustmentCatalogs.push(catalog);
+        }
+      }
+    }
+
+    const exclusiveAdjustments = adjustmentCatalogs.filter(
+      (a) => a.exclusivity === "exclusive"
+    );
+
+    const {
+      adjustments,
+      paymentAmountAfterAdjustments: paymentAmountAfterExclusiveAdjustments,
+    } = await this.applyPaymentAdjustments({
+      adjustmentCatalogs: exclusiveAdjustments,
+      paymentAmount: payment.amount,
+      currencyType: payment.type,
+    });
+
+    const inclusiveAdjustmentCatalogs = adjustmentCatalogs.filter(
+      (a) => a.exclusivity === "inclusive"
+    );
+    const {
+      adjustments: inclusiveAdjustments,
+      paymentAmountAfterAdjustments: paymentAmountAfterInclusiveAdjustments,
+    } = await this.applyPaymentAdjustments({
+      adjustmentCatalogs: inclusiveAdjustmentCatalogs,
+      paymentAmount: payment.amount,
+      currencyType: payment.type,
+    });
+
     const fiatPriceOfOneAR =
       await this.arweaveToFiatOracle.getFiatPriceForOneAR(payment.type);
 
-    const baseWinstonCreditsFromPayment = payment.winstonCreditAmountForARPrice(
-      fiatPriceOfOneAR,
-      turboFeePercentageAsADecimal
+    const baseWinstonCreditsFromPayment = new Winston(
+      BigNumber(
+        (zeroDecimalCurrencyTypes.includes(payment.type)
+          ? paymentAmountAfterInclusiveAdjustments
+          : paymentAmountAfterInclusiveAdjustments / 100) / fiatPriceOfOneAR
+      )
+        .times(1_000_000_000_000)
+        .toFixed(0)
     );
 
-    return baseWinstonCreditsFromPayment;
-  }
+    const finalPrice = new FinalPrice(baseWinstonCreditsFromPayment);
+    const quotedPaymentAmount = payment.amount;
 
-  async getWCForBytes(bytes: ByteCount): Promise<WincForBytesResponse> {
-    const chunkSize = roundToArweaveChunkSize(bytes);
-    const winston = await this.bytesToWinstonOracle.getWinstonForBytes(
-      chunkSize
-    );
-
-    const adjustmentMultiplier =
-      (process.env.SUBSIDIZED_WINC_PERCENTAGE
-        ? +process.env.SUBSIDIZED_WINC_PERCENTAGE
-        : 0) / 100;
-    // round down the subsidy amount to closest full integer for the subsidy amount
-    const adjustmentAmount = winston.times(adjustmentMultiplier);
-
-    const adjustments: Adjustment[] = [
-      {
-        name: "FWD Research July 2023 Subsidy",
-        description: `A ${
-          adjustmentMultiplier * 100
-        }% discount for uploads over 500KiB`,
-        operator: "multiply",
-        value: adjustmentMultiplier,
-        // We DEDUCT the adjustment in this flow so we give the inverse by multiplying by negative one
-        adjustmentAmount: adjustmentAmount.times(-1),
-      },
-    ];
-    this.logger.info("Calculated adjustments for bytes.", {
-      bytes,
-      originalAmount: winston.toString(),
+    this.logger.info("Calculated adjustments for payment.", {
+      quotedPaymentAmount,
+      paymentAmountAfterExclusiveAdjustments,
+      paymentAmountAfterInclusiveAdjustments,
+      finalPrice,
       adjustments,
     });
 
     return {
-      winc: winston.minus(adjustmentAmount),
+      finalPrice,
+      actualPaymentAmount: paymentAmountAfterExclusiveAdjustments,
+      adjustments,
+      inclusiveAdjustments,
+      quotedPaymentAmount,
+    };
+  }
+
+  async getWCForBytes(bytes: ByteCount): Promise<WincForBytesResponse> {
+    const chunkSize = roundToArweaveChunkSize(bytes);
+    const networkPrice = new NetworkPrice(
+      await this.bytesToWinstonOracle.getWinstonForBytes(chunkSize)
+    );
+
+    const uploadAdjustmentCatalogs =
+      await this.paymentDatabase.getUploadAdjustmentCatalogs();
+
+    const adjustments: UploadAdjustment[] = [];
+    let subtotalPrice: SubtotalPrice = new SubtotalPrice(networkPrice.winc);
+
+    for (const {
+      catalogId,
+      name,
+      operator,
+      operatorMagnitude,
+      description,
+    } of uploadAdjustmentCatalogs) {
+      const priceBeforeAdjustment = subtotalPrice.winc;
+
+      if (operator === "add") {
+        subtotalPrice = subtotalPrice.add(W(operatorMagnitude));
+      } else {
+        subtotalPrice = subtotalPrice.multiply(operatorMagnitude);
+      }
+
+      if (
+        subtotalPrice.winc.isNonZeroNegativeInteger() ||
+        +subtotalPrice.winc === 0
+      ) {
+        subtotalPrice = new SubtotalPrice(W(0));
+      }
+
+      const adjustmentAmount = subtotalPrice.winc.minus(priceBeforeAdjustment);
+
+      const adjustment: UploadAdjustment = {
+        name,
+        description,
+        operator,
+        operatorMagnitude,
+        adjustmentAmount,
+        catalogId,
+      };
+      adjustments.push(adjustment);
+
+      if (+subtotalPrice.winc === 0) {
+        break;
+      }
+    }
+
+    this.logger.info("Calculated adjustments for bytes.", {
+      bytes,
+      originalAmount: networkPrice.toString(),
+      adjustments,
+    });
+
+    const finalPrice = FinalPrice.fromSubtotal(subtotalPrice);
+
+    return {
+      finalPrice,
+      networkPrice,
       adjustments,
     };
+  }
+
+  private async applyPaymentAdjustments({
+    adjustmentCatalogs,
+    paymentAmount,
+    currencyType,
+    forRatesEndpoint = false,
+  }: {
+    adjustmentCatalogs: (
+      | PaymentAdjustmentCatalog
+      | SingleUseCodePaymentCatalog
+    )[];
+    paymentAmount: PaymentAmount;
+    currencyType: CurrencyType;
+    forRatesEndpoint?: boolean;
+  }): Promise<{
+    paymentAmountAfterAdjustments: PaymentAmount;
+    adjustments: PaymentAdjustment[];
+  }> {
+    const adjustments = [];
+    let paymentAmountAfterAdjustments = paymentAmount;
+
+    for (const catalog of adjustmentCatalogs) {
+      const {
+        operator,
+        operatorMagnitude,
+        name: adjustmentName,
+        description,
+        catalogId,
+      } = catalog;
+      const amountBeforeAdjustment = paymentAmountAfterAdjustments;
+
+      switch (operator) {
+        case "add":
+          if (currencyType === "usd") {
+            paymentAmountAfterAdjustments += forRatesEndpoint
+              ? -operatorMagnitude
+              : operatorMagnitude;
+          } else {
+            paymentAmountAfterAdjustments += await this.convertFromUSDAmount({
+              amount: forRatesEndpoint ? -operatorMagnitude : operatorMagnitude,
+              type: currencyType,
+            });
+          }
+          break;
+        case "multiply":
+          // eslint-disable-next-line no-case-declarations
+          let calculatedPaymentAmountAfterAdjustments = forRatesEndpoint
+            ? paymentAmountAfterAdjustments / operatorMagnitude
+            : Math.round(paymentAmountAfterAdjustments * operatorMagnitude);
+
+          if ((catalog as SingleUseCodePaymentCatalog).maximumDiscountAmount) {
+            // If theres a max discount amount, we need to check if the calculated amount is greater than the max discount amount
+            const calculatedAdjustmentAmount =
+              amountBeforeAdjustment - calculatedPaymentAmountAfterAdjustments;
+            if (
+              (await this.convertFromUSDAmount({
+                amount: calculatedAdjustmentAmount,
+                type: currencyType,
+              })) >
+              (catalog as SingleUseCodePaymentCatalog).maximumDiscountAmount
+            ) {
+              // If the calculated adjustment amount is greater than the max discount amount, we need to instead set the calculated amount subtract the max discount amount
+              calculatedPaymentAmountAfterAdjustments =
+                paymentAmountAfterAdjustments -
+                (await this.convertFromUSDAmount({
+                  amount: (catalog as SingleUseCodePaymentCatalog)
+                    .maximumDiscountAmount,
+                  type: currencyType,
+                }));
+            }
+          }
+
+          paymentAmountAfterAdjustments =
+            calculatedPaymentAmountAfterAdjustments;
+
+          break;
+        default:
+          this.logger.warn("Unknown operator from database!", { operator });
+          continue;
+      }
+
+      if (paymentAmountAfterAdjustments < 0) {
+        paymentAmountAfterAdjustments = 0;
+      }
+
+      const adjustment: PaymentAdjustment = {
+        adjustmentAmount:
+          paymentAmountAfterAdjustments - amountBeforeAdjustment,
+        currencyType,
+        catalogId,
+        description,
+        name: adjustmentName,
+        operator,
+        operatorMagnitude,
+      };
+      if ((catalog as SingleUseCodePaymentCatalog).codeValue) {
+        adjustment["promoCode"] = (
+          catalog as SingleUseCodePaymentCatalog
+        ).codeValue;
+      }
+      if ((catalog as SingleUseCodePaymentCatalog).maximumDiscountAmount) {
+        adjustment["maxDiscount"] = (
+          catalog as SingleUseCodePaymentCatalog
+        ).maximumDiscountAmount;
+      }
+
+      adjustments.push(adjustment);
+    }
+
+    return { adjustments, paymentAmountAfterAdjustments };
   }
 }

@@ -18,41 +18,34 @@ import { Next } from "koa";
 
 import { UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
-import { Winston } from "../types/winston";
+import {
+  validateAuthorizedRoute,
+  validateQueryParameters,
+  validateWinstonCreditAmount,
+} from "../utils/validators";
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase, logger } = ctx.state;
   const { walletAddress } = ctx.params;
 
-  const { winstonCredits, dataItemId } = ctx.query;
-
-  if (!ctx.request.headers.authorization || !ctx.state.user) {
-    ctx.response.status = 401;
-    ctx.body = "Unauthorized";
-    logger.error("GET Refund balance route with no AUTHORIZATION!");
+  if (validateAuthorizedRoute(ctx) === false) {
     return next();
   }
 
-  if (
-    Array.isArray(dataItemId) ||
-    !winstonCredits ||
-    Array.isArray(winstonCredits)
-  ) {
-    ctx.response.status = 400;
-    ctx.body = "Invalid parameters";
-    logger.error("GET Refund balance route with invalid parameters!", {
-      query: ctx.query,
-      params: ctx.params,
-    });
+  const { winstonCredits, dataItemId: rawDataItemId } = ctx.query;
+  const queryParameters = [winstonCredits, rawDataItemId];
+  if (!validateQueryParameters(ctx, queryParameters)) {
     return next();
   }
 
-  let winstonCreditsToRefund: Winston;
-  try {
-    winstonCreditsToRefund = new Winston(+winstonCredits);
-  } catch (error) {
-    ctx.response.status = 400;
-    ctx.body = `Invalid value provided for winstonCredits: ${winstonCredits}`;
+  // TODO: do some regex validation on the dataItemId
+  const [stringWinstonCredits, dataItemId] = queryParameters;
+
+  const winstonCreditsToRefund = validateWinstonCreditAmount(
+    ctx,
+    stringWinstonCredits
+  );
+  if (!winstonCreditsToRefund) {
     return next();
   }
 

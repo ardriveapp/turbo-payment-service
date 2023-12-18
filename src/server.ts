@@ -21,7 +21,11 @@ import Stripe from "stripe";
 import { Logger } from "winston";
 
 import { Architecture } from "./architecture";
-import { TEST_PRIVATE_ROUTE_SECRET, defaultPort } from "./constants";
+import {
+  TEST_PRIVATE_ROUTE_SECRET,
+  defaultPort,
+  migrateOnStartup,
+} from "./constants";
 import { PostgresDatabase } from "./database/postgres";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
@@ -67,7 +71,8 @@ export async function createServer(
   app.use(jwt({ secret: sharedSecret, passthrough: true }));
 
   const pricingService = arch.pricingService ?? new TurboPricingService({});
-  const paymentDatabase = arch.paymentDatabase ?? new PostgresDatabase();
+  const paymentDatabase =
+    arch.paymentDatabase ?? new PostgresDatabase({ migrate: migrateOnStartup });
   const stripe =
     arch.stripe ?? new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2022-11-15" });
 

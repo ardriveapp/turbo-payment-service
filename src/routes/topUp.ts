@@ -24,13 +24,15 @@ import {
   paymentIntentTopUpMethod,
   topUpMethods,
 } from "../constants";
-import { PaymentValidationError } from "../database/errors";
+import { CreateTopUpQuoteParams } from "../database/dbTypes";
+import { PaymentValidationError, PromoCodeError } from "../database/errors";
 import { MetricRegistry } from "../metricRegistry";
+import { WincForPaymentResponse } from "../pricing/pricing";
 import { KoaContext } from "../server";
-import { WC } from "../types/arc";
 import { Payment } from "../types/payment";
 import { winstonToArc } from "../types/winston";
 import { isValidArweaveBase64URL } from "../utils/base64";
+import { parseQueryParams } from "../utils/parseQueryParams";
 
 export async function topUp(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
@@ -86,13 +88,28 @@ export async function topUp(ctx: KoaContext, next: Next) {
     return next();
   }
 
-  let winstonCreditAmount: WC;
+  const promoCodes = parseQueryParams(ctx.query.promoCode);
+
+  let wincForPaymentResponse: WincForPaymentResponse;
   try {
-    winstonCreditAmount = await pricingService.getWCForPayment(payment);
-  } catch (error: unknown) {
-    logger.error(error);
-    ctx.response.status = 502;
-    ctx.body = "Fiat Oracle Unavailable";
+    wincForPaymentResponse = await pricingService.getWCForPayment({
+      payment,
+      userAddress: destinationAddress,
+      promoCodes,
+    });
+  } catch (error) {
+    if (error instanceof PromoCodeError) {
+      logger.warn("Failed to get price with Promo Code:", {
+        payment,
+        message: error.message,
+      });
+      ctx.response.status = 400;
+      ctx.body = error.message;
+    } else {
+      logger.error(error);
+      ctx.response.status = 502;
+      ctx.body = "Fiat Oracle Unavailable";
+    }
 
     return next();
   }
@@ -102,23 +119,43 @@ export async function topUp(ctx: KoaContext, next: Next) {
   const fiveMinutesMs = oneMinuteMs * 5;
   const fiveMinutesFromNow = new Date(Date.now() + fiveMinutesMs).toISOString();
 
-  const topUpQuote = {
+  const {
+    adjustments,
+    inclusiveAdjustments,
+    finalPrice,
+    actualPaymentAmount,
+    quotedPaymentAmount,
+  } = wincForPaymentResponse;
+
+  // TODO: Allow users to top up for free with promo codes
+
+  const topUpQuote: CreateTopUpQuoteParams = {
     topUpQuoteId: randomUUID(),
     destinationAddressType: "arweave",
-    paymentAmount: payment.amount,
-    winstonCreditAmount,
+    paymentAmount: actualPaymentAmount,
+    quotedPaymentAmount,
+    winstonCreditAmount: finalPrice.winc,
     destinationAddress,
     currencyType: payment.type,
     quoteExpirationDate: fiveMinutesFromNow,
     paymentProvider: "stripe",
+    adjustments,
   };
-  // Take all of topUpQuote to stripeMetadata except paymentProvider
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { paymentProvider, ...stripeMetadataRaw } = topUpQuote;
-  const stripeMetadata = {
-    ...stripeMetadataRaw,
-    winstonCreditAmount: winstonCreditAmount.toString(),
-  };
+
+  const { paymentProvider, adjustments: _a, ...stripeMetadataRaw } = topUpQuote;
+  const stripeMetadata = adjustments.reduce(
+    (acc, curr, i) => {
+      // Add adjustments to stripe metadata
+      // Stripe key name in metadata is limited to 40 characters, so we need to truncate the name.
+      const keyName = `adj${i}_${curr.name}`.slice(0, 40);
+      acc[keyName] = curr.adjustmentAmount.toString();
+      return acc;
+    },
+    {
+      ...stripeMetadataRaw,
+      winstonCreditAmount: finalPrice.winc.toString(),
+    } as Record<string, string | number | null>
+  );
 
   let intentOrCheckout:
     | Stripe.Response<Stripe.PaymentIntent>
@@ -127,12 +164,13 @@ export async function topUp(ctx: KoaContext, next: Next) {
     logger.info(`Creating stripe ${method}...`, loggerObject);
     if (method === paymentIntentTopUpMethod) {
       intentOrCheckout = await stripe.paymentIntents.create({
-        amount: payment.amount,
+        amount: actualPaymentAmount,
         currency: payment.type,
         metadata: stripeMetadata,
       });
     } else {
       intentOrCheckout = await stripe.checkout.sessions.create({
+        // TODO: Success and Cancel URLS (Do we need app origin? e.g: ArDrive Widget, Top Up Page, ario-turbo-cli)
         success_url: "https://app.ardrive.io",
         cancel_url: "https://app.ardrive.io",
         currency: payment.type,
@@ -146,13 +184,13 @@ export async function topUp(ctx: KoaContext, next: Next) {
               product_data: {
                 name: "Turbo Credits",
                 description: `${winstonToArc(
-                  winstonCreditAmount
+                  finalPrice.winc
                 )} credits on Turbo to destination address "${destinationAddress}"`,
                 tax_code: electronicallySuppliedServicesTaxCode,
                 metadata: stripeMetadata,
               },
               currency: payment.type,
-              unit_amount: payment.amount,
+              unit_amount: actualPaymentAmount,
             },
             quantity: 1,
           },
@@ -172,7 +210,10 @@ export async function topUp(ctx: KoaContext, next: Next) {
   }
 
   try {
-    await paymentDatabase.createTopUpQuote(topUpQuote);
+    await paymentDatabase.createTopUpQuote({
+      ...topUpQuote,
+      adjustments: [...adjustments, ...inclusiveAdjustments],
+    });
   } catch (error) {
     logger.error(error);
     ctx.response.status = 503;
@@ -183,6 +224,16 @@ export async function topUp(ctx: KoaContext, next: Next) {
   ctx.body = {
     topUpQuote,
     paymentSession: intentOrCheckout,
+    adjustments: adjustments.map((a) => {
+      const { catalogId: _, ...adjustmentsWithoutCatalogId } = a;
+
+      return adjustmentsWithoutCatalogId;
+    }),
+    fees: inclusiveAdjustments.map((a) => {
+      const { catalogId: _, ...adjustmentsWithoutCatalogId } = a;
+
+      return adjustmentsWithoutCatalogId;
+    }),
   };
   ctx.response.status = 200;
 

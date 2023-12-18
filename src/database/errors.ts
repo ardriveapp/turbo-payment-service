@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { CurrencyType, PaymentAmount, UserAddress } from "./dbTypes";
+import { CurrencyType, PaymentAmount, Timestamp, UserAddress } from "./dbTypes";
 
 export class UserNotFoundWarning extends Error {
   constructor(userAddress: UserAddress) {
@@ -73,5 +73,48 @@ export class PaymentAmountTooLarge extends PaymentValidationError {
       `The provided payment amount (${paymentAmount}) is too large for the currency type "${currencyType}"; it must be below or equal to ${maximumAllowedAmount}!`
     );
     this.name = "PaymentAmountTooLarge";
+  }
+}
+
+export abstract class PromoCodeError extends Error {}
+
+export class UserIneligibleForPromoCode extends PromoCodeError {
+  constructor(userAddress: UserAddress, promoCode: string) {
+    super(
+      `The user '${userAddress}' is ineligible for the promo code '${promoCode}'`
+    );
+    this.name = "UserIneligibleForPromoCode";
+  }
+}
+
+export class PromoCodeNotFound extends PromoCodeError {
+  constructor(promoCode: string) {
+    super(`No promo code found with code '${promoCode}'`);
+    this.name = "PromoCodeNotFound";
+  }
+}
+
+export class PromoCodeExpired extends PromoCodeError {
+  constructor(promoCode: string, endDate: Timestamp) {
+    super(`The promo code '${promoCode}' expired on '${endDate}'`);
+    this.name = "PromoCodeExpired";
+  }
+}
+
+export class PaymentAmountTooSmallForPromoCode extends PromoCodeError {
+  constructor(promoCode: string, minimumPaymentAmount: PaymentAmount) {
+    super(
+      `The promo code '${promoCode}' can only used on payments above '${minimumPaymentAmount}'`
+    );
+    this.name = "PaymentAmountTooSmallForPromoCode";
+  }
+}
+
+export class PromoCodeExceedsMaxUses extends PromoCodeError {
+  constructor(promoCode: string, maxUses: number) {
+    super(
+      `The promo code '${promoCode}' has already been used the maximum number of times (${maxUses})`
+    );
+    this.name = "PromoCodeExceedsMaxUses";
   }
 }

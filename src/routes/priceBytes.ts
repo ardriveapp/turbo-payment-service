@@ -47,11 +47,12 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
   }
   try {
     const priceWithAdjustments = await pricingService.getWCForBytes(bytes);
+    const { adjustments, finalPrice } = priceWithAdjustments;
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = {
-      winc: priceWithAdjustments.winc.toString(),
-      adjustments: priceWithAdjustments.adjustments,
+      winc: finalPrice.winc.toString(),
+      adjustments,
     };
     logger.info("Successfully calculated price for byte count", {
       ...priceWithAdjustments,

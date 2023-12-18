@@ -18,12 +18,19 @@ import { expect } from "chai";
 
 import { tableNames } from "../src/database/dbConstants";
 import {
+  AuditLogDBResult,
+  BalanceReservationDBResult,
   ChargebackReceiptDBResult,
+  PaymentAdjustmentDBResult,
   PaymentReceiptDBResult,
+  SingleUseCodePaymentCatalogDBResult,
   TopUpQuoteDBResult,
+  UploadAdjustment,
+  UploadAdjustmentDBInsert,
   UserDBResult,
 } from "../src/database/dbTypes";
 import { PostgresDatabase } from "../src/database/postgres";
+import { FinalPrice, NetworkPrice } from "../src/pricing/price";
 import { Winston } from "../src/types/winston";
 import { DbTestHelper } from "./dbTestHelper";
 import { stubTxId1 } from "./helpers/stubs";
@@ -33,6 +40,22 @@ describe("PostgresDatabase class", () => {
   const db = new PostgresDatabase();
   const dbTestHelper = new DbTestHelper(db);
 
+  const postgresTestPromoCode = "postgresTestPromoCode";
+  const postgresTestPromoCodeCatalogId = "postgresTestPromoCodeCatalogId";
+
+  before(async () => {
+    await db["writer"]<SingleUseCodePaymentCatalogDBResult>(
+      tableNames.singleUseCodePaymentAdjustmentCatalog
+    ).insert({
+      code_value: postgresTestPromoCode,
+      adjustment_exclusivity: "exclusive",
+      adjustment_name: "Postgres Test Promo Code",
+      catalog_id: postgresTestPromoCodeCatalogId,
+      operator: "multiply",
+      operator_magnitude: "0.8",
+    });
+  });
+
   describe("createTopUpQuote method", () => {
     const quoteExpirationDate = new Date(
       "2023-03-23 12:34:56.789Z"
@@ -41,8 +64,20 @@ describe("PostgresDatabase class", () => {
     before(async () => {
       await db.createTopUpQuote({
         paymentAmount: 100,
+        quotedPaymentAmount: 150,
         currencyType: "usd",
         destinationAddress: "XYZ",
+        adjustments: [
+          {
+            adjustmentAmount: -50,
+            catalogId: "uuid",
+            currencyType: "usd",
+            name: "best adjustment",
+            operator: "add",
+            operatorMagnitude: -50,
+            description: "fifty cents off",
+          },
+        ],
         destinationAddressType: "arweave",
         quoteExpirationDate,
         paymentProvider: "stripe",
@@ -52,13 +87,14 @@ describe("PostgresDatabase class", () => {
     });
 
     it("creates the expected top up quote in the database", async () => {
-      const topUpQuote = await db["knexWriter"]<TopUpQuoteDBResult>(
+      const topUpQuote = await db["writer"]<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       ).where({ top_up_quote_id: "Unique Identifier" });
       expect(topUpQuote.length).to.equal(1);
 
       const {
         payment_amount,
+        quoted_payment_amount,
         currency_type,
         destination_address,
         destination_address_type,
@@ -70,6 +106,7 @@ describe("PostgresDatabase class", () => {
       } = topUpQuote[0];
 
       expect(payment_amount).to.equal("100");
+      expect(quoted_payment_amount).to.equal("150");
       expect(currency_type).to.equal("usd");
       expect(destination_address).to.equal("XYZ");
       expect(destination_address_type).to.equal("arweave");
@@ -80,6 +117,35 @@ describe("PostgresDatabase class", () => {
       );
       expect(top_up_quote_id).to.equal("Unique Identifier");
       expect(winston_credit_amount).to.equal("500");
+    });
+
+    it("creates the expected payment adjustment in the database", async () => {
+      const paymentAdjustments = await db["writer"]<PaymentAdjustmentDBResult>(
+        tableNames.paymentAdjustment
+      ).where({
+        top_up_quote_id: "Unique Identifier",
+      });
+      expect(paymentAdjustments.length).to.equal(1);
+
+      const {
+        adjusted_currency_type,
+        adjusted_payment_amount,
+        adjustment_date,
+        adjustment_id,
+        adjustment_index,
+        catalog_id,
+        user_address,
+        top_up_quote_id,
+      } = paymentAdjustments[0];
+
+      expect(adjusted_payment_amount).to.equal("-50");
+      expect(catalog_id).to.equal("uuid");
+      expect(adjusted_currency_type).to.equal("usd");
+      expect(user_address).to.equal("XYZ");
+      expect(adjustment_index).to.equal(0);
+      expect(adjustment_date).to.exist;
+      expect(top_up_quote_id).to.equal("Unique Identifier");
+      expect(adjustment_id).to.be.a("number");
     });
   });
 
@@ -159,7 +225,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("creates the expected payment_receipt in the database entity", async () => {
-      const paymentReceipt = await db["knexWriter"]<PaymentReceiptDBResult>(
+      const paymentReceipt = await db["writer"]<PaymentReceiptDBResult>(
         tableNames.paymentReceipt
       ).where({ payment_receipt_id: "Unique Identifier" });
       expect(paymentReceipt.length).to.equal(1);
@@ -188,7 +254,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("creates the expected new user when an existing user address cannot be found", async () => {
-      const user = await db["knexWriter"]<UserDBResult>(tableNames.user).where({
+      const user = await db["writer"]<UserDBResult>(tableNames.user).where({
         user_address: newUserAddress,
       });
       expect(user.length).to.equal(1);
@@ -207,9 +273,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("increments existing user's balance as expected", async () => {
-      const oldUser = await db["knexWriter"]<UserDBResult>(
-        tableNames.user
-      ).where({
+      const oldUser = await db["writer"]<UserDBResult>(tableNames.user).where({
         user_address: oldUserAddress,
       });
       expect(oldUser.length).to.equal(1);
@@ -220,7 +284,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("deletes the top_up_quotes as expected", async () => {
-      const topUpQuoteDbResults = await db["knexWriter"]<TopUpQuoteDBResult>(
+      const topUpQuoteDbResults = await db["writer"]<TopUpQuoteDBResult>(
         tableNames.topUpQuote
       );
       const topUpIds = topUpQuoteDbResults.map((r) => r.top_up_quote_id);
@@ -251,7 +315,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knexWriter"](tableNames.paymentReceipt).where({
+          await db["writer"](tableNames.paymentReceipt).where({
             payment_receipt_id: "This is fine",
           })
         ).length
@@ -283,7 +347,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knexWriter"](tableNames.paymentReceipt).where({
+          await db["writer"](tableNames.paymentReceipt).where({
             payment_receipt_id: "This is a string",
           })
         ).length
@@ -304,8 +368,78 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knexWriter"](tableNames.paymentReceipt).where({
+          await db["writer"](tableNames.paymentReceipt).where({
             payment_receipt_id: "This is fine",
+          })
+        ).length
+      ).to.equal(0);
+    });
+
+    it("errors as expected when 20% off promo code payment adjustment is no longer eligible", async () => {
+      const userAddress = "this promo code User Address";
+      const firstTopUpQuoteId = "First Top Up Quote ID";
+      const secondTopUpQuoteId = "Second Top Up Quote ID";
+
+      const promoCodeEventCatalogId = await db[
+        "reader"
+      ]<SingleUseCodePaymentCatalogDBResult>(
+        tableNames.singleUseCodePaymentAdjustmentCatalog
+      )
+        .where({ code_value: postgresTestPromoCode })
+        .first()
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        .then((r) => r!.catalog_id);
+
+      await dbTestHelper.insertStubTopUpQuote({
+        destination_address: userAddress,
+        top_up_quote_id: firstTopUpQuoteId,
+      });
+      await dbTestHelper.insertStubTopUpQuote({
+        destination_address: userAddress,
+        top_up_quote_id: secondTopUpQuoteId,
+      });
+      await dbTestHelper.insertStubPaymentAdjustment({
+        top_up_quote_id: firstTopUpQuoteId,
+        user_address: userAddress,
+        catalog_id: promoCodeEventCatalogId,
+      });
+      await dbTestHelper.insertStubPaymentAdjustment({
+        top_up_quote_id: secondTopUpQuoteId,
+        user_address: userAddress,
+        catalog_id: promoCodeEventCatalogId,
+      });
+
+      await db.createPaymentReceipt({
+        currencyType: "usd",
+        paymentAmount: 100,
+        topUpQuoteId: firstTopUpQuoteId,
+        paymentReceiptId: "Unique Identifier promo code",
+      });
+
+      expect(
+        (
+          await db["reader"](tableNames.paymentReceipt).where({
+            payment_receipt_id: "Unique Identifier promo code",
+          })
+        ).length
+      ).to.equal(1);
+
+      await expectAsyncErrorThrow({
+        promiseToError: db.createPaymentReceipt({
+          currencyType: "usd",
+          paymentAmount: 100,
+          topUpQuoteId: secondTopUpQuoteId,
+          paymentReceiptId: "Unique Identifier second promo code ",
+        }),
+        errorMessage:
+          "The user 'this promo code User Address' is ineligible for the promo code 'postgresTestPromoCode'",
+        errorType: "UserIneligibleForPromoCode",
+      });
+
+      expect(
+        (
+          await db["reader"](tableNames.paymentReceipt).where({
+            payment_receipt_id: "Unique Identifier second promo code ",
           })
         ).length
       ).to.equal(0);
@@ -368,9 +502,9 @@ describe("PostgresDatabase class", () => {
     });
 
     it("creates the expected chargeback receipt in the database", async () => {
-      const chargebackReceipt = await db[
-        "knexWriter"
-      ]<ChargebackReceiptDBResult>(tableNames.chargebackReceipt).where({
+      const chargebackReceipt = await db["writer"]<ChargebackReceiptDBResult>(
+        tableNames.chargebackReceipt
+      ).where({
         chargeback_receipt_id: "A great Unique Identifier",
       });
       expect(chargebackReceipt.length).to.equal(1);
@@ -402,7 +536,7 @@ describe("PostgresDatabase class", () => {
 
     it("deletes the payment_receipt entity", async () => {
       const paymentReceiptDbResults = await db[
-        "knexWriter"
+        "writer"
       ]<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
         payment_receipt_id: naughtyPaymentId,
       });
@@ -410,9 +544,7 @@ describe("PostgresDatabase class", () => {
     });
 
     it("decrements user's balance as expected", async () => {
-      const oldUser = await db["knexWriter"]<UserDBResult>(
-        tableNames.user
-      ).where({
+      const oldUser = await db["writer"]<UserDBResult>(tableNames.user).where({
         user_address: naughtyUserAddress,
       });
       expect(oldUser.length).to.equal(1);
@@ -434,7 +566,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knexWriter"](tableNames.chargebackReceipt).where({
+          await db["writer"](tableNames.chargebackReceipt).where({
             chargeback_receipt_id: "Great value",
           })
         ).length
@@ -458,7 +590,7 @@ describe("PostgresDatabase class", () => {
         winston_credit_amount: disputedWinstonAmount,
       });
 
-      const negativeBalanceUserBefore = await db["knexWriter"]<UserDBResult>(
+      const negativeBalanceUserBefore = await db["writer"]<UserDBResult>(
         tableNames.user
       ).where({
         user_address: underfundedUserAddress,
@@ -474,7 +606,7 @@ describe("PostgresDatabase class", () => {
         chargebackReason: "Stripe Dispute Webhook Event",
       });
 
-      const negativeBalanceAfter = await db["knexWriter"]<UserDBResult>(
+      const negativeBalanceAfter = await db["writer"]<UserDBResult>(
         tableNames.user
       ).where({
         user_address: underfundedUserAddress,
@@ -492,7 +624,7 @@ describe("PostgresDatabase class", () => {
 
       expect(
         (
-          await db["knexWriter"](tableNames.chargebackReceipt).where({
+          await db["writer"](tableNames.chargebackReceipt).where({
             chargeback_receipt_id: chargebackReceiptId,
           })
         ).length
@@ -654,20 +786,89 @@ describe("PostgresDatabase class", () => {
     });
 
     it("reserves the balance as expected when winston balance is available", async () => {
-      await db.reserveBalance(richAddress, new Winston(500), stubTxId1);
+      const adjustments: UploadAdjustment[] = [
+        {
+          adjustmentAmount: new Winston(-500),
+          name: "Best Adjustment Ever",
+          operator: "add",
+          operatorMagnitude: -500,
+          description: "we rebate 500 winc on your upload :)",
+          catalogId: "Stub Catalog ID",
+        },
+        {
+          adjustmentAmount: new Winston(-2345678),
+          name: "Another good Adjustment Ever",
+          operator: "multiply",
+          operatorMagnitude: 0.5,
+          description: "we subsidize 50% of your upload 👍",
+          catalogId: "Another stub catalog id",
+        },
+      ];
+
+      await db.reserveBalance({
+        userAddress: richAddress,
+        reservedWincAmount: new FinalPrice(new Winston(500)),
+        networkWincAmount: new NetworkPrice(new Winston(500)),
+        dataItemId: stubTxId1,
+        adjustments,
+      });
 
       const richUser = await db.getUser(richAddress);
-
       expect(+richUser.winstonCreditBalance).to.equal(99_999_999_500);
+
+      const balanceReservationDbResult = await db[
+        "writer"
+      ]<BalanceReservationDBResult>(tableNames.balanceReservation).where({
+        data_item_id: stubTxId1,
+      });
+
+      expect(balanceReservationDbResult.length).to.equal(1);
+      expect(balanceReservationDbResult[0].user_address).to.equal(richAddress);
+      expect(balanceReservationDbResult[0].reserved_winc_amount).to.equal(
+        "500"
+      );
+      expect(balanceReservationDbResult[0].reserved_date).to.exist;
+      expect(typeof balanceReservationDbResult[0].reservation_id).to.equal(
+        "string"
+      );
+      expect(balanceReservationDbResult[0].data_item_id).to.equal(stubTxId1);
+
+      const adjustmentDbResult = await db["writer"]<UploadAdjustmentDBInsert>(
+        tableNames.uploadAdjustment
+      ).where({
+        reservation_id: balanceReservationDbResult[0].reservation_id,
+      });
+      expect(adjustmentDbResult.length).to.equal(2);
+
+      expect(adjustmentDbResult[0].adjusted_winc_amount).to.equal("-500");
+      expect(adjustmentDbResult[0].adjustment_index).to.equal(0);
+
+      expect(adjustmentDbResult[1].adjusted_winc_amount).to.equal("-2345678");
+      expect(adjustmentDbResult[1].adjustment_index).to.equal(1);
+
+      const auditLogDbResult = await db["writer"]<AuditLogDBResult>(
+        tableNames.auditLog
+      ).where({
+        change_id: stubTxId1,
+      });
+
+      expect(auditLogDbResult.length).to.equal(1);
+      expect(auditLogDbResult[0].user_address).to.equal(richAddress);
+      expect(auditLogDbResult[0].winston_credit_amount).to.equal("-500");
+      expect(auditLogDbResult[0].change_id).to.equal(stubTxId1);
+      expect(typeof auditLogDbResult[0].audit_id).to.equal("number");
+      expect(auditLogDbResult[0].change_reason).to.equal("upload");
     });
 
     it("throws an error as expected when winston balance is not available", async () => {
       await expectAsyncErrorThrow({
-        promiseToError: db.reserveBalance(
-          poorAddress,
-          new Winston(200),
-          stubTxId1
-        ),
+        promiseToError: db.reserveBalance({
+          userAddress: poorAddress,
+          reservedWincAmount: new FinalPrice(new Winston(200)),
+          networkWincAmount: new NetworkPrice(new Winston(200)),
+          adjustments: [],
+          dataItemId: stubTxId1,
+        }),
         errorType: "InsufficientBalance",
         errorMessage: `Insufficient balance for '${poorAddress}'`,
       });
@@ -678,11 +879,13 @@ describe("PostgresDatabase class", () => {
 
     it("throws a warning as expected when user cannot be found", async () => {
       await expectAsyncErrorThrow({
-        promiseToError: db.reserveBalance(
-          "Non Existent Address",
-          new Winston(1337),
-          stubTxId1
-        ),
+        promiseToError: db.reserveBalance({
+          userAddress: "Non Existent Address",
+          reservedWincAmount: new FinalPrice(new Winston(200)),
+          networkWincAmount: new NetworkPrice(new Winston(200)),
+          adjustments: [],
+          dataItemId: stubTxId1,
+        }),
         errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
@@ -718,6 +921,151 @@ describe("PostgresDatabase class", () => {
         errorType: "UserNotFoundWarning",
         errorMessage:
           "No user found in database with address 'Non Existent Address'",
+      });
+    });
+  });
+
+  describe("getSingleUsePromoCodeAdjustments", () => {
+    it("returns the expected adjustment for a user and 20% off promo code", async () => {
+      const userAddress = "userAddress";
+
+      const adjustmentDbResult = await db.getSingleUsePromoCodeAdjustments(
+        [postgresTestPromoCode],
+        userAddress
+      );
+      expect(adjustmentDbResult.length).to.equal(1);
+
+      const {
+        catalogId,
+        codeValue,
+        exclusivity,
+        name,
+        operator,
+        operatorMagnitude,
+        priority,
+        startDate,
+        description,
+        endDate,
+      } = adjustmentDbResult[0];
+
+      expect(catalogId).to.equal(postgresTestPromoCodeCatalogId);
+      expect(codeValue).to.be.equal(postgresTestPromoCode);
+      expect(exclusivity).to.be.equal("exclusive");
+      expect(name).to.be.equal("Postgres Test Promo Code");
+      expect(operator).to.be.equal("multiply");
+      expect(operatorMagnitude).to.be.equal(0.8);
+      expect(priority).to.be.equal(500);
+      expect(startDate).to.be.a("date");
+      expect(description).to.be.equal("");
+      expect(endDate).to.be.null;
+    });
+
+    describe("test pilot referral code", () => {
+      const pilotReferralPromoCode = "pilotReferralPromoCode";
+      const pilotReferralPromoCodeCatalogId = "pilotReferralPromoCodeCatalogId";
+
+      before(async () => {
+        await db["writer"]<SingleUseCodePaymentCatalogDBResult>(
+          tableNames.singleUseCodePaymentAdjustmentCatalog
+        ).insert({
+          code_value: pilotReferralPromoCode,
+          adjustment_exclusivity: "exclusive",
+          adjustment_name: "Pilot Referral Promo Code",
+          catalog_id: pilotReferralPromoCodeCatalogId,
+          target_user_group: "new",
+          max_uses: 10,
+          minimum_payment_amount: 5000,
+          operator: "add",
+          operator_magnitude: "-500",
+          adjustment_start_date: "2023-09-20T16:47:37.660Z", // in the past
+        });
+      });
+
+      it("returns the expected adjustment when un-used", async () => {
+        const userAddress = "userAddress";
+
+        const adjustmentDbResult = await db.getSingleUsePromoCodeAdjustments(
+          [pilotReferralPromoCode],
+          userAddress
+        );
+        expect(adjustmentDbResult.length).to.equal(1);
+
+        const {
+          catalogId,
+          codeValue,
+          exclusivity,
+          name,
+          operator,
+          operatorMagnitude,
+          priority,
+          startDate,
+          description,
+          endDate,
+          maxUses,
+          minimumPaymentAmount,
+          targetUserGroup,
+        } = adjustmentDbResult[0];
+
+        expect(catalogId).to.equal(pilotReferralPromoCodeCatalogId);
+        expect(codeValue).to.be.equal(pilotReferralPromoCode);
+        expect(exclusivity).to.be.equal("exclusive");
+        expect(name).to.be.equal("Pilot Referral Promo Code");
+        expect(operator).to.be.equal("add");
+        expect(operatorMagnitude).to.be.equal(-500);
+        expect(maxUses).to.be.equal(10);
+        expect(minimumPaymentAmount).to.be.equal(5000);
+        expect(targetUserGroup).to.be.equal("new");
+        expect(priority).to.be.equal(500);
+        expect(startDate).to.be.a("date");
+        expect(description).to.be.equal("");
+        expect(endDate).to.be.null;
+      });
+
+      it("errors as expected when used beyond max uses", async () => {
+        for (let i = 0; i < 10; i++) {
+          // Insert 10 stub payment adjustments with catalog id
+          await dbTestHelper.insertStubPaymentAdjustment({
+            catalog_id: pilotReferralPromoCodeCatalogId,
+          });
+        }
+
+        await expectAsyncErrorThrow({
+          promiseToError: db.getSingleUsePromoCodeAdjustments(
+            [pilotReferralPromoCode],
+            "userAddress"
+          ),
+          errorMessage: `The promo code '${pilotReferralPromoCode}' has already been used the maximum number of times (10)`,
+          errorType: "PromoCodeExceedsMaxUses",
+        });
+      });
+    });
+
+    describe("when promo code has been used", () => {
+      const usedPromoCodeUserAddress = "usedPromoCodeUserAddress";
+      const usedPromoCodeTopUpQuoteId = "usedPromoCodeTopUpQuoteId";
+
+      before(async () => {
+        // Presence of Payment Receipt and Payment Adjustment indicates that the promo code has been used
+        await dbTestHelper.insertStubPaymentReceipt({
+          destination_address: usedPromoCodeUserAddress,
+          top_up_quote_id: usedPromoCodeTopUpQuoteId,
+        });
+        await dbTestHelper.insertStubPaymentAdjustment({
+          catalog_id: postgresTestPromoCodeCatalogId,
+          top_up_quote_id: usedPromoCodeTopUpQuoteId,
+          user_address: usedPromoCodeUserAddress,
+        });
+      });
+
+      it("throws an error for a user when already used 20% off promo code", async () => {
+        await expectAsyncErrorThrow({
+          promiseToError: db.getSingleUsePromoCodeAdjustments(
+            [postgresTestPromoCode],
+            usedPromoCodeUserAddress
+          ),
+          errorMessage: `The user 'usedPromoCodeUserAddress' is ineligible for the promo code '${postgresTestPromoCode}'`,
+          errorType: "UserIneligibleForPromoCode",
+        });
       });
     });
   });

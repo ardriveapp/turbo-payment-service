@@ -21,6 +21,16 @@ export const tableNames = {
   paymentReceipt: "payment_receipt",
   chargebackReceipt: "chargeback_receipt",
   auditLog: "audit_log",
+  balanceReservation: "balance_reservation",
+  // TODO: refundedReservation, finalizedReservation
+
+  uploadAdjustment: "upload_adjustment",
+  paymentAdjustment: "payment_adjustment",
+
+  uploadAdjustmentCatalog: "upload_adjustment_catalog",
+  paymentAdjustmentCatalog: "payment_adjustment_catalog",
+  singleUseCodePaymentAdjustmentCatalog:
+    "single_use_code_payment_adjustment_catalog",
 } as const;
 
 export const columnNames = {
@@ -35,7 +45,8 @@ export const columnNames = {
   topUpQuoteId: "top_up_quote_id",
   destinationAddress: "destination_address",
   destinationAddressType: "destination_address_type",
-  paymentAmount: "payment_amount",
+  paymentAmount: "payment_amount", // amount we will expect from payment provider
+  quotedPaymentAmount: "quoted_payment_amount", // amount before payment-exclusive adjustments
   currencyType: "currency_type",
   winstonCreditAmount: "winston_credit_amount",
   quoteExpirationDate: "quote_expiration_date",
@@ -55,9 +66,43 @@ export const columnNames = {
   chargebackReason: "chargeback_reason",
   chargebackReceiptDate: "chargeback_receipt_date",
 
+  // Balance reservation
+  reservationId: "reservation_id",
+  dataItemId: "data_item_id",
+  reservedDate: "reserved_date",
+  networkWincAmount: "network_winc_amount", // amount before adjustments
+  reservedWincAmount: "reserved_winc_amount", // amount reserved after adjustments
+
+  // Adjustments
+  adjustmentId: "adjustment_id",
+  adjustmentDate: "adjustment_date",
+  adjustmentIndex: "adjustment_index", // ordering index with which adjustment should be applied to associated reservation_id
+  adjustedWincAmount: "adjusted_winc_amount",
+  adjustedPaymentAmount: "adjusted_payment_amount",
+  adjustedCurrencyType: "adjusted_currency_type",
+
   // Audit Log
   auditId: "audit_id",
   auditDate: "audit_date",
   changeReason: "change_reason",
   changeId: "change_id",
+
+  // Adjustment Catalog
+  catalogId: "catalog_id",
+  adjustmentName: "adjustment_name",
+  adjustmentDescription: "adjustment_description",
+  adjustmentStartDate: "adjustment_start_date",
+  adjustmentEndDate: "adjustment_end_date",
+
+  adjustmentPriority: "adjustment_priority",
+  // inclusive: applied within the payment that is made, exclusive: applied before payment is made where user can see the adjustment
+  adjustmentExclusivity: "adjustment_exclusivity",
+  adjustmentCodeValue: "code_value",
+  targetUserGroup: "target_user_group",
+  maxUses: "max_uses",
+  minimumPaymentAmount: "minimum_payment_amount",
+  maximumDiscountAmount: "maximum_discount_amount",
+
+  operator: "operator",
+  operatorMagnitude: "operator_magnitude",
 } as const;

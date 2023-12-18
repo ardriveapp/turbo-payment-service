@@ -1,4 +1,4 @@
-ARG NODE_VERSION=18.16.0
+ARG NODE_VERSION=18.17.0
 ARG NODE_VERSION_SHORT=18
 
 FROM node:${NODE_VERSION}-bullseye-slim AS builder
@@ -8,8 +8,11 @@ WORKDIR /usr/src/app
 COPY . .
 RUN yarn && yarn build
 
+# Clean out dependencies
+RUN yarn workspaces focus --production
+
 # Extract dist
-FROM gcr.io/distroless/nodejs:${NODE_VERSION_SHORT}
+FROM gcr.io/distroless/nodejs${NODE_VERSION_SHORT}-debian11
 WORKDIR /usr/src/app
 
 # Add shell

@@ -18,52 +18,31 @@ import { Next } from "koa";
 
 import { InsufficientBalance, UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
-import { ByteCount } from "../types";
+import {
+  validateAuthorizedRoute,
+  validateByteCount,
+  validateQueryParameters,
+} from "../utils/validators";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase, pricingService, logger } = ctx.state;
   const { walletAddress } = ctx.params;
 
-  const { byteCount: rawByteCount, dataItemId } = ctx.query;
-
-  if (!ctx.request.headers.authorization || !ctx.state.user) {
-    ctx.response.status = 401;
-    ctx.body = "Unauthorized";
-    logger.error(
-      "Unable to reserve balance. No authorization or user provided.",
-      {
-        user: ctx.state.user,
-        headers: ctx.request.headers,
-      }
-    );
+  if (!validateAuthorizedRoute(ctx)) {
     return next();
   }
 
-  // validate we have what we need
-  if (
-    Array.isArray(dataItemId) ||
-    !rawByteCount ||
-    Array.isArray(rawByteCount)
-  ) {
-    ctx.response.status = 400;
-    ctx.body = "Missing parameters";
-    logger.error("GET Reserve balance route with missing parameters!", {
-      ...ctx.params,
-      ...ctx.query,
-    });
+  const { byteCount: rawByteCount, dataItemId: rawDataItemId } = ctx.query;
+  const queryParameters = [rawByteCount, rawDataItemId];
+  if (!validateQueryParameters(ctx, queryParameters)) {
     return next();
   }
 
-  let byteCount: ByteCount;
-  try {
-    byteCount = ByteCount(+rawByteCount);
-  } catch (error) {
-    ctx.response.status = 400;
-    ctx.body = `Invalid parameter for byteCount: ${rawByteCount}`;
-    logger.error("GET Reserve balance route with invalid parameters!", {
-      ...ctx.params,
-      ...ctx.query,
-    });
+  // TODO: do some regex validation on the dataItemId
+  const [stringByteCount, dataItemId] = queryParameters;
+
+  const byteCount = validateByteCount(ctx, stringByteCount);
+  if (!byteCount) {
     return next();
   }
 
@@ -74,6 +53,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       dataItemId,
     });
     const priceWithAdjustments = await pricingService.getWCForBytes(byteCount);
+    const { finalPrice, networkPrice, adjustments } = priceWithAdjustments;
 
     logger.info("Reserving balance for user ", {
       walletAddress,
@@ -81,15 +61,17 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       dataItemId,
       ...priceWithAdjustments,
     });
-    await paymentDatabase.reserveBalance(
-      walletAddress,
-      priceWithAdjustments.winc,
-      dataItemId
-    );
+    await paymentDatabase.reserveBalance({
+      userAddress: walletAddress,
+      dataItemId,
+      reservedWincAmount: finalPrice,
+      adjustments,
+      networkWincAmount: networkPrice,
+    });
     ctx.response.status = 200;
     ctx.response.message = "Balance reserved";
-
-    ctx.response.body = priceWithAdjustments.winc;
+    // TODO: Adjust to JSON response body to Expose adjustments via Reserve balance (e.g: body = { winc, adjustments }), and then to the user of data POST
+    ctx.body = finalPrice.winc;
     logger.info("Balance reserved for user!", {
       walletAddress,
       byteCount,

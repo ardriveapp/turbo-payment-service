@@ -19,14 +19,18 @@ import { WC } from "../types/arc";
 import {
   ChargebackReceipt,
   ChargebackReceiptId,
+  CreateBalanceReservationParams,
   CreateChargebackReceiptParams,
   CreatePaymentReceiptParams,
   CreateTopUpQuoteParams,
+  PaymentAdjustmentCatalog,
   PaymentReceipt,
   PaymentReceiptId,
   PromotionalInfo,
+  SingleUseCodePaymentCatalog,
   TopUpQuote,
   TopUpQuoteId,
+  UploadAdjustmentCatalog,
   User,
   UserAddress,
 } from "./dbTypes";
@@ -48,14 +52,12 @@ export interface Database {
     paymentReceiptId: PaymentReceiptId
   ) => Promise<PaymentReceipt>;
   reserveBalance: (
-    userAddress: UserAddress,
-    winstonCreditAmount: WC,
-    dataItemId?: TransactionId
+    createBalanceReservationParams: CreateBalanceReservationParams
   ) => Promise<void>;
   refundBalance: (
     userAddress: UserAddress,
     winstonCreditAmount: WC,
-    dataItemId?: TransactionId
+    dataItemId?: TransactionId // TODO: once the upload-service is updated with the new routes, make this required
   ) => Promise<void>;
   createChargebackReceipt: (
     createChargebackReceiptParams: CreateChargebackReceiptParams
@@ -69,4 +71,10 @@ export interface Database {
   checkForExistingPaymentByTopUpQuoteId: (
     topUpQuoteId: TopUpQuoteId
   ) => Promise<boolean>;
+  getSingleUsePromoCodeAdjustments: (
+    promoCodes: string[],
+    userAddress: UserAddress
+  ) => Promise<SingleUseCodePaymentCatalog[]>;
+  getUploadAdjustmentCatalogs: () => Promise<UploadAdjustmentCatalog[]>;
+  getPaymentAdjustmentCatalogs(): Promise<PaymentAdjustmentCatalog[]>;
 }

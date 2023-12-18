@@ -54,9 +54,17 @@ export class MetricRegistry {
     help: "Count of uncaught exceptions",
   });
 
+  // TODO: add metric that tracks fraudulent wallet addresses
   public static suspiciousWalletActivity = new promClient.Counter({
     name: "suspicious_wallet_activity",
     help: "Count of suspicious wallet activity (e.g. high number of chargebacks)",
+  });
+
+  // Protected routes are obscured from the public, but still require authorization
+  // If we see activity on these routes, it's likely a bad actor inside our infrastructure
+  public static unauthorizedProtectedRouteActivity = new promClient.Counter({
+    name: "unauthorized_protected_route_activity",
+    help: "Count of unauthorized activity on protected routes",
   });
 
   private constructor() {
@@ -72,6 +80,9 @@ export class MetricRegistry {
       MetricRegistry.stripeSessionCreationErrorCounter
     );
     this.registry.registerMetric(MetricRegistry.suspiciousWalletActivity);
+    this.registry.registerMetric(
+      MetricRegistry.unauthorizedProtectedRouteActivity
+    );
   }
 
   public static getInstance(): MetricRegistry {

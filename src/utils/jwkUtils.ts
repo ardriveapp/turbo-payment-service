@@ -21,9 +21,8 @@ import { createHash } from "crypto";
 import { RSAModulusString } from "../types";
 import { toB64Url } from "./base64";
 
-export async function arweaveRSAModulusToAddress(
-  modulus: RSAModulusString
-): Promise<string> {
+// TODO: create a factory that returns address for various wallet types (Arweave, ETH, SOL)
+export function arweaveRSAModulusToAddress(modulus: RSAModulusString): string {
   const hash = createHash("sha256");
   hash.update(b64UrlToBuffer(modulus));
   const result = new Uint8Array(hash.digest());
