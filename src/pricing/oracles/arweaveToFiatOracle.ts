@@ -14,9 +14,12 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import {
+  CacheParams,
+  ReadThroughPromiseCache,
+} from "@ardrive/ardrive-promise-cache";
+
 import { createAxiosInstance } from "../../axiosClient";
-import { CacheParams } from "../../cache/promiseCache";
-import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import logger from "../../logger";
 import { supportedPaymentCurrencyTypes } from "../../types/supportedCurrencies";
 
@@ -74,6 +77,8 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
   }
 }
 
+const oneMinuteMs = 60 * 1000;
+
 export class ReadThroughArweaveToFiatOracle {
   private readonly oracle: ArweaveToFiatOracle;
   private readonly readThroughPromiseCache: ReadThroughPromiseCache<
@@ -90,8 +95,13 @@ export class ReadThroughArweaveToFiatOracle {
   }) {
     this.oracle = oracle ?? new CoingeckoArweaveToFiatOracle();
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
-      cacheParams: cacheParams ?? { cacheCapacity: 10 },
-      readThroughFunction: () => this.oracle.getFiatPricesForOneAR(),
+      cacheParams: cacheParams ?? {
+        cacheCapacity: 10,
+        cacheTTL: oneMinuteMs,
+      },
+      readThroughFunction: () =>
+        // TODO: Get from service level cache before oracle (elasticache)
+        this.oracle.getFiatPricesForOneAR(),
     });
   }
 

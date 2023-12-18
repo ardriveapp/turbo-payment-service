@@ -25,7 +25,6 @@ export async function priceRoutes(ctx: KoaContext, next: Next) {
 
   const walletAddress = ctx.state.walletAddress;
   if (walletAddress) {
-    // eslint-disable-next-line
     // TODO: Put any promotional info from the DB that may change pricing calculations into state
   }
 

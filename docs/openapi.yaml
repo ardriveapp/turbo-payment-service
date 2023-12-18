@@ -18,11 +18,38 @@ components:
       type: object
       properties:
         winc:
-          type: string
-          description: A big number string representing an amount of credits in winc. One credit is equivalent to 1,000,000,000,000 winc
-          example: "332824926"
+          "$ref": "#/components/schemas/Winc"
         adjustments:
           "$ref": "#/components/schemas/Adjustment"
+
+    PaymentCreditResponse:
+      type: object
+      properties:
+        winc:
+          "$ref": "#/components/schemas/Winc"
+        adjustments:
+          "$ref": "#/components/schemas/Adjustment"
+        fees:
+          "$ref": "#/components/schemas/Adjustment"
+        actualPaymentAmount:
+          "$ref": "#/components/schemas/ActualPaymentAmount"
+        quotedPaymentAmount:
+          "$ref": "#/components/schemas/QuotedPaymentAmount"
+
+    ActualPaymentAmount:
+      type: integer
+      description: The actual payment amount a user will spend in the given currency's smallest unit value. For example, $8 USD is 800
+      example: 800
+
+    QuotedPaymentAmount:
+      type: integer
+      description: The quoted payment amount without adjustments in the given currency's smallest unit value. For example, $10 USD is 1000
+      example: 1000
+
+    Winc:
+      type: string
+      description: A big number string representing an amount of credits in winc. One credit is equivalent to 10^12 winc
+      example: "332824926"
 
     Adjustment:
       type: array
@@ -33,18 +60,21 @@ components:
             type: string
           description:
             type: string
-          value:
+          operatorMagnitude:
             type: number
           operator:
             type: string
           adjustmentAmount:
             type: string
+          promoCode:
+            type: string
       example:
         - name: "Adjustment"
           description: "Some great subsidy"
-          value: "0.6"
+          operatorMagnitude: "0.6"
           operator: "multiply"
           adjustmentAmount: "-12300"
+          promoCode: "SOME-GREAT-CODE"
 
     CurrencyType:
       type: string
@@ -68,6 +98,10 @@ components:
       type: string
       description: The "modulus" of the JWK used to create the signature header
 
+    PromoCode:
+      type: string
+      description: Comma-separated list of promo codes
+
     TopUpQuote:
       type: object
       description: A copy of the top up quote that was saved to the service's database
@@ -82,8 +116,9 @@ components:
           type: string
           example: arweave
         paymentAmount:
-          type: integer
-          example: 1000
+          "$ref": "#/components/schemas/ActualPaymentAmount"
+        quotedPaymentAmount:
+          "$ref": "#/components/schemas/QuotedPaymentAmount"
         currencyType:
           type: string
           example: usd
@@ -102,7 +137,7 @@ components:
       properties:
         winc:
           type: string
-          description: A big number representing the amount of credits in winc that 1GB of storage costs based on current market rates. One credit is equivalent to 1,000,000,000,000 winc.
+          description: A big number representing the amount of credits in winc that 1GB of storage costs based on current market rates. One credit is equivalent to 10^12 winc.
           example: 332824926
         fiat:
           type: object
@@ -185,16 +220,48 @@ paths:
       description: Returns the current amount of winc this service will quote for a given payment type and amount
 
       parameters:
+        - name: x-signature
+          in: header
+          required: false
+          schema:
+            "$ref": "#/components/schemas/SignatureHeader"
+
+        - name: x-nonce
+          in: header
+          required: false
+          schema:
+            "$ref": "#/components/schemas/NonceHeader"
+
+        - name: x-public-key
+          in: header
+          required: false
+          schema:
+            "$ref": "#/components/schemas/PublicKeyHeader"
+
         - name: type
           in: path
           required: true
           schema:
             "$ref": "#/components/schemas/CurrencyType"
+
         - name: amount
           in: path
           required: true
           schema:
             "$ref": "#/components/schemas/PaymentAmount"
+
+        - name: promoCode
+          in: query
+          required: false
+          schema:
+            "$ref": "#/components/schemas/PromoCode"
+
+        - name: destinationAddress
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Destination wallet address. This will override the signature header's public key if provided
 
       responses:
         "200":
@@ -202,7 +269,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/CreditResponse"
+                "$ref": "#/components/schemas/PaymentCreditResponse"
 
         "400":
           description: Bad Request
@@ -284,6 +351,24 @@ paths:
       description: Get a top up quote and payment session for a given method (payment-intent or checkout-session), destination address, currency type, and payment amount
 
       parameters:
+        - name: x-signature
+          in: header
+          required: false
+          schema:
+            "$ref": "#/components/schemas/SignatureHeader"
+
+        - name: x-nonce
+          in: header
+          required: false
+          schema:
+            "$ref": "#/components/schemas/NonceHeader"
+
+        - name: x-public-key
+          in: header
+          required: false
+          schema:
+            "$ref": "#/components/schemas/PublicKeyHeader"
+
         - name: method
           in: path
           required: true
@@ -310,6 +395,12 @@ paths:
           schema:
             "$ref": "#/components/schemas/PaymentAmount"
 
+        - name: promoCode
+          in: query
+          required: false
+          schema:
+            "$ref": "#/components/schemas/PromoCode"
+
       responses:
         "200":
           description: OK
@@ -324,6 +415,10 @@ paths:
                   topUpQuote:
                     allOf:
                       - "$ref": "#/components/schemas/TopUpQuote"
+                  adjustments:
+                    "$ref": "#/components/schemas/Adjustment"
+                  fees:
+                    "$ref": "#/components/schemas/Adjustment"
 
         "403":
           description: Forbidden
@@ -374,14 +469,14 @@ paths:
                       {
                         usd:
                           {
-                            minimumPaymentAmount: 1000,
+                            minimumPaymentAmount: 500,
                             maximumPaymentAmount: 1000000,
                             suggestedPaymentAmounts: [2500, 5000, 10000],
                             zeroDecimalCurrency: false,
                           },
                         jpy:
                           {
-                            minimumPaymentAmount: 1500,
+                            minimumPaymentAmount: 750,
                             maximumPaymentAmount: 1500000,
                             suggestedPaymentAmounts: [3500, 6500, 15000],
                             zeroDecimalCurrency: true,

@@ -14,6 +14,10 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import {
+  CacheParams,
+  ReadThroughPromiseCache,
+} from "@ardrive/ardrive-promise-cache";
 import { AxiosInstance } from "axios";
 import BigNumber from "bignumber.js";
 
@@ -21,8 +25,6 @@ import {
   CreateAxiosInstanceParams,
   createAxiosInstance,
 } from "../../axiosClient";
-import { CacheParams } from "../../cache/promiseCache";
-import { ReadThroughPromiseCache } from "../../cache/readThroughPromiseCache";
 import { msPerMinute } from "../../constants";
 import logger from "../../logger";
 import { ByteCount, Winston } from "../../types";
@@ -63,6 +65,7 @@ export class ReadThroughBytesToWinstonOracle {
     Winston
   >;
   private getWinstonForBytesFromOracle = async (bytes: ByteCount) => {
+    //TODO Get from elasticache first
     return this.oracle.getWinstonForBytes(bytes);
   };
 

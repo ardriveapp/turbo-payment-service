@@ -67,8 +67,10 @@ export async function handleDisputeCreatedEvent(
 
     if (
       walletBalanceAfterChargeback.isNonZeroNegativeInteger() ||
+      // TODO: we may want to filter within a certain period (e.g. 90/180 days)
       totalWalletChargebacks.length > maxAllowedChargebackDisputes
     ) {
+      // TODO: tag a user in stripe as potentially fraudulent, block payments from card/customer
       logger.info(
         "Wallet has suspicious number of chargebacks and/or a negative balance.",
         {

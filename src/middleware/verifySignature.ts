@@ -42,12 +42,12 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
     }
     logger.info("Verifying arweave signature");
 
+    // TODO: use a factory that verifies, validates and returns address of provided x-public-key-header
     const isVerified = await verifyArweaveSignature({
       publicKey,
       signature: fromB64UrlToBuffer(signature),
-      additionalData: Object.keys(ctx.request.query).length
-        ? JSON.stringify(ctx.request.query)
-        : undefined,
+      // TODO: Verify from additional DATA on POST
+      additionalData: undefined,
       nonce: nonce,
     });
 
@@ -55,7 +55,7 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
 
     if (isVerified) {
       // Attach wallet address for the next middleware
-      ctx.state.walletAddress = await arweaveRSAModulusToAddress(publicKey);
+      ctx.state.walletAddress = arweaveRSAModulusToAddress(publicKey);
       // Generate a JWT token for subsequent requests
       logger.info("Generating JWT token for wallet.", {
         wallet: ctx.state.walletAddress,

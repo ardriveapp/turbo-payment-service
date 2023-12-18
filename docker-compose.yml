@@ -5,7 +5,7 @@ services:
     build:
       context: .
       args:
-        NODE_VERSION: ${NODE_VERSION:-18.16.0}
+        NODE_VERSION: ${NODE_VERSION:-18.17.0}
         NODE_VERSION_SHORT: ${NODE_VERSION_SHORT:-18}
     environment:
       NODE_ENV: ${NODE_ENV:-test}
@@ -16,6 +16,7 @@ services:
       DISABLE_LOGS: ${DISABLE_LOGS:-false}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      MIGRATE_ON_STARTUP: ${MIGRATE_ON_STARTUP:-}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
@@ -37,7 +38,7 @@ services:
       context: .
       dockerfile: tests/Dockerfile.integration
       args:
-        NODE_VERSION: ${NODE_VERSION:-18.16.0}
+        NODE_VERSION: ${NODE_VERSION:-18.17.0}
     environment:
       DB_HOST: payment-service-pg
       DB_PASSWORD: postgres

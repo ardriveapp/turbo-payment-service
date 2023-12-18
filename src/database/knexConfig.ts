@@ -17,13 +17,14 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import KnexDialect from "knex/lib/dialects/postgres";
+import path from "path";
 
 const baseConfig = {
   client: KnexDialect,
   version: "13.8",
   migrations: {
     tableName: "knex_migrations",
-    directory: "../../migrations",
+    directory: path.join(__dirname, "../migrations"),
   },
 };
 

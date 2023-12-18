@@ -16,15 +16,23 @@
  */
 import { Winston } from "../types/winston";
 import {
+  AdjustmentCatalog,
+  AdjustmentCatalogDBResult,
   ChargebackReceipt,
   ChargebackReceiptDBResult,
   FailedTopUpQuote,
   FailedTopUpQuoteDBResult,
+  PaymentAdjustmentCatalog,
+  PaymentAdjustmentCatalogDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
   PromotionalInfo,
+  SingleUseCodePaymentCatalog,
+  SingleUseCodePaymentCatalogDBResult,
   TopUpQuote,
   TopUpQuoteDBResult,
+  UploadAdjustmentCatalog,
+  UploadAdjustmentCatalogDBResult,
   User,
   UserDBResult,
 } from "./dbTypes";
@@ -47,6 +55,7 @@ export function userDBMap({
 
 export function topUpQuoteDBMap({
   payment_amount,
+  quoted_payment_amount,
   currency_type,
   payment_provider,
   top_up_quote_id,
@@ -58,6 +67,7 @@ export function topUpQuoteDBMap({
 }: TopUpQuoteDBResult): TopUpQuote {
   return {
     paymentAmount: +payment_amount,
+    quotedPaymentAmount: +quoted_payment_amount,
     currencyType: currency_type,
     paymentProvider: payment_provider,
     topUpQuoteId: top_up_quote_id,
@@ -97,5 +107,55 @@ export function chargebackReceiptDBMap(
     chargebackReceiptDate: dbResult.chargeback_receipt_date,
     chargebackReason: dbResult.chargeback_reason,
     chargebackReceiptId: dbResult.chargeback_receipt_id,
+  };
+}
+
+function priceAdjustmentCatalogDBMap({
+  catalog_id,
+  adjustment_name,
+  adjustment_description,
+  operator,
+  operator_magnitude,
+  adjustment_priority,
+  adjustment_start_date,
+  adjustment_end_date,
+}: AdjustmentCatalogDBResult): AdjustmentCatalog {
+  return {
+    catalogId: catalog_id,
+    name: adjustment_name,
+    description: adjustment_description,
+    startDate: adjustment_start_date,
+    endDate: adjustment_end_date,
+    priority: adjustment_priority,
+    operator,
+    operatorMagnitude: +operator_magnitude,
+  };
+}
+
+export function uploadAdjustmentCatalogDBMap(
+  dbResult: UploadAdjustmentCatalogDBResult
+): UploadAdjustmentCatalog {
+  return priceAdjustmentCatalogDBMap(dbResult);
+}
+
+export function paymentAdjustmentCatalogDBMap(
+  dbResult: PaymentAdjustmentCatalogDBResult
+): PaymentAdjustmentCatalog {
+  return {
+    ...priceAdjustmentCatalogDBMap(dbResult),
+    exclusivity: dbResult.adjustment_exclusivity,
+  };
+}
+
+export function singleUseCodePaymentCatalogDBMap(
+  dbResult: SingleUseCodePaymentCatalogDBResult
+): SingleUseCodePaymentCatalog {
+  return {
+    ...paymentAdjustmentCatalogDBMap(dbResult),
+    codeValue: dbResult.code_value,
+    targetUserGroup: dbResult.target_user_group,
+    maxUses: dbResult.max_uses,
+    minimumPaymentAmount: dbResult.minimum_payment_amount,
+    maximumDiscountAmount: dbResult.maximum_discount_amount,
   };
 }

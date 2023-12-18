@@ -1,0 +1,41 @@
+{
+  "files.insertFinalNewline": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "cSpell.words": [
+    "abcdefghijklmnopqrxtuvwxyz",
+    "alexsasharegan",
+    "ario",
+    "bignumber",
+    "capturable",
+    "chargeback",
+    "Chargebacks",
+    "Clawback",
+    "Hodler",
+    "knexfile",
+    "livemode",
+    "nvmrc",
+    "openapi",
+    "Readables",
+    "sats",
+    "sslmode",
+    "trivago",
+    "typecheck",
+    "uncategorized",
+    "winc",
+    "winstons"
+  ],
+  "search.exclude": {
+    "**/.yarn": true,
+    "**/.pnp.*": true
+  },
+  "eslint.nodePath": ".yarn/sdks",
+  "prettier.prettierPath": ".yarn/sdks/prettier/index.js",
+  "typescript.tsdk": ".yarn/sdks/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "[dockerfile]": {
+    "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+  }
+}

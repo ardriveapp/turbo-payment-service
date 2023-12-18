@@ -17,13 +17,27 @@
 import { Next } from "koa";
 
 import { oneMinuteInSeconds } from "../constants";
-import { PaymentValidationError } from "../database/errors";
+import { PaymentValidationError, PromoCodeError } from "../database/errors";
 import { KoaContext } from "../server";
 import { Payment } from "../types/payment";
+import { parseQueryParams } from "../utils/parseQueryParams";
 
 export async function priceFiatHandler(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
   const { pricingService } = ctx.state;
+  const { destinationAddress: rawDestinationAddress, promoCode } = ctx.query;
+
+  const promoCodes = parseQueryParams(promoCode);
+  const [destinationAddress] = parseQueryParams(rawDestinationAddress);
+
+  const walletAddress = destinationAddress || ctx.state.walletAddress;
+
+  if (promoCodes.length > 0 && !walletAddress) {
+    ctx.response.status = 400;
+    ctx.body =
+      "Promo codes must be applied to a specific `destinationAddress` or to the request signer";
+    return next();
+  }
 
   let payment: Payment;
   try {
@@ -36,23 +50,65 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
     ctx.body = (error as PaymentValidationError).message;
     return next();
   }
-  logger.info("Payment Price GET Route :", { payment });
+
+  logger.info("Payment Price GET Route :", {
+    payment,
+    walletAddress,
+    promoCodes,
+  });
 
   try {
-    const winstonCreditAmount = await pricingService.getWCForPayment(payment);
+    const wincForPaymentResponse = await pricingService.getWCForPayment({
+      payment,
+      promoCodes,
+      userAddress: walletAddress,
+    });
+
+    const {
+      actualPaymentAmount,
+      adjustments,
+      finalPrice,
+      quotedPaymentAmount,
+      inclusiveAdjustments,
+    } = wincForPaymentResponse;
 
     logger.info("Base credit amount found for payment", {
       payment,
-      winstonCreditAmount,
+      wincForPaymentResponse,
     });
 
-    ctx.body = { winc: winstonCreditAmount.toString() };
+    ctx.body = {
+      winc: finalPrice.toString(),
+      adjustments: adjustments.map((adjustment) => ({
+        ...adjustment,
+        catalogId: undefined,
+      })),
+      fees: inclusiveAdjustments.map((adjustment) => ({
+        ...adjustment,
+        catalogId: undefined,
+      })),
+      actualPaymentAmount,
+      quotedPaymentAmount,
+    };
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.response.status = 200;
   } catch (error) {
-    logger.error("Failed to get price for payment!", { payment }, error);
-    ctx.response.status = 502;
-    ctx.body = "Fiat Oracle Unavailable";
+    if (error instanceof PromoCodeError) {
+      logger.warn("Failed to get price with Promo Code:", {
+        payment,
+        message: error.message,
+      });
+      ctx.response.status = 400;
+      ctx.body = error.message;
+    } else {
+      logger.error(
+        "Failed to get price for payment!",
+        { payment, error },
+        error
+      );
+      ctx.response.status = 502;
+      ctx.body = "Fiat Oracle Unavailable";
+    }
   }
 
   return next();

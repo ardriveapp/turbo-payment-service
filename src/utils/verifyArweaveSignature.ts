@@ -26,6 +26,7 @@ export interface VerifySignatureParams {
   nonce: string;
 }
 
+// TODO: turn this into a class/factory function that can validate a data signature of other wallets (ETH, SOL)
 export async function verifyArweaveSignature({
   publicKey,
   signature,

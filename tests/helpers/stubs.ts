@@ -16,9 +16,8 @@
  */
 import Stripe from "stripe";
 
-import { Adjustment } from "../../src/database/dbTypes";
-
 export const stubTxId1 = "0000000000000000000000000000000000000000001";
+export const stubTxId2 = "0000000000000000000000000000000000000000002";
 
 interface StubPaymentIntentParams {
   id?: string;
@@ -152,6 +151,7 @@ export const paymentIntentFailedStub: Stripe.PaymentIntent = paymentIntentStub({
   status: "canceled",
 });
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const stripeResponseStub: Stripe.Response<any> = (
   details: Stripe.PaymentIntent | Stripe.Checkout.Session
 ) => {
@@ -297,30 +297,19 @@ export const expectedArPrices = {
   },
 };
 
-export const expectedAdjustments: Adjustment[] = [
-  {
-    name: "FWD Research July 2023 Subsidy",
-    description: "A 0% discount for uploads over 500KiB",
-    value: 0,
-    operator: "multiply",
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-expect-error : Winston type is stringified into "0" on API response
-    adjustmentAmount: "0",
-  },
-];
-
+// TODO: we could make this a function and apply it against the arweave rates above using the turboPercentageFee constant
 export const expectedRates = {
   winc: "857922282166",
   fiat: {
-    aud: 10.93233205718397,
-    brl: 36.638085813267686,
-    cad: 9.908744982331742,
-    eur: 6.743011761139201,
-    gbp: 5.8671589032756595,
-    hkd: 58.02788994445884,
-    inr: 607.008240275528,
-    jpy: 995.4331540717822,
-    sgd: 9.82432542976695,
-    usd: 7.407815737590149,
+    aud: 11.603230865848,
+    brl: 38.886503442302,
+    cad: 10.516827975899,
+    eur: 7.156819037912,
+    gbp: 6.227216565069,
+    hkd: 61.5889638333,
+    inr: 644.25931379941,
+    jpy: 1056.521210460615,
+    sgd: 10.427227737552,
+    usd: 7.862420914889,
   },
 };

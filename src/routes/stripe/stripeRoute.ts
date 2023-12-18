@@ -66,6 +66,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
   ctx.status = 200;
 
   // Unawaited calls so we can return a response immediately.
+  // TODO - Set the events we want to handle on stripe dashboard
 
   switch (event.type) {
     case "payment_intent.succeeded":

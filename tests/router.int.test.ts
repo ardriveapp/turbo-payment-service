@@ -15,10 +15,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 import Arweave from "arweave/node/common";
+import axiosPackage from "axios";
 import { expect } from "chai";
 import { Server } from "http";
 import { sign } from "jsonwebtoken";
-import { spy, stub } from "sinon";
+import { spy, stub, useFakeTimers } from "sinon";
 import Stripe from "stripe";
 
 import {
@@ -30,6 +31,8 @@ import { tableNames } from "../src/database/dbConstants";
 import {
   ChargebackReceiptDBResult,
   PaymentReceiptDBResult,
+  SingleUseCodePaymentCatalogDBResult,
+  TopUpQuote,
   UserDBResult,
 } from "../src/database/dbTypes.js";
 import logger from "../src/logger";
@@ -37,22 +40,23 @@ import {
   CoingeckoArweaveToFiatOracle,
   ReadThroughArweaveToFiatOracle,
 } from "../src/pricing/oracles/arweaveToFiatOracle";
+import { FinalPrice, NetworkPrice } from "../src/pricing/price";
 import { TurboPricingService } from "../src/pricing/pricing";
 import { createServer } from "../src/server";
 import { supportedPaymentCurrencyTypes } from "../src/types/supportedCurrencies";
 import { Winston } from "../src/types/winston";
+import { arweaveRSAModulusToAddress } from "../src/utils/jwkUtils";
 import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
 import {
   chargeDisputeStub,
   checkoutSessionStub,
   checkoutSessionSuccessStub,
-  expectedAdjustments,
   expectedArPrices,
-  expectedRates,
   paymentIntentStub,
   stripeResponseStub,
   stripeStubEvent,
   stubTxId1,
+  stubTxId2,
 } from "./helpers/stubs";
 import { assertExpectedHeadersWithContentLength } from "./helpers/testExpectations";
 import {
@@ -60,6 +64,7 @@ import {
   coinGeckoAxios,
   coinGeckoOracle,
   dbTestHelper,
+  localTestUrl,
   paymentDatabase,
   pricingService,
   stripe,
@@ -75,8 +80,21 @@ describe("Router tests", () => {
     logger.info("Server closed!");
   }
 
+  const routerTestPromoCode = "routerTestPromoCode";
+  const routerTestPromoCodeCatalogId = "routerTestPromoCodeCatalogId";
+
   before(async () => {
     server = await createServer({ pricingService, paymentDatabase, stripe });
+    await paymentDatabase["writer"]<SingleUseCodePaymentCatalogDBResult>(
+      tableNames.singleUseCodePaymentAdjustmentCatalog
+    ).insert({
+      code_value: routerTestPromoCode,
+      adjustment_exclusivity: "exclusive",
+      adjustment_name: "Router Test Promo Code",
+      catalog_id: routerTestPromoCodeCatalogId,
+      operator: "multiply",
+      operator_magnitude: "0.8",
+    });
   });
 
   after(() => {
@@ -97,7 +115,8 @@ describe("Router tests", () => {
   it("GET /price/bytes", async () => {
     const wincTotal = new Winston("1234567890");
     stub(pricingService, "getWCForBytes").resolves({
-      winc: wincTotal,
+      finalPrice: new FinalPrice(wincTotal),
+      networkPrice: new NetworkPrice(wincTotal),
       adjustments: [],
     });
 
@@ -108,6 +127,40 @@ describe("Router tests", () => {
     expect(statusText).to.equal("OK");
 
     expect(+new Winston(data.winc)).to.equal(1234567890);
+  });
+
+  it("GET /price/arweave/:bytes", async () => {
+    const wincTotal = new Winston("1234567890");
+    stub(pricingService, "getWCForBytes").resolves({
+      finalPrice: new FinalPrice(wincTotal),
+      networkPrice: new NetworkPrice(wincTotal),
+      adjustments: [],
+    });
+
+    const { status, statusText, data } = await axios.get(`/price/arweave/1024`);
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    expect(+new Winston(data)).to.equal(1234567890);
+  });
+
+  it("GET /price/arweave/:bytes returns 400 for invalid byte count", async () => {
+    const { status, statusText, data } = await axios.get(
+      `/price/arweave/-54.2`
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+    expect(data).to.equal("Invalid byte count");
+  });
+
+  it("GET /price/arweave/:bytes returns 502 if bytes pricing oracle fails to get a price", async () => {
+    stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
+    const { status, statusText, data } = await axios.get(
+      `/price/arweave/1321321`
+    );
+    expect(status).to.equal(502);
+    expect(data).to.equal("Pricing Oracle Unavailable");
+    expect(statusText).to.equal("Bad Gateway");
   });
 
   it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
@@ -163,6 +216,11 @@ describe("Router tests", () => {
   });
 
   it("GET /rates returns the correct response", async () => {
+    const fakeDateBeforeSubsidyAndInfraFee = new Date(
+      "2021-01-01T00:00:00.000Z"
+    );
+    const clock = useFakeTimers(fakeDateBeforeSubsidyAndInfraFee.getTime());
+
     stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
       expectedArPrices.arweave
     );
@@ -172,9 +230,93 @@ describe("Router tests", () => {
     expect(statusText).to.equal("OK");
 
     expect(data).to.deep.equal({
-      ...expectedRates,
-      adjustments: expectedAdjustments,
+      // No Infra Fee
+      fiat: {
+        aud: 8.888074843239,
+        brl: 29.787061636803,
+        cad: 8.055890229538,
+        eur: 5.48212338304,
+        gbp: 4.770047888842,
+        hkd: 47.177146296308,
+        inr: 493.502634370348,
+        jpy: 809.295247212831,
+        sgd: 7.987256446965,
+        usd: 6.022614420805,
+      },
+      // No Subsidy
+      winc: "857922282166",
+      adjustments: [],
     });
+    clock.restore();
+  });
+
+  it("GET /rates during twenty percent infra fee event returns the expected result", async () => {
+    const fakeDateDuringTwentyPctInfraFee = new Date(
+      "2023-01-02T00:00:00.000Z"
+    );
+    const clock = useFakeTimers(fakeDateDuringTwentyPctInfraFee.getTime());
+
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { data, status, statusText } = await axios.get(`/v1/rates`);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    expect(data).to.deep.equal({
+      // No Subsidy
+      fiat: {
+        aud: 11.110093554049,
+        brl: 37.233827046004,
+        cad: 10.069862786923,
+        eur: 6.8526542288,
+        gbp: 5.962559861053,
+        hkd: 58.971432870385,
+        inr: 616.878292962935,
+        jpy: 1011.619059016038,
+        sgd: 9.984070558706,
+        usd: 7.528268026006,
+      },
+      winc: "857922282166",
+      adjustments: [],
+    });
+    clock.restore();
+  });
+
+  it("GET /rates during twenty three point four percent infra fee event and Sep - Oct Subsidy Event returns the expected result", async () => {
+    const fakeDateDuringTwentyThreeFourPctInfraFeeAndSepOctSubsidyEvent =
+      new Date("2023-09-25T00:00:00.000Z");
+    const clock = useFakeTimers(
+      fakeDateDuringTwentyThreeFourPctInfraFeeAndSepOctSubsidyEvent.getTime()
+    );
+
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { data, status, statusText } = await axios.get(`/v1/rates`);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    expect(data.fiat).to.deep.equal({
+      // 23.4% Infra Fee applied
+      aud: 6.381776976212,
+      brl: 21.387576893252,
+      cad: 5.78425538674,
+      eur: 3.936250470849,
+      gbp: 3.424969110785,
+      hkd: 33.873930108293,
+      inr: 354.34262258945,
+      jpy: 581.086665752968,
+      sgd: 5.73497525565,
+      usd: 4.324331503186,
+    });
+
+    // 45% Subsidy Event applied
+    expect(data.winc).to.equal("471857255191");
+    expect(data.adjustments[0].adjustmentAmount).to.equal("-386065026975");
+    clock.restore();
   });
 
   it("GET /rates/:currency returns 404 for non supported currency", async () => {
@@ -215,16 +357,266 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(+new Winston(data.winc)).to.equal(109686609687);
+    const {
+      winc,
+      actualPaymentAmount,
+      quotedPaymentAmount,
+      adjustments,
+      fees,
+    } = data;
+
+    expect(+new Winston(winc)).to.equal(109686609687);
+    expect(quotedPaymentAmount).to.equal(100);
+    expect(actualPaymentAmount).to.equal(100);
+    expect(fees).to.deep.equal([
+      {
+        adjustmentAmount: -23,
+        currencyType: "usd",
+        description:
+          "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+        name: "Turbo Infrastructure Fee",
+        operator: "multiply",
+        operatorMagnitude: 0.766,
+      },
+    ]);
+    expect(adjustments).to.deep.equal([]);
+  });
+
+  it("GET /price/:currency/:value with a 20% off promoCode in query params returns expected result", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      .get(`/v1/price/USD/123?promoCode=${routerTestPromoCode}`, {
+        headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+      });
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    const {
+      winc,
+      actualPaymentAmount,
+      quotedPaymentAmount,
+      adjustments,
+      fees,
+    } = data;
+
+    expect(+new Winston(winc)).to.equal(133903133903);
+    expect(quotedPaymentAmount).to.equal(123);
+    expect(actualPaymentAmount).to.equal(98);
+    expect(adjustments).to.deep.equal([
+      {
+        adjustmentAmount: -25,
+        currencyType: "usd",
+        description: "",
+        name: "Router Test Promo Code",
+        operator: "multiply",
+        operatorMagnitude: 0.8,
+        promoCode: routerTestPromoCode,
+      },
+    ]);
+    expect(fees).to.deep.equal([
+      {
+        adjustmentAmount: -29,
+        currencyType: "usd",
+        description:
+          "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+        name: "Turbo Infrastructure Fee",
+        operator: "multiply",
+        operatorMagnitude: 0.766,
+      },
+    ]);
+  });
+
+  it("GET /price/:currency/:value with a 20% off promoCode and destinationAddress in query params  returns expected result", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+
+    const destinationAddress = "43CharactersABCDEFGHIJKLMNOPQRSTUVWXYZ12345";
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      .get(
+        `/v1/price/USD/123?promoCode=${routerTestPromoCode}&destinationAddress=${destinationAddress}`
+      );
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    const {
+      winc,
+      actualPaymentAmount,
+      quotedPaymentAmount,
+      adjustments,
+      fees,
+    } = data;
+
+    expect(+new Winston(winc)).to.equal(133903133903);
+    expect(quotedPaymentAmount).to.equal(123);
+    expect(actualPaymentAmount).to.equal(98);
+    expect(adjustments).to.deep.equal([
+      {
+        adjustmentAmount: -25,
+        currencyType: "usd",
+        description: "",
+        name: "Router Test Promo Code",
+        operator: "multiply",
+        operatorMagnitude: 0.8,
+        promoCode: routerTestPromoCode,
+      },
+    ]);
+    expect(fees).to.deep.equal([
+      {
+        adjustmentAmount: -29,
+        currencyType: "usd",
+        description:
+          "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+        name: "Turbo Infrastructure Fee",
+        operator: "multiply",
+        operatorMagnitude: 0.766,
+      },
+    ]);
+  });
+
+  it("GET /price/:currency/:value with duplicate 20% off promoCodes in query params returns expected result", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      .get(
+        `/v1/price/USD/1234?promoCode=${routerTestPromoCode}&promoCode=${routerTestPromoCode}`,
+        {
+          headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+        }
+      );
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    const {
+      winc,
+      actualPaymentAmount,
+      quotedPaymentAmount,
+      adjustments,
+      fees,
+    } = data;
+
+    expect(+new Winston(winc)).to.equal(1346153846154);
+    expect(quotedPaymentAmount).to.equal(1234);
+    expect(actualPaymentAmount).to.equal(987);
+    expect(adjustments).to.deep.equal([
+      {
+        adjustmentAmount: -247,
+        currencyType: "usd",
+        description: "",
+        name: "Router Test Promo Code",
+        operator: "multiply",
+        operatorMagnitude: 0.8,
+        promoCode: "routerTestPromoCode",
+      },
+    ]);
+    expect(fees).to.deep.equal([
+      {
+        adjustmentAmount: -289,
+        currencyType: "usd",
+        description:
+          "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+        name: "Turbo Infrastructure Fee",
+        operator: "multiply",
+        operatorMagnitude: 0.766,
+      },
+    ]);
+  });
+
+  it("GET /price/:currency/:value with INVALID promoCode in query params returns a 400", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      .get(`/v1/price/USD/100?promoCode=fakeCodeLOL`, {
+        headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+      });
+
+    expect(data).to.equal("No promo code found with code 'fakeCodeLOL'");
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /price/:currency/:value with INELIGIBLE promoCode in query params returns a 400", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const jwk = await Arweave.crypto.generateJWK();
+    const userAddress = arweaveRSAModulusToAddress(jwk.n);
+
+    await dbTestHelper.insertStubPaymentReceipt({
+      payment_receipt_id: "unique id promo ineligible price fiat",
+      top_up_quote_id: "used promo code id",
+      destination_address: userAddress,
+    });
+    await dbTestHelper.insertStubPaymentAdjustment({
+      catalog_id: routerTestPromoCodeCatalogId,
+      top_up_quote_id: "used promo code id",
+      user_address: userAddress,
+    });
+
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      // This wallet just used this code above... So we should now fail
+      .get(`/v1/price/USD/100?promoCode=${routerTestPromoCode}`, {
+        headers: await signedRequestHeadersFromJwk(jwk, "123"),
+      });
+
+    expect(data).to.equal(
+      `The user '${userAddress}' is ineligible for the promo code '${routerTestPromoCode}'`
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /price/:currency/:value with promoCode in query params but an unauthenticated request and lacking a destinationAddress returns a 400", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      .get(`/v1/price/USD/100?promoCode=${routerTestPromoCode}`);
+
+    expect(data).to.equal(
+      "Promo codes must be applied to a specific `destinationAddress` or to the request signer"
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
   });
 
   it("GET /price/:currency/:value returns 400 for invalid currency", async () => {
     const { data, status, statusText } = await axios.get(
-      `/v1/price/RandomCurrency/100`
+      `/v1/price/Random-Currency/100`
     );
     expect(data).to.equal(
-      // cspell:disable
-      "The currency type 'randomcurrency' is currently not supported by this API!" // cspell:enable
+      "The currency type 'random-currency' is currently not supported by this API!"
     );
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
@@ -379,7 +771,180 @@ describe("Router tests", () => {
     expect(client_secret).to.be.a.string;
     expect(metadata.topUpQuoteId).to.be.a.string;
     expect(paymentStatus).to.equal("requires_payment_method");
+
+    const {
+      quotedPaymentAmount,
+      paymentAmount,
+      topUpQuoteId,
+      winstonCreditAmount,
+    }: TopUpQuote = data.topUpQuote;
+
+    expect(quotedPaymentAmount).to.equal(1000);
+    expect(paymentAmount).to.equal(1000);
+    expect(topUpQuoteId).to.be.a.string;
+    expect(winstonCreditAmount).to.equal("1091168091168");
+
+    expect(data.fees).to.deep.equal([
+      {
+        adjustmentAmount: -234,
+        currencyType: "usd",
+        description:
+          "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+        name: "Turbo Infrastructure Fee",
+        operator: "multiply",
+        operatorMagnitude: 0.766,
+      },
+    ]);
+    expect(data.adjustments).to.deep.equal([]);
+
     paymentIntentStubSpy.restore();
+  });
+
+  it("GET /top-up with promoCode in query params returns the expected result", async () => {
+    const topUpAmount = 1000;
+    const paymentIntentStubSpy = stub(stripe.paymentIntents, "create").resolves(
+      stripeResponseStub({
+        ...paymentIntentStub({
+          amount: 800,
+          status: "requires_payment_method",
+        }),
+      })
+    );
+
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      .get(
+        `/v1/top-up/payment-intent/${testAddress}/usd/${topUpAmount}?promoCode=${routerTestPromoCode}`,
+        {
+          headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+        }
+      );
+
+    expect(data).to.have.property("topUpQuote");
+    expect(data).to.have.property("paymentSession");
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    const {
+      object,
+      payment_method_types,
+      amount,
+      currency,
+      client_secret,
+      status: paymentStatus,
+      metadata,
+    } = data.paymentSession;
+
+    const {
+      quotedPaymentAmount,
+      paymentAmount,
+      topUpQuoteId,
+      winstonCreditAmount,
+    }: TopUpQuote = data.topUpQuote;
+
+    expect(object).to.equal("payment_intent");
+    expect(payment_method_types).to.deep.equal(["card"]);
+    expect(amount).to.equal(paymentAmount);
+    expect(currency).to.equal("usd");
+    expect(client_secret).to.be.a.string;
+    expect(metadata.topUpQuoteId).to.be.a.string;
+    expect(paymentStatus).to.equal("requires_payment_method");
+
+    expect(quotedPaymentAmount).to.equal(1000);
+    expect(paymentAmount).to.equal(800);
+    expect(topUpQuoteId).to.be.a.string;
+    expect(winstonCreditAmount).to.equal("1091168091168");
+
+    expect(data.adjustments).to.deep.equal([
+      {
+        adjustmentAmount: -200,
+        currencyType: "usd",
+        description: "",
+        name: "Router Test Promo Code",
+        operator: "multiply",
+        operatorMagnitude: 0.8,
+        promoCode: "routerTestPromoCode",
+      },
+    ]);
+    expect(data.fees).to.deep.equal([
+      {
+        adjustmentAmount: -234,
+        currencyType: "usd",
+        description:
+          "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+        name: "Turbo Infrastructure Fee",
+        operator: "multiply",
+        operatorMagnitude: 0.766,
+      },
+    ]);
+
+    paymentIntentStubSpy.restore();
+  });
+
+  it("GET /top-up with INVALID promoCode in query params returns a 400", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      .get(
+        `/v1/top-up/payment-intent/${testAddress}/usd/1000?promoCode=fakeCodeLOL`,
+        {
+          headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+        }
+      );
+
+    expect(data).to.equal("No promo code found with code 'fakeCodeLOL'");
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
+  });
+
+  it("GET /top-up with INELIGIBLE promoCode in query params returns a 400", async () => {
+    stub(coinGeckoOracle, "getFiatPricesForOneAR").resolves(
+      expectedArPrices.arweave
+    );
+    const jwk = await Arweave.crypto.generateJWK();
+    const userAddress = arweaveRSAModulusToAddress(jwk.n);
+
+    await dbTestHelper.insertStubPaymentReceipt({
+      top_up_quote_id: "used promo code id",
+      destination_address: userAddress,
+      payment_receipt_id: "unique id promo ineligible top up",
+    });
+    await dbTestHelper.insertStubPaymentAdjustment({
+      catalog_id: routerTestPromoCodeCatalogId,
+      top_up_quote_id: "used promo code id",
+      user_address: userAddress,
+    });
+
+    const { status, statusText, data } = await axiosPackage
+      .create({
+        baseURL: localTestUrl,
+        validateStatus: () => true,
+      })
+      // This wallet just used this code above... So we should now fail
+      .get(
+        `/v1/top-up/payment-intent/${userAddress}/usd/1000?promoCode=${routerTestPromoCode}`,
+        {
+          headers: await signedRequestHeadersFromJwk(jwk, "123"),
+        }
+      );
+
+    expect(data).to.equal(
+      `The user '${userAddress}' is ineligible for the promo code '${routerTestPromoCode}'`
+    );
+    expect(status).to.equal(400);
+    expect(statusText).to.equal("Bad Request");
   });
 
   it("GET /top-up returns 403 for bad arweave address", async () => {
@@ -579,12 +1144,13 @@ describe("Router tests", () => {
 
     const adjustedWincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
-      winc: adjustedWincTotal,
+      finalPrice: new FinalPrice(adjustedWincTotal),
+      networkPrice: new NetworkPrice(adjustedWincTotal),
       adjustments: [],
     });
 
     const { status, statusText, data } = await axios.get(
-      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
+      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId2}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -596,7 +1162,7 @@ describe("Router tests", () => {
     expect(data).to.equal("100");
   });
 
-  it("GET /reserve-balance returns 200 for correct params using legacy route", async () => {
+  it("GET /reserve-balance returns 400 for legacy route without a data item ID", async () => {
     const testAddress = "a stub address 2";
     await dbTestHelper.insertStubUser({
       user_address: testAddress,
@@ -610,7 +1176,8 @@ describe("Router tests", () => {
 
     const wincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
-      winc: wincTotal,
+      finalPrice: new FinalPrice(wincTotal),
+      networkPrice: new NetworkPrice(wincTotal),
       adjustments: [],
     });
 
@@ -622,9 +1189,9 @@ describe("Router tests", () => {
         },
       }
     );
-    expect(statusText).to.equal("Balance reserved");
-    expect(status).to.equal(200);
-    expect(data).to.equal("100");
+    expect(statusText).to.equal("Bad Request");
+    expect(status).to.equal(400);
+    expect(data).to.equal("Invalid or missing parameters");
   });
 
   it("GET /reserve-balance returns 401 for missing authorization", async () => {
@@ -675,6 +1242,91 @@ describe("Router tests", () => {
     expect(status).to.equal(404);
   });
 
+  it("GET /check-balance returns 200 for correct params", async () => {
+    const testAddress = "a unique new stub address";
+    await dbTestHelper.insertStubUser({
+      user_address: testAddress,
+      winston_credit_balance: "1000000000",
+    });
+
+    const byteCount = 1;
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
+      expiresIn: "1h",
+    });
+
+    const adjustedWincTotal = new Winston("100");
+    stub(pricingService, "getWCForBytes").resolves({
+      finalPrice: new FinalPrice(adjustedWincTotal),
+      networkPrice: new NetworkPrice(adjustedWincTotal),
+      adjustments: [],
+    });
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    expect(statusText).to.equal("User has sufficient balance");
+    expect(status).to.equal(200);
+    expect(data).to.deep.equal({
+      userHasSufficientBalance: true,
+      bytesCostInWinc: "100",
+      userBalanceInWinc: "1000000000",
+      adjustments: [],
+    });
+  });
+
+  it("GET /check-balance returns 401 for missing authorization", async () => {
+    const byteCount = 1000;
+
+    const { status, statusText } = await axios.get(
+      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`
+    );
+    expect(statusText).to.equal("Unauthorized");
+    expect(status).to.equal(401);
+  });
+
+  it("GET /check-balance returns 402 for insufficient balance", async () => {
+    const byteCount = 10000000;
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
+      expiresIn: "1h",
+    });
+
+    const { status, statusText } = await axios.get(
+      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    expect(statusText).to.equal("Insufficient balance");
+    expect(status).to.equal(402);
+  });
+
+  it("GET /check-balance returns 404 if user not found", async () => {
+    const testAddress = "someRandomAddress";
+    const byteCount = 100000;
+
+    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
+      expiresIn: "1h",
+    });
+
+    const { status, statusText } = await axios.get(
+      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+    expect(statusText).to.equal("User not found");
+    expect(status).to.equal(404);
+  });
+
   it("GET /refund-balance returns 200 for correct params", async () => {
     const winstonCredits = 1000;
     const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
@@ -683,24 +1335,6 @@ describe("Router tests", () => {
 
     const { status, statusText } = await axios.get(
       `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-    expect(statusText).to.equal("Balance refunded");
-    expect(status).to.equal(200);
-  });
-
-  it("GET /refund-balance returns 200 for correct params for legacy route", async () => {
-    const winstonCredits = 1000;
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
-
-    const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}/${winstonCredits}`,
       {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -813,7 +1447,7 @@ describe("Router tests", () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const chargebackReceipt = await paymentDatabase[
-      "knexReader"
+      "reader"
     ]<ChargebackReceiptDBResult>(tableNames.chargebackReceipt).where({
       payment_receipt_id: disputeEventPaymentReceiptId,
     });
@@ -843,7 +1477,7 @@ describe("Router tests", () => {
     expect(winston_credit_amount).to.equal("50");
     expect(chargeback_reason).to.equal("fraudulent");
 
-    const user = await paymentDatabase["knexReader"]<UserDBResult>(
+    const user = await paymentDatabase["reader"]<UserDBResult>(
       tableNames.user
     ).where({
       user_address: disputeEventUserAddress,
@@ -869,6 +1503,7 @@ describe("Router tests", () => {
       top_up_quote_id: paymentSuccessTopUpQuoteId,
       winston_credit_amount: "500",
       payment_amount: "100",
+      quoted_payment_amount: "100",
       destination_address: paymentReceivedUserAddress,
     });
 
@@ -900,7 +1535,7 @@ describe("Router tests", () => {
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const paymentReceipt = await paymentDatabase[
-      "knexReader"
+      "reader"
     ]<PaymentReceiptDBResult>(tableNames.paymentReceipt).where({
       top_up_quote_id: paymentSuccessTopUpQuoteId,
     });
@@ -908,6 +1543,7 @@ describe("Router tests", () => {
 
     const {
       payment_amount,
+      quoted_payment_amount,
       currency_type,
       destination_address,
       destination_address_type,
@@ -915,6 +1551,7 @@ describe("Router tests", () => {
     } = paymentReceipt[0];
 
     expect(payment_amount).to.equal("100");
+    expect(quoted_payment_amount).to.equal("100");
     expect(currency_type).to.equal("usd");
     expect(destination_address).to.equal(paymentReceivedUserAddress);
     expect(destination_address_type).to.equal("arweave");
