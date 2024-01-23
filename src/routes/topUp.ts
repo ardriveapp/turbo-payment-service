@@ -38,6 +38,7 @@ import { parseQueryParams } from "../utils/parseQueryParams";
 import {
   validateDestinationAddressType,
   validateGiftMessage,
+  validateUiMode,
 } from "../utils/validators";
 
 export async function topUp(ctx: KoaContext, next: Next) {
@@ -51,6 +52,8 @@ export async function topUp(ctx: KoaContext, next: Next) {
     address: rawDestinationAddress,
   } = ctx.params;
 
+  const referer = ctx.headers.referer;
+
   const loggerObject = { amount, currency, method, rawDestinationAddress };
 
   if (!topUpMethods.includes(method)) {
@@ -63,6 +66,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
   const {
     destinationAddressType: rawAddressType,
     giftMessage: rawGiftMessage,
+    uiMode: rawUiMode,
   } = ctx.query;
 
   const destinationAddressType = rawAddressType
@@ -76,6 +80,11 @@ export async function topUp(ctx: KoaContext, next: Next) {
     ? validateGiftMessage(ctx, rawGiftMessage)
     : undefined;
   if (giftMessage === false) {
+    return next();
+  }
+
+  const uiMode = rawUiMode ? validateUiMode(ctx, rawUiMode) : "hosted";
+  if (uiMode === false) {
     return next();
   }
 
@@ -207,6 +216,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     {
       ...stripeMetadataRaw,
       winstonCreditAmount: finalPrice.winc.toString(),
+      referer,
     } as Record<string, string | number | null>
   );
 
@@ -220,6 +230,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
         amount: actualPaymentAmount,
         currency: payment.type,
         metadata: stripeMetadata,
+        payment_method_types: ["card"],
       });
     } else {
       const localGiftUrl = `http://localhost:5173`;
@@ -232,17 +243,31 @@ export async function topUp(ctx: KoaContext, next: Next) {
       const urlEncodedGiftMessage = giftMessage
         ? encodeURIComponent(giftMessage)
         : undefined;
+
+      const urls:
+        | { success_url: string; cancel_url: string }
+        | { redirect_on_completion: "never" } =
+        uiMode === "embedded"
+          ? {
+              redirect_on_completion: "never",
+            }
+          : {
+              //       // TODO: Success and Cancel URLS (Do we need app origin? e.g: ArDrive Widget, Top Up Page, ario-turbo-cli)
+              success_url: "https://app.ardrive.io",
+              cancel_url:
+                destinationAddressType === "email"
+                  ? `${giftUrl}?email=${destinationAddress}&amount=${
+                      payment.amount
+                    }${
+                      urlEncodedGiftMessage
+                        ? `&giftMessage=${urlEncodedGiftMessage}`
+                        : ""
+                    }`
+                  : "https://app.ardrive.io",
+            };
+
       intentOrCheckout = await stripe.checkout.sessions.create({
-        // TODO: Success and Cancel URLS (Do we need app origin? e.g: ArDrive Widget, Top Up Page, ario-turbo-cli)
-        success_url: "https://app.ardrive.io",
-        cancel_url:
-          destinationAddressType === "email"
-            ? `${giftUrl}?email=${destinationAddress}&amount=${payment.amount}${
-                urlEncodedGiftMessage
-                  ? `&giftMessage=${urlEncodedGiftMessage}`
-                  : ""
-              }`
-            : "https://app.ardrive.io",
+        ...urls,
         currency: payment.type,
         automatic_tax: {
           enabled: !!process.env.ENABLE_AUTO_STRIPE_TAX || false,
@@ -269,6 +294,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
           metadata: stripeMetadata,
         },
         mode: "payment",
+        ui_mode: uiMode,
       });
     }
   } catch (error) {

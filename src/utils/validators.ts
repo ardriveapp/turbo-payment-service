@@ -163,3 +163,27 @@ export function validateGiftMessage(
 
   return validator.escape(message);
 }
+
+export const uiModes = ["hosted", "embedded"] as const;
+export type UiMode = (typeof uiModes)[number];
+function isUiMode(uiMode: string): uiMode is UiMode {
+  return uiModes.includes(uiMode as UiMode);
+}
+export function validateUiMode(
+  ctx: KoaContext,
+  uiMode: string | string[]
+): UiMode | false {
+  const mode = validateSingularQueryParameter(ctx, uiMode);
+
+  if (!mode || !isUiMode(mode)) {
+    ctx.response.status = 400;
+    ctx.body = `Invalid ui mode! Allowed modes: "${uiModes.toString()}"`;
+    ctx.state.logger.error("Invalid ui mode!", {
+      query: ctx.query,
+      params: ctx.params,
+    });
+    return false;
+  }
+
+  return mode;
+}

@@ -5697,7 +5697,7 @@ __metadata:
     rimraf: ^3.0.2
     sinon: ^14.0.0
     sinon-chai: ^3.7.0
-    stripe: ^11.13.0
+    stripe: ^14.11.0
     ts-node: ^10.7.0
     typescript: ^4.7.4
     validator: ^13.11.0
@@ -6566,13 +6566,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"stripe@npm:^11.13.0":
-  version: 11.18.0
-  resolution: "stripe@npm:11.18.0"
+"stripe@npm:^14.11.0":
+  version: 14.11.0
+  resolution: "stripe@npm:14.11.0"
   dependencies:
     "@types/node": ">=8.1.0"
     qs: ^6.11.0
-  checksum: 7da0195730df921c983560f22820797c1a9f8bc200e89012a87180d65628506a98fe400dca2c6e78ea98b9b931fac62dd9c223920566e0aa71468ec6cc671695
+  checksum: 3d4c683675c0046de567d286aa5c79e3b8e2551e9cb64921790c835fe1fbe1855a31332a014e74507fad793f3976f683e94d2126a9e30b137c13d4992d0818e7
   languageName: node
   linkType: hard
 

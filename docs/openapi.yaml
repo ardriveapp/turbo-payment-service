@@ -401,6 +401,15 @@ paths:
           schema:
             "$ref": "#/components/schemas/PromoCode"
 
+        - name: uiMode
+          in: query
+          required: false
+          schema:
+            type: string
+            description: Which UI Mode to create the checkout session in
+            default: hosted
+            example: embedded
+
       responses:
         "200":
           description: OK
