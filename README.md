@@ -24,6 +24,8 @@ With a compatible system, follow these steps to start the upload service:
 - `yarn start`
   - alternatively use `yarn start:watch` to run the app in development mode with hot reloading provided by `nodemon`
 
+Note: we store credentials for the service in AWS - to avoid these requests - set your NODE_ENV to `test` in your .env file.
+
 ## Database
 
 The service relies on a postgres database. The following scripts can be used to create a local postgres database via docker:
@@ -62,16 +64,14 @@ Additional `knex` documentation can be found [here](https://knexjs.org/guide/mig
 
 To run this service and a connected postgres database, fully migrated.
 
-Run the container:
+- `cp .env.sample .env` (and update values)
+- `yarn start:docker` - run the local service and postgres database in docker containers
 
-```shell
-yarn start:docker
-```
+Alternatively, you can run the service in docker and connect to a local postgres database. You will need to standup `postgres` in a separate container.
 
-To build the image:
-
-```shell
-docker build --build-arg NODE_VERSION=$(cat .nvmrc |cut -c2-8) --build-arg NODE_VERSION_SHORT=$(cat .nvmrc |cut -c2-3) .
+```bash
+docker run --name turbo-payment-service-postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 -d postgres
+docker run --env-file .env -p 4000:4000 ghcr.io/ardriveapp/turbo-payment-service:latest
 ```
 
 ## Tests

@@ -46,6 +46,16 @@ process.on("uncaughtException", (error) => {
   logger.error("Uncaught exception:", error);
 });
 
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM received, exiting...");
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  logger.info("SIGINT received, exiting...");
+  process.exit(0);
+});
+
 export async function createServer(
   arch: Partial<Architecture>,
   port: number = defaultPort
@@ -76,7 +86,7 @@ export async function createServer(
   const paymentDatabase =
     arch.paymentDatabase ?? new PostgresDatabase({ migrate: migrateOnStartup });
   const stripe =
-    arch.stripe ?? new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2022-11-15" });
+    arch.stripe ?? new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
 
   const emailProvider = (() => {
     if (!isGiftingEnabled) {

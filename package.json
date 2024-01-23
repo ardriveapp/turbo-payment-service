@@ -86,7 +86,7 @@
     "prom-client": "^14.1.0",
     "raw-body": "^2.5.2",
     "sinon-chai": "^3.7.0",
-    "stripe": "^11.13.0",
+    "stripe": "^14.11.0",
     "validator": "^13.11.0",
     "winston": "^3.8.2",
     "yaml": "^2.2.2"

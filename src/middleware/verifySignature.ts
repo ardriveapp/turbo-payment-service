@@ -37,7 +37,7 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
 
   try {
     if (!signature || !publicKey || !nonce) {
-      logger.info("Missing signature, public key or nonce");
+      logger.debug("Missing signature, public key or nonce");
       return next();
     }
     logger.info("Verifying arweave signature");

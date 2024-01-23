@@ -78,6 +78,11 @@ export const paymentIntentStub = ({
     statement_descriptor_suffix: null,
     transfer_data: null,
     transfer_group: null,
+    latest_charge: null,
+    payment_method_configuration_details: {
+      id: "pm_1MnkNVC8apPOWkDLH9wJvENb",
+      parent: "card_1MnkNVC8apPOWkDLH9wJvENb",
+    },
   };
 };
 
@@ -104,6 +109,8 @@ export const checkoutSessionStub = ({
     custom_text: {
       shipping_address: null,
       submit: null,
+      after_submit: null,
+      terms_of_service_acceptance: null,
     },
     custom_fields: [],
     customer_creation: null,
@@ -140,6 +147,13 @@ export const checkoutSessionStub = ({
     success_url: "",
     total_details: null,
     url: null,
+    client_secret: null,
+    currency_conversion: null,
+    payment_method_configuration_details: {
+      id: "pm_1MnkNVC8apPOWkDLH9wJvENb",
+      parent: "card_1MnkNVC8apPOWkDLH9wJvENb",
+    },
+    ui_mode: "hosted",
   };
 };
 
@@ -233,7 +247,7 @@ export const stripeStubEvent = ({
 }: {
   eventObject: Stripe.Dispute | Stripe.PaymentIntent;
   id?: string;
-  type: string;
+  type: "payment_intent.succeeded" | "charge.dispute.created";
 }): Stripe.Event => {
   return {
     id,
@@ -247,7 +261,7 @@ export const stripeStubEvent = ({
     type: type,
     pending_webhooks: 0,
     request: null,
-  };
+  } as Stripe.Event;
 };
 
 export const expectedArPrices = {

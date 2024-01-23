@@ -110,7 +110,7 @@ export const coinGeckoOracle = new CoingeckoArweaveToFiatOracle(coinGeckoAxios);
 export const arweaveToFiatOracle = new ReadThroughArweaveToFiatOracle({
   oracle: coinGeckoOracle,
 });
-export const stripe = new Stripe("test", { apiVersion: "2022-11-15" });
+export const stripe = new Stripe("test", { apiVersion: "2023-10-16" });
 export const pricingService = new TurboPricingService({ arweaveToFiatOracle });
 export const axios = axiosPackage.create({
   baseURL: localTestUrl,
