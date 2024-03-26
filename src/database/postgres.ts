@@ -723,7 +723,36 @@ export class PostgresDatabase implements Database {
     adjustments = [],
   }: CreateBalanceReservationParams): Promise<void> {
     await this.writer.transaction(async (knexTransaction) => {
-      const user = await this.getUser(userAddress, knexTransaction);
+      let user: User;
+      try {
+        user = await this.getUser(userAddress, knexTransaction);
+      } catch (error) {
+        if (error instanceof UserNotFoundWarning) {
+          if (reservedWincAmount.winc.isNonZeroNegativeInteger()) {
+            throw new UserNotFoundWarning(userAddress);
+          }
+          this.log.info(
+            `No user found with address '${userAddress}', but this reservation is free. Creating a new user without balance.`
+          );
+          const userDbInsert: UserDBInsert = {
+            user_address: userAddress,
+            // TODO: user_address_type should be injected as a parameter
+            user_address_type: "arweave",
+            winston_credit_balance: "0",
+          };
+          const dbResult = await knexTransaction<UserDBResult>(tableNames.user)
+            .insert(userDbInsert)
+            .returning("user_creation_date");
+          user = {
+            userAddress,
+            winstonCreditBalance: new Winston("0"),
+            promotionalInfo: {},
+            userAddressType: "arweave",
+            userCreationDate: dbResult[0].user_creation_date,
+          };
+        }
+        throw error; // Re throw the error if it's not a UserNotFoundWarning
+      }
 
       const currentWinstonBalance = user.winstonCreditBalance;
       const newBalance = currentWinstonBalance.minus(reservedWincAmount.winc);

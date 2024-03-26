@@ -16,7 +16,7 @@
  */
 import Arweave from "arweave/node/common";
 import { stringToBuffer } from "arweave/node/lib/utils";
-import { AxiosRequestHeaders } from "axios";
+import { RawAxiosRequestHeaders } from "axios";
 import { Buffer } from "buffer";
 import { randomUUID } from "crypto";
 
@@ -36,7 +36,7 @@ export async function signedRequestHeadersFromJwk(
   jwk: JWKInterface,
   nonce: string = randomUUID(),
   data = ""
-): Promise<AxiosRequestHeaders> {
+): Promise<RawAxiosRequestHeaders> {
   const signature = await signData(jwk, data + nonce);
 
   return {
