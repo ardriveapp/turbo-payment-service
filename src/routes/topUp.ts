@@ -25,6 +25,7 @@ import {
   isGiftingEnabled,
   paymentIntentTopUpMethod,
   topUpMethods,
+  topUpQuoteExpirationMs,
 } from "../constants";
 import { CreateTopUpQuoteParams } from "../database/dbTypes";
 import { PaymentValidationError, PromoCodeError } from "../database/errors";
@@ -175,10 +176,10 @@ export async function topUp(ctx: KoaContext, next: Next) {
     return next();
   }
 
-  const oneSecondMs = 1000;
-  const oneMinuteMs = oneSecondMs * 60;
-  const fiveMinutesMs = oneMinuteMs * 5;
-  const fiveMinutesFromNow = new Date(Date.now() + fiveMinutesMs).toISOString();
+  const quoteExpirationDate = new Date(
+    Date.now() + topUpQuoteExpirationMs
+  ).toISOString();
+  const quoteExpirationMs = new Date(quoteExpirationDate).getTime();
 
   const {
     adjustments,
@@ -198,7 +199,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     winstonCreditAmount: finalPrice.winc,
     destinationAddress,
     currencyType: payment.type,
-    quoteExpirationDate: fiveMinutesFromNow,
+    quoteExpirationDate,
     paymentProvider: "stripe",
     adjustments,
     giftMessage,
@@ -272,6 +273,8 @@ export async function topUp(ctx: KoaContext, next: Next) {
         automatic_tax: {
           enabled: !!process.env.ENABLE_AUTO_STRIPE_TAX || false,
         },
+        // Convert to stripe compatible timestamp, trim off precision
+        expires_at: Math.floor(quoteExpirationMs / 1000),
         payment_method_types: ["card"],
         line_items: [
           {
