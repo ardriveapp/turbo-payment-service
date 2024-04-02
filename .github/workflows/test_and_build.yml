@@ -2,40 +2,31 @@ name: Node.js CI
 
 on: [push]
 jobs:
-  node_version:
-    runs-on: ubuntu-latest
-    outputs:
-      NODE_VERSION: ${{ steps.node_version.outputs.NODE_VERSION }}
-    steps:
-      - uses: actions/checkout@v3
-      - name: Read .nvmrc
-        id: node_version
-        run: echo ::set-output name=NODE_VERSION::$(cat .nvmrc |cut -c2-8)
-
   build:
-    needs: [node_version]
     runs-on: ubuntu-latest
     strategy:
       matrix:
         step: ["lint:check", "format:check", "build", "test:docker"]
     steps:
-      - uses: actions/checkout@v3
-      - name: Read .nvmrc
-        id: node_version
-        run: echo ::set-output name=NODE_VERSION::$(cat .nvmrc |cut -c2-8)
+      - uses: actions/checkout@v4
 
-      - name: Use Node.js ${{ needs.node_version.outputs.NODE_VERSION }}
-        uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ needs.node_version.outputs.NODE_VERSION }}
+          node-version-file: .nvmrc
+          cache: "yarn"
 
-      # Build Typescript
-      - run: |
-          yarn
-          yarn ${{ matrix.step }}
+      - name: Install dependencies
+        run: yarn
+
+      - name: Run ${{ matrix.step }}
+        run: yarn ${{ matrix.step }}
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }} 
 
   push:
-    needs: [node_version, build]
+    needs: [build]
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     permissions:
@@ -44,7 +35,7 @@ jobs:
       checks: write
       packages: write
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       # Build and push container image to GCR (only on main branch)
       - name: Log in to the GitHub Container Registry
         uses: docker/login-action@v1
@@ -57,8 +48,6 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: true
-          build-args: |
-            NODE_VERSION=${{ needs.node_version.outputs.NODE_VERSION }}
           tags: |
             ghcr.io/ardriveapp/${{ github.event.repository.name }}:latest
             ghcr.io/ardriveapp/${{ github.event.repository.name }}:${{ github.sha }}
