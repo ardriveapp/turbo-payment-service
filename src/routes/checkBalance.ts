@@ -19,6 +19,7 @@ import { Next } from "koa";
 import { UserNotFoundWarning } from "../database/errors";
 import { WincForBytesResponse } from "../pricing/pricing";
 import { KoaContext } from "../server";
+import { W, Winston } from "../types";
 import {
   validateAuthorizedRoute,
   validateByteCount,
@@ -66,18 +67,22 @@ export async function checkBalance(ctx: KoaContext, next: Next) {
   const { finalPrice, adjustments } = priceWithAdjustments;
 
   try {
-    const userBalance = await paymentDatabase.getBalance(walletAddress);
+    let userBalance: Winston = W("0");
+    // If price is more than 0, check if user has sufficient balance
+    if (finalPrice.winc.isNonZeroPositiveInteger() === true) {
+      userBalance = await paymentDatabase.getBalance(walletAddress);
 
-    if (finalPrice.winc.isGreaterThan(userBalance)) {
-      ctx.response.status = 402;
-      ctx.response.message = "Insufficient balance";
-      ctx.body = {
-        userHasSufficientBalance: false,
-        bytesCostInWinc: finalPrice.winc.toString(),
-        userBalanceInWinc: userBalance.toString(),
-        adjustments: adjustments,
-      };
-      return next();
+      if (finalPrice.winc.isGreaterThan(userBalance)) {
+        ctx.response.status = 402;
+        ctx.response.message = "Insufficient balance";
+        ctx.body = {
+          userHasSufficientBalance: false,
+          bytesCostInWinc: finalPrice.winc.toString(),
+          userBalanceInWinc: userBalance.toString(),
+          adjustments: adjustments,
+        };
+        return next();
+      }
     }
 
     ctx.response.status = 200;
@@ -85,8 +90,8 @@ export async function checkBalance(ctx: KoaContext, next: Next) {
     ctx.body = {
       userHasSufficientBalance: true,
       bytesCostInWinc: finalPrice.winc.toString(),
-      userBalanceInWinc: userBalance.toString(),
       adjustments: adjustments,
+      userBalanceInWinc: userBalance.toString(),
     };
   } catch (error: UserNotFoundWarning | unknown) {
     if (error instanceof UserNotFoundWarning) {

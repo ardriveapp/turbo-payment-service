@@ -322,3 +322,8 @@ export const giftingEmailAddress =
 
 /** gifting on top up via email depends on GIFTING_ENABLED="true" env var */
 export const isGiftingEnabled = process.env.GIFTING_ENABLED === "true";
+
+const thirtyMinutesMs = 1000 * 60 * 30;
+export const topUpQuoteExpirationMs = +(
+  process.env.TOP_UP_QUOTE_EXPIRATION_MS ?? thirtyMinutesMs
+);
