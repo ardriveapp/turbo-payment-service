@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,7 +18,7 @@ import { Next } from "koa";
 
 import { oneMinuteInSeconds } from "../constants";
 import { KoaContext } from "../server";
-import { supportedPaymentCurrencyTypes } from "../types/supportedCurrencies";
+import { supportedFiatPaymentCurrencyTypes } from "../types/supportedCurrencies";
 
 export async function ratesHandler(ctx: KoaContext, next: Next) {
   const { pricingService, logger } = ctx.state;
@@ -45,7 +45,7 @@ export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
   logger.info("Fetching raw conversion rate for 1 AR", {
     currency,
   });
-  if (!supportedPaymentCurrencyTypes.includes(currency)) {
+  if (!supportedFiatPaymentCurrencyTypes.includes(currency)) {
     ctx.status = 404;
     ctx.body = "Invalid currency.";
     return next();

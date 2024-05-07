@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-export const supportedPaymentCurrencyTypes = [
+export const supportedFiatPaymentCurrencyTypes = [
   "aud",
   "brl",
   "cad",
@@ -26,8 +26,8 @@ export const supportedPaymentCurrencyTypes = [
   "sgd",
   "usd",
 ] as const;
-export type SupportedPaymentCurrencyTypes =
-  (typeof supportedPaymentCurrencyTypes)[number];
+export type SupportedFiatPaymentCurrencyType =
+  (typeof supportedFiatPaymentCurrencyTypes)[number];
 
 // Note: We will support these zero decimal currencies on MVP: [ 'jpy' ]
 export const zeroDecimalCurrencyTypes = [

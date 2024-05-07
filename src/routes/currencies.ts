@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,8 +19,8 @@ import { Next } from "koa";
 import { ExposedCurrencyLimitations, oneHourInSeconds } from "../constants";
 import { KoaContext } from "../server";
 import {
-  SupportedPaymentCurrencyTypes,
-  supportedPaymentCurrencyTypes,
+  SupportedFiatPaymentCurrencyType,
+  supportedFiatPaymentCurrencyTypes,
   zeroDecimalCurrencyTypes,
 } from "../types/supportedCurrencies";
 
@@ -35,17 +35,17 @@ export async function currenciesRoute(ctx: KoaContext, next: Next) {
     const exposedLimits: ExposedCurrencyLimitations = Object.entries(
       limits
     ).reduce((acc, [curr, limitation]) => {
-      acc[curr as SupportedPaymentCurrencyTypes] = {
+      acc[curr as SupportedFiatPaymentCurrencyType] = {
         ...limitation,
         zeroDecimalCurrency: zeroDecimalCurrencyTypes.includes(
-          curr as SupportedPaymentCurrencyTypes
+          curr as SupportedFiatPaymentCurrencyType
         ),
       };
       return acc;
     }, {} as ExposedCurrencyLimitations);
 
     ctx.body = {
-      supportedCurrencies: supportedPaymentCurrencyTypes,
+      supportedCurrencies: supportedFiatPaymentCurrencyTypes,
       limits: exposedLimits,
     };
     ctx.status = 200;

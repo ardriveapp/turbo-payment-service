@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -46,7 +46,10 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
     return next();
   }
   try {
-    const priceWithAdjustments = await pricingService.getWCForBytes(bytes);
+    // TODO: Optionally accept a wallet address to include user specific adjustments
+    const priceWithAdjustments = await pricingService.getWCForBytes(
+      bytes /* , userAddress */
+    );
     const { adjustments, finalPrice } = priceWithAdjustments;
     ctx.response.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);

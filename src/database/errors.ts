@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -130,5 +130,44 @@ export class GiftAlreadyRedeemed extends GiftRedemptionError {
   constructor() {
     super("Gift has already been redeemed!");
     this.name = "GiftAlreadyRedeemed";
+  }
+}
+
+export class PaymentTransactionNotMined extends Error {
+  constructor(transactionId: string) {
+    super(`Transaction with id '${transactionId}' has not been mined yet!`);
+    this.name = "PaymentTransactionNotMined";
+  }
+}
+
+export class PaymentTransactionNotFound extends Error {
+  constructor(transactionId: string) {
+    super(`No payment transaction found with id '${transactionId}'`);
+    this.name = "PaymentTransactionNotFound";
+  }
+}
+
+export class PaymentTransactionHasWrongTarget extends Error {
+  constructor(transactionId: string, targetAddress: string) {
+    super(
+      `Payment transaction '${transactionId}' has wrong target address '${targetAddress}'`
+    );
+    this.name = "PaymentTransactionHasWrongTarget";
+  }
+}
+
+export class BadRequest extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BadRequest";
+  }
+}
+
+export class CryptoPaymentTooSmallError extends Error {
+  constructor() {
+    super(
+      `Crypto payment amount is too small! Token value must convert to at least one winc`
+    );
+    this.name = "CryptoPaymentTooSmallError";
   }
 }

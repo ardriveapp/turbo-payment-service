@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,12 +20,19 @@ import {
   ChargebackReceipt,
   ChargebackReceiptId,
   CreateBalanceReservationParams,
+  CreateBypassedPaymentReceiptParams,
   CreateChargebackReceiptParams,
+  CreateNewCreditedTransactionParams,
   CreatePaymentReceiptParams,
+  CreatePendingTransactionParams,
   CreateTopUpQuoteParams,
+  CreditedPaymentTransaction,
+  FailedPaymentTransaction,
+  IntervalUnit,
   PaymentAdjustmentCatalog,
   PaymentReceipt,
   PaymentReceiptId,
+  PendingPaymentTransaction,
   PromotionalInfo,
   SingleUseCodePaymentCatalog,
   TopUpQuote,
@@ -34,7 +41,15 @@ import {
   UploadAdjustmentCatalog,
   User,
   UserAddress,
+  UserAddressType,
 } from "./dbTypes";
+
+export type WincUsedForUploadAdjustmentParams = {
+  userAddress: string;
+  catalogId: string;
+  limitationInterval: number;
+  limitationIntervalUnit: IntervalUnit;
+};
 
 export interface Database {
   createTopUpQuote: (topUpQuote: CreateTopUpQuoteParams) => Promise<void>;
@@ -49,6 +64,9 @@ export interface Database {
   createPaymentReceipt: (
     paymentReceipt: CreatePaymentReceiptParams
   ) => Promise<void | UnredeemedGift>;
+  createBypassedPaymentReceipts(
+    paymentReceipts: CreateBypassedPaymentReceiptParams[]
+  ): Promise<UnredeemedGift[]>;
   getPaymentReceipt: (
     paymentReceiptId: PaymentReceiptId
   ) => Promise<PaymentReceipt>;
@@ -82,5 +100,54 @@ export interface Database {
     paymentReceiptId: string;
     recipientEmail: string;
     destinationAddress: string;
-  }) => Promise<User>;
+    destinationAddressType: UserAddressType;
+  }) => Promise<{ user: User; wincRedeemed: WC }>;
+
+  /**
+   * Creates a pending_payment_transaction where we found and validated the
+   * incoming payment transaction, but are waiting more blocks to confirm
+   */
+  createPendingTransaction: (
+    params: CreatePendingTransactionParams
+  ) => Promise<void>;
+  /**
+   * Creates a credited_payment_transaction where the block_height is already confirmed
+   * This will credit a user's balance and add a payment notation to the audit log
+   */
+  createNewCreditedTransaction: (
+    params: CreateNewCreditedTransactionParams
+  ) => Promise<void>;
+
+  /** Get all `new` and `pending` payment transactions for processing credited/failed payments */
+  getPendingTransactions: () => Promise<PendingPaymentTransaction[]>;
+
+  /** Get any existing payment transaction from the the database */
+  checkForPendingTransaction: (
+    transactionId: TransactionId
+  ) => Promise<
+    | PendingPaymentTransaction
+    | FailedPaymentTransaction
+    | CreditedPaymentTransaction
+    | false
+  >;
+
+  /**
+   * Credit a pending_payment_transaction where the block_height has been confirmed
+   */
+  creditPendingTransaction: (
+    transactionId: TransactionId,
+    blockHeight: number
+  ) => Promise<void>;
+
+  /**
+   * Fail a pending_payment_transaction where the transaction was no longer found in a block
+   */
+  failPendingTransaction: (
+    transactionId: TransactionId,
+    failedReason: string
+  ) => Promise<void>;
+
+  getWincUsedForUploadAdjustmentCatalog(
+    params: WincUsedForUploadAdjustmentParams
+  ): Promise<WC>;
 }

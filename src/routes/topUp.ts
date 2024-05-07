@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -34,7 +34,7 @@ import { WincForPaymentResponse } from "../pricing/pricing";
 import { KoaContext } from "../server";
 import { Payment } from "../types/payment";
 import { winstonToArc } from "../types/winston";
-import { isValidArweaveBase64URL } from "../utils/base64";
+import { isValidUserAddress } from "../utils/base64";
 import { parseQueryParams } from "../utils/parseQueryParams";
 import {
   validateDestinationAddressType,
@@ -65,14 +65,22 @@ export async function topUp(ctx: KoaContext, next: Next) {
   }
 
   const {
-    destinationAddressType: rawAddressType,
+    token: rawTokenType = "arweave",
+    destinationAddressType: rawDestinationAddressType,
     giftMessage: rawGiftMessage,
     uiMode: rawUiMode,
   } = ctx.query;
 
-  const destinationAddressType = rawAddressType
-    ? validateDestinationAddressType(ctx, rawAddressType)
-    : "arweave";
+  // First use destinationAddressType from backwards compatible routes ("email" address type), else use token
+  const rawAddressType =
+    rawDestinationAddressType !== undefined
+      ? rawDestinationAddressType
+      : rawTokenType;
+
+  const destinationAddressType = validateDestinationAddressType(
+    ctx,
+    rawAddressType
+  );
   if (!destinationAddressType) {
     return next();
   }
@@ -90,16 +98,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
   }
 
   let destinationAddress: string;
-  if (destinationAddressType === "arweave") {
-    if (!isValidArweaveBase64URL(rawDestinationAddress)) {
-      ctx.response.status = 403;
-      ctx.body = "Destination address is not a valid Arweave native address!";
-      logger.info("top-up GET -- Invalid destination address", loggerObject);
-      return next();
-    }
-
-    destinationAddress = rawDestinationAddress;
-  } else {
+  if (destinationAddressType === "email") {
     if (!isGiftingEnabled) {
       ctx.response.status = 403;
       ctx.body = "Gifting by email is disabled!";
@@ -116,6 +115,16 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
     // Escape email address to prevent XSS
     destinationAddress = validator.escape(rawDestinationAddress);
+  } else {
+    if (!isValidUserAddress(rawDestinationAddress, destinationAddressType)) {
+      ctx.response.status = 403;
+      ctx.body =
+        "Destination address is not a valid supported native wallet address!";
+      logger.warn("Invalid destination address", loggerObject);
+      return next();
+    }
+
+    destinationAddress = rawDestinationAddress;
   }
 
   let currencyLimitations: CurrencyLimitations;

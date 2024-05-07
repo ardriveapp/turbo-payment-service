@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -33,20 +33,25 @@ import {
   PaymentAmount,
   SingleUseCodePaymentCatalog,
   UploadAdjustment,
+  UserAddress,
 } from "../database/dbTypes";
-import { PaymentAmountTooSmallForPromoCode } from "../database/errors";
+import {
+  CryptoPaymentTooSmallError,
+  PaymentAmountTooSmallForPromoCode,
+} from "../database/errors";
 import { PostgresDatabase } from "../database/postgres";
+import { TokenType } from "../gateway";
 import defaultLogger from "../logger";
-import { ByteCount, W, Winston } from "../types";
+import { ByteCount, PositiveFiniteInteger, W, Winston } from "../types";
 import { Payment } from "../types/payment";
 import {
-  SupportedPaymentCurrencyTypes,
-  supportedPaymentCurrencyTypes,
+  SupportedFiatPaymentCurrencyType,
+  supportedFiatPaymentCurrencyTypes,
   zeroDecimalCurrencyTypes,
 } from "../types/supportedCurrencies";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
-import { ReadThroughArweaveToFiatOracle } from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
+import { ReadThroughTokenToFiatOracle } from "./oracles/tokenToFiatOracle";
 import { FinalPrice, NetworkPrice, SubtotalPrice } from "./price";
 
 export type WincForBytesResponse = {
@@ -63,16 +68,34 @@ export type WincForPaymentResponse = {
   inclusiveAdjustments: PaymentAdjustment[];
 };
 
+export type WincForCryptoPaymentResponse = {
+  finalPrice: FinalPrice;
+  actualPaymentAmount: Winston;
+  inclusiveAdjustments: PaymentAdjustment[];
+  // adjustments: PaymentAdjustment[];
+};
+
 export type WincForPaymentParams = {
   payment: Payment;
   promoCodes?: string[];
   userAddress?: string;
 };
 
+export type WincForCryptoPaymentParams = {
+  amount: Winston;
+  token: TokenType;
+  // TODO: Promo code support for crypto payments. Since payments happen before we give a quote, we may not be able to support `exclusive` adjustments for crypto payments without sending crypto back to the user
+  // userAddress?: string;
+  // promoCodes?: string[];
+};
+
 export interface PricingService {
   getWCForPayment: (
     params: WincForPaymentParams
   ) => Promise<WincForPaymentResponse>;
+  getWCForCryptoPayment: (
+    params: WincForCryptoPaymentParams
+  ) => Promise<WincForCryptoPaymentResponse>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
   getFiatRatesForOneGiB: () => Promise<{
@@ -80,7 +103,10 @@ export interface PricingService {
     fiat: Record<string, number>;
     adjustments: Adjustment[];
   }>;
-  getWCForBytes: (bytes: ByteCount) => Promise<WincForBytesResponse>;
+  getWCForBytes: (
+    bytes: ByteCount,
+    userAddress?: UserAddress
+  ) => Promise<WincForBytesResponse>;
   convertFromUSDAmount: (params: {
     amount: number;
     type: CurrencyType;
@@ -96,25 +122,25 @@ const maxStripeAmount = 990_000_00;
 export class TurboPricingService implements PricingService {
   private logger: winston.Logger;
   private readonly bytesToWinstonOracle: ReadThroughBytesToWinstonOracle;
-  private readonly arweaveToFiatOracle: ReadThroughArweaveToFiatOracle;
+  private readonly tokenToFiatOracle: ReadThroughTokenToFiatOracle;
   private readonly paymentDatabase: Database;
 
   constructor({
     bytesToWinstonOracle,
-    arweaveToFiatOracle,
+    tokenToFiatOracle,
     logger = defaultLogger,
     paymentDatabase,
   }: {
     bytesToWinstonOracle?: ReadThroughBytesToWinstonOracle;
-    arweaveToFiatOracle?: ReadThroughArweaveToFiatOracle;
+    tokenToFiatOracle?: ReadThroughTokenToFiatOracle;
     logger?: winston.Logger;
     paymentDatabase?: Database;
-  }) {
+  } = {}) {
     this.logger = logger.child({ class: this.constructor.name });
     this.bytesToWinstonOracle =
       bytesToWinstonOracle ?? new ReadThroughBytesToWinstonOracle({});
-    this.arweaveToFiatOracle =
-      arweaveToFiatOracle ?? new ReadThroughArweaveToFiatOracle({});
+    this.tokenToFiatOracle =
+      tokenToFiatOracle ?? new ReadThroughTokenToFiatOracle({});
     this.paymentDatabase = paymentDatabase ?? new PostgresDatabase();
   }
 
@@ -151,10 +177,10 @@ export class TurboPricingService implements PricingService {
     if (type === "usd") {
       return amount;
     }
-    const usdPriceOfOneAR = await this.arweaveToFiatOracle.getFiatPriceForOneAR(
+    const usdPriceOfOneAR = await this.tokenToFiatOracle.getFiatPriceForOneAR(
       "usd"
     );
-    const priceOfOneAR = await this.arweaveToFiatOracle.getFiatPriceForOneAR(
+    const priceOfOneAR = await this.tokenToFiatOracle.getFiatPriceForOneAR(
       type
     );
     const isZeroDecimalCurrency = zeroDecimalCurrencyTypes.includes(type);
@@ -249,7 +275,7 @@ export class TurboPricingService implements PricingService {
 
     await Promise.all(
       Object.entries(paymentAmountLimits).map(async ([curr, currLimits]) => {
-        limits[curr as SupportedPaymentCurrencyTypes] =
+        limits[curr as SupportedFiatPaymentCurrencyType] =
           await this.getDynamicCurrencyLimitation(curr, currLimits);
       })
     );
@@ -258,7 +284,7 @@ export class TurboPricingService implements PricingService {
   }
 
   public getFiatPriceForOneAR(currency: CurrencyType): Promise<number> {
-    return this.arweaveToFiatOracle.getFiatPriceForOneAR(currency);
+    return this.tokenToFiatOracle.getFiatPriceForOneAR(currency);
   }
 
   public async getFiatRatesForOneGiB() {
@@ -272,9 +298,9 @@ export class TurboPricingService implements PricingService {
 
     // Calculate fiat prices for one GiB
     await Promise.all(
-      supportedPaymentCurrencyTypes.map(async (currency) => {
+      supportedFiatPaymentCurrencyTypes.map(async (currency) => {
         const fiatPriceOfOneAR =
-          await this.arweaveToFiatOracle.getFiatPriceForOneAR(currency);
+          await this.tokenToFiatOracle.getFiatPriceForOneAR(currency);
 
         const { paymentAmountAfterAdjustments: fiatPriceAfterAdjustments } =
           await this.applyPaymentAdjustments({
@@ -355,8 +381,9 @@ export class TurboPricingService implements PricingService {
       currencyType: payment.type,
     });
 
-    const fiatPriceOfOneAR =
-      await this.arweaveToFiatOracle.getFiatPriceForOneAR(payment.type);
+    const fiatPriceOfOneAR = await this.tokenToFiatOracle.getFiatPriceForOneAR(
+      payment.type
+    );
 
     const baseWinstonCreditsFromPayment = new Winston(
       BigNumber(
@@ -388,7 +415,10 @@ export class TurboPricingService implements PricingService {
     };
   }
 
-  async getWCForBytes(bytes: ByteCount): Promise<WincForBytesResponse> {
+  async getWCForBytes(
+    bytes: ByteCount,
+    userAddress?: UserAddress
+  ): Promise<WincForBytesResponse> {
     const chunkSize = roundToArweaveChunkSize(bytes);
     const networkPrice = new NetworkPrice(
       await this.bytesToWinstonOracle.getWinstonForBytes(chunkSize)
@@ -400,13 +430,26 @@ export class TurboPricingService implements PricingService {
     const adjustments: UploadAdjustment[] = [];
     let subtotalPrice: SubtotalPrice = new SubtotalPrice(networkPrice.winc);
 
+    const finiteZero = new PositiveFiniteInteger(0);
     for (const {
       catalogId,
       name,
       operator,
       operatorMagnitude,
       description,
+      wincLimitation,
+      byteCountThreshold,
+      limitationInterval,
+      limitationIntervalUnit,
     } of uploadAdjustmentCatalogs) {
+      if (
+        byteCountThreshold.isGreaterThan(finiteZero) &&
+        bytes.isGreaterThan(byteCountThreshold)
+      ) {
+        // if the incoming byte count is above the threshold, this upload adjustment should not be applied
+        continue;
+      }
+
       const priceBeforeAdjustment = subtotalPrice.winc;
 
       if (operator === "add") {
@@ -423,6 +466,48 @@ export class TurboPricingService implements PricingService {
       }
 
       const adjustmentAmount = subtotalPrice.winc.minus(priceBeforeAdjustment);
+
+      if (wincLimitation.isGreaterThan(W(0))) {
+        if (!userAddress) {
+          // if there is no user to check the limitation against this upload adjustment should not be applied
+          subtotalPrice = new SubtotalPrice(priceBeforeAdjustment);
+          continue;
+        }
+
+        // if the incoming byte count is within the limitation, we need to check if the user has already used this adjustment within the limitation interval
+        const wincUsed =
+          await this.paymentDatabase.getWincUsedForUploadAdjustmentCatalog({
+            userAddress,
+            catalogId,
+            limitationInterval,
+            limitationIntervalUnit,
+          });
+        if (
+          wincUsed
+            .plus(adjustmentAmount)
+            .times(-1)
+            .isGreaterThan(wincLimitation)
+        ) {
+          // When the used winc plus the incoming winc adjusted is greater than the limitation, this upload adjustment should not be applied
+          this.logger.info(
+            "User would or has already exceeded winc limitation, skipping upload adjustment",
+            {
+              userAddress,
+              catalogId,
+              wincLimitation,
+              wincUsed,
+              bytes,
+              adjustmentAmount,
+            }
+          );
+
+          // TODO: We could subsidize partial of the upload to use maximum of the subsidy event for the user
+
+          // We will skip this adjustment, set subtotal back to the price before the adjustment
+          subtotalPrice = new SubtotalPrice(priceBeforeAdjustment);
+          continue;
+        }
+      }
 
       const adjustment: UploadAdjustment = {
         name,
@@ -563,5 +648,166 @@ export class TurboPricingService implements PricingService {
     }
 
     return { adjustments, paymentAmountAfterAdjustments };
+  }
+
+  public async getWCForCryptoPayment({
+    amount,
+    token,
+  }: WincForCryptoPaymentParams): Promise<WincForCryptoPaymentResponse> {
+    if (token !== "arweave") {
+      const tokenRatio = await this.tokenToFiatOracle.getPriceRatioForToken(
+        token
+      );
+      this.logger.debug("Converting crypto payment to AR...", {
+        token,
+        tokenRatio,
+        amount,
+      });
+      const tokenAmount = baseAmountToTokenAmount(amount.toString(), token);
+      const creditAmount = tokenAmount.times(tokenRatio);
+      const wincAmount = creditAmount
+        .shiftedBy(12)
+        .toFixed(0, BigNumber.ROUND_DOWN);
+
+      amount = W(wincAmount);
+
+      if (amount.isLessThan(W(1))) {
+        throw new CryptoPaymentTooSmallError();
+      }
+    }
+
+    const adjustmentCatalogs: PaymentAdjustmentCatalog[] =
+      await this.paymentDatabase.getPaymentAdjustmentCatalogs();
+    this.logger.debug("Got adjustment catalogs", {
+      adjustmentCatalogs: adjustmentCatalogs.map((a) => ({
+        catalogId: a.catalogId,
+        name: a.name,
+      })),
+    });
+
+    const exclusiveAdjustments = adjustmentCatalogs.filter(
+      (a) => a.exclusivity === "exclusive"
+    );
+
+    if (exclusiveAdjustments.length > 0) {
+      this.logger.warn(
+        "Exclusive adjustments found for crypto payment. Exclusive adjustments not yet supported, crypto was already sent. Skipping adjustments...",
+        {
+          exclusiveAdjustments,
+        }
+      );
+    }
+
+    const inclusiveAdjustmentCatalogs = adjustmentCatalogs.filter(
+      (a) => a.exclusivity === "inclusive"
+    );
+
+    let paymentAmountAfterInclusiveAdjustments = amount;
+    const inclusiveAdjustments: PaymentAdjustment[] = [];
+    for (const catalog of inclusiveAdjustmentCatalogs) {
+      const {
+        operator,
+        operatorMagnitude,
+        name: adjustmentName,
+        description,
+        catalogId,
+      } = catalog;
+      const amountBeforeAdjustment = paymentAmountAfterInclusiveAdjustments;
+
+      switch (operator) {
+        case "add":
+          // eslint-disable-next-line no-case-declarations
+          const operatorMagInUsdCents = operatorMagnitude;
+          // eslint-disable-next-line no-case-declarations
+          const oneArToUsdCents =
+            (await this.tokenToFiatOracle.getFiatPriceForOneAR("usd")) * 100;
+          // eslint-disable-next-line no-case-declarations
+          const operatorMagnitudeFromUsdCentsToWinston = new Winston(
+            BigNumber(operatorMagInUsdCents)
+              .dividedBy(oneArToUsdCents)
+              .times(1_000_000_000_000)
+              .toFixed(0)
+          );
+          paymentAmountAfterInclusiveAdjustments =
+            paymentAmountAfterInclusiveAdjustments.plus(
+              operatorMagnitudeFromUsdCentsToWinston
+            );
+
+          break;
+        case "multiply":
+          paymentAmountAfterInclusiveAdjustments =
+            paymentAmountAfterInclusiveAdjustments.times(operatorMagnitude);
+
+          break;
+        default:
+          this.logger.warn("Unknown operator from database!", { operator });
+          continue;
+      }
+
+      if (paymentAmountAfterInclusiveAdjustments.isLessThan(W(0))) {
+        this.logger.debug(
+          "Payment amount after inclusive adjustments is less than 0, setting to 0."
+        );
+        paymentAmountAfterInclusiveAdjustments = W(0);
+      }
+
+      const adjustment: PaymentAdjustment = {
+        adjustmentAmount: paymentAmountAfterInclusiveAdjustments.minus(
+          amountBeforeAdjustment
+        ),
+        currencyType: token,
+        catalogId,
+        description,
+        name: adjustmentName,
+        operator,
+        operatorMagnitude,
+      };
+      this.logger.debug("Applying inclusive adjustment", { adjustment });
+      inclusiveAdjustments.push(adjustment);
+    }
+
+    const baseWinstonCreditsFromPayment =
+      paymentAmountAfterInclusiveAdjustments;
+
+    const finalPrice = new FinalPrice(baseWinstonCreditsFromPayment);
+
+    this.logger.debug("Calculated price and adjustments for crypto payment.", {
+      finalPrice,
+      actualPaymentAmount: amount,
+      inclusiveAdjustments,
+    });
+    return {
+      finalPrice,
+      actualPaymentAmount: amount,
+      inclusiveAdjustments: inclusiveAdjustments,
+    };
+  }
+}
+
+export function wincToCredits(winc: BigNumber.Value): BigNumber {
+  return BigNumber(winc).shiftedBy(-12);
+}
+
+export function weiToEth(wei: BigNumber.Value): BigNumber {
+  return BigNumber(wei).shiftedBy(-18);
+}
+
+export function lamportsToSol(lamports: BigNumber.Value): BigNumber {
+  return BigNumber(lamports).shiftedBy(-9);
+}
+
+export function baseAmountToTokenAmount(
+  amount: BigNumber.Value,
+  token: TokenType
+): BigNumber {
+  switch (token) {
+    case "arweave":
+      return wincToCredits(amount);
+    case "ethereum":
+      return weiToEth(amount);
+    case "solana":
+      return lamportsToSol(amount);
+    default:
+      return BigNumber(amount);
   }
 }

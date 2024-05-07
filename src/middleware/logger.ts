@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,11 @@ import logger from "../logger";
 import { KoaContext } from "../server";
 
 export async function loggerMiddleware(ctx: KoaContext, next: Next) {
+  // Skip logging for metrics and health checks
+  if (ctx.path === "/metrics" || ctx.path === "/health") {
+    return next();
+  }
+
   const trace = randomUUID().substring(0, 6);
   const log = logger.child({
     trace,
@@ -29,13 +34,15 @@ export async function loggerMiddleware(ctx: KoaContext, next: Next) {
     params: ctx.params,
     query: ctx.query,
   });
-  // TODO: replace with opentelemetry middleware, log the request headers once to track SDK usage.
+
+  // TODO: replace with open telemetry middleware, log the request headers once to track SDK usage.
   log.info("Request headers", { headers: ctx.headers });
   ctx.state.logger = log;
   ctx.state.trace = trace;
   const startTime = Date.now();
   await next();
   const duration = Date.now() - startTime;
+
   log.debug("Completed request.", {
     responseTime: `${duration}ms`,
   });

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -34,6 +34,10 @@ export const tableNames = {
 
   unredeemedGift: "unredeemed_gift",
   redeemedGift: "redeemed_gift",
+
+  pendingPaymentTransaction: "pending_payment_transaction",
+  creditedPaymentTransaction: "credited_payment_transaction",
+  failedPaymentTransaction: "failed_payment_transaction",
 } as const;
 
 export const columnNames = {
@@ -98,6 +102,12 @@ export const columnNames = {
   adjustmentStartDate: "adjustment_start_date",
   adjustmentEndDate: "adjustment_end_date",
 
+  // Upload Adjustment Catalog
+  byteCountThreshold: "byte_count_threshold",
+  wincLimitation: "winc_limitation",
+  limitationInterval: "limitation_interval",
+  limitationIntervalUnit: "limitation_interval_unit",
+
   adjustmentPriority: "adjustment_priority",
   // inclusive: applied within the payment that is made, exclusive: applied before payment is made where user can see the adjustment
   adjustmentExclusivity: "adjustment_exclusivity",
@@ -119,4 +129,17 @@ export const columnNames = {
 
   // Redeemed Gift
   redemptionDate: "redemption_date",
+
+  // Pending Transaction Payment
+  tokenType: "token_type",
+  transactionId: "transaction_id",
+  blockHeight: "block_height",
+  createdDate: "created_date",
+  transactionQuantity: "transaction_quantity",
+
+  // Failed Payment Transaction
+  failedDate: "failed_date",
+
+  // Credited Payment Transaction
+  creditedDate: "credited_date",
 } as const;

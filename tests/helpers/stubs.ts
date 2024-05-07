@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -264,7 +264,7 @@ export const stripeStubEvent = ({
   } as Stripe.Event;
 };
 
-export const expectedArPrices = {
+export const expectedTokenPrices = {
   arweave: {
     usd: 7.02,
     aed: 25.78,
@@ -308,6 +308,30 @@ export const expectedArPrices = {
     uah: 258.2,
     vnd: 164811,
     zar: 132.44,
+  },
+  ethereum: {
+    usd: 3544.24,
+    jpy: 542088,
+    eur: 3300.02,
+    gbp: 2827.36,
+    inr: 295635,
+    aud: 5446.18,
+    sgd: 4799.23,
+    cad: 4851.82,
+    hkd: 27770,
+    brl: 17961.12,
+  },
+  solana: {
+    usd: 173.41,
+    jpy: 26523,
+    eur: 161.46,
+    gbp: 138.33,
+    inr: 14464.61,
+    aud: 266.47,
+    sgd: 234.81,
+    cad: 237.39,
+    hkd: 1358.73,
+    brl: 878.79,
   },
 };
 

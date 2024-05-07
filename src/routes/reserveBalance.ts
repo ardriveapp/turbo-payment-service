@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,21 +18,35 @@ import { Next } from "koa";
 
 import { InsufficientBalance, UserNotFoundWarning } from "../database/errors";
 import { KoaContext } from "../server";
+import { isValidUserAddress } from "../utils/base64";
 import {
   validateAuthorizedRoute,
   validateByteCount,
   validateQueryParameters,
+  validateUserAddressType,
 } from "../utils/validators";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase, pricingService, logger } = ctx.state;
-  const { walletAddress } = ctx.params;
+
+  const { walletAddress, token: rawToken = "arweave" } = ctx.params;
 
   if (!validateAuthorizedRoute(ctx)) {
     return next();
   }
 
   const { byteCount: rawByteCount, dataItemId: rawDataItemId } = ctx.query;
+
+  const userAddressType = validateUserAddressType(ctx, rawToken);
+  if (!userAddressType) {
+    return next();
+  }
+  if (!isValidUserAddress(walletAddress, userAddressType)) {
+    ctx.response.status = 400;
+    ctx.response.message = "Invalid wallet address";
+    return next();
+  }
+
   const queryParameters = [rawByteCount, rawDataItemId];
   if (!validateQueryParameters(ctx, queryParameters)) {
     return next();
@@ -52,7 +66,10 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       byteCount,
       dataItemId,
     });
-    const priceWithAdjustments = await pricingService.getWCForBytes(byteCount);
+    const priceWithAdjustments = await pricingService.getWCForBytes(
+      byteCount,
+      walletAddress
+    );
     const { finalPrice, networkPrice, adjustments } = priceWithAdjustments;
 
     logger.info("Reserving balance for user ", {
@@ -67,6 +84,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       reservedWincAmount: finalPrice,
       adjustments,
       networkWincAmount: networkPrice,
+      userAddressType,
     });
     ctx.response.status = 200;
     ctx.response.message = "Balance reserved";

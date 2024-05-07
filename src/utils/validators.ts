@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,9 @@ import validator from "validator";
 import { maxGiftMessageLength } from "../constants";
 import {
   DestinationAddressType,
+  UserAddressType,
   destinationAddressTypes,
+  userAddressTypes,
 } from "../database/dbTypes";
 import { MetricRegistry } from "../metricRegistry";
 import { KoaContext } from "../server";
@@ -143,6 +145,31 @@ export function validateDestinationAddressType(
   }
 
   return destType;
+}
+
+function isValidUserAddressType(
+  userAddressType: string
+): userAddressType is UserAddressType {
+  return userAddressTypes.includes(userAddressType as UserAddressType);
+}
+
+export function validateUserAddressType(
+  ctx: KoaContext,
+  userAddressType: string | string[]
+): UserAddressType | false {
+  const addressType = validateSingularQueryParameter(ctx, userAddressType);
+
+  if (!addressType || !isValidUserAddressType(addressType)) {
+    ctx.response.status = 400;
+    ctx.body = `Invalid user address type: ${addressType}`;
+    ctx.state.logger.error("Invalid user address type!", {
+      ...ctx.params,
+      ...ctx.query,
+    });
+    return false;
+  }
+
+  return addressType;
 }
 
 export function validateGiftMessage(

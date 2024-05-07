@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -22,6 +22,8 @@ import {
   PaymentAdjustmentDBInsert,
   PaymentAdjustmentDBResult,
   PaymentReceiptDBInsert,
+  PendingPaymentTransactionDBInsert,
+  PendingPaymentTransactionDBResult,
   TopUpQuoteDBInsert,
   UserAddress,
   UserDBInsert,
@@ -99,6 +101,26 @@ function stubPaymentReceiptInsert(
 
 type StubChargebackReceiptParams = Partial<ChargebackReceiptDBInsert>;
 
+function stubPendingPaymentTxInsert({
+  destination_address = stubArweaveUserAddress,
+  destination_address_type = "arweave",
+  created_date,
+  winston_credit_amount = "100",
+  transaction_quantity = "100",
+  transaction_id = "The Stubbiest Transaction" + Math.random(),
+  token_type = "arweave",
+}: Partial<PendingPaymentTransactionDBResult>): PendingPaymentTransactionDBInsert {
+  return {
+    transaction_id,
+    token_type,
+    created_date,
+    destination_address,
+    destination_address_type,
+    transaction_quantity,
+    winston_credit_amount,
+  };
+}
+
 function stubChargebackReceiptInsert(
   params: StubChargebackReceiptParams
 ): ChargebackReceiptDBInsert {
@@ -127,7 +149,7 @@ function stubUserInsert({
 export class DbTestHelper {
   constructor(public readonly db: PostgresDatabase) {}
 
-  private get knex(): Knex {
+  public get knex(): Knex {
     return this.db["writer"];
   }
 
@@ -164,6 +186,14 @@ export class DbTestHelper {
   ): Promise<void> {
     return this.knex(tableNames.chargebackReceipt).insert(
       stubChargebackReceiptInsert(insertParams)
+    );
+  }
+
+  public async insertStubPendingPaymentTransaction(
+    insertParams: Partial<PendingPaymentTransactionDBInsert>
+  ): Promise<void> {
+    return this.knex(tableNames.pendingPaymentTransaction).insert(
+      stubPendingPaymentTxInsert(insertParams)
     );
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -14,9 +14,12 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import BigNumber from "bignumber.js";
+
+import { TokenType } from "../gateway";
 import { FinalPrice, NetworkPrice } from "../pricing/price";
-import { PublicArweaveAddress } from "../types";
-import { WC } from "../types/arc";
+import { ByteCount, PublicArweaveAddress, WC, Winston } from "../types";
+import "../types/arc";
 
 export interface Adjustment {
   name: string;
@@ -35,7 +38,7 @@ export interface UploadAdjustment extends Adjustment {
 
 export interface PaymentAdjustment extends Adjustment {
   /** Amount of payment amount (usd, eur, btc) this adjustment changes (e.g -600 for 600 dollars saved) */
-  adjustmentAmount: PaymentAmount;
+  adjustmentAmount: PaymentAmount | Winston;
   currencyType: CurrencyType;
   maxDiscount?: number;
   promoCode?: string;
@@ -43,10 +46,10 @@ export interface PaymentAdjustment extends Adjustment {
 
 export type UserAddress = string | PublicArweaveAddress;
 
-export const userAddressTypes = ["arweave"] as const;
+export const userAddressTypes = ["arweave", "solana", "ethereum"] as const;
 export type UserAddressType = (typeof userAddressTypes)[number];
 
-export const destinationAddressTypes = ["email", "arweave"] as const;
+export const destinationAddressTypes = [...userAddressTypes, "email"] as const;
 export type DestinationAddressType = (typeof destinationAddressTypes)[number];
 
 /** Currently using Postgres Date type (ISO String) */
@@ -77,7 +80,7 @@ export type PaymentAmount = number;
 
 export type CurrencyType = string;
 
-export type PaymentProvider = string | "stripe"; // TODO: "apple-pay"
+export type PaymentProvider = string | "stripe" | "admin"; // TODO: "apple-pay"
 
 export interface User {
   userAddress: UserAddress;
@@ -101,9 +104,104 @@ export interface TopUpQuote {
   giftMessage?: string;
 }
 
+export type PendingPaymentTransaction = {
+  transactionId: string;
+  tokenType: TokenType;
+  createdDate: Timestamp;
+
+  transactionQuantity: BigNumber;
+  winstonCreditAmount: WC;
+
+  destinationAddress: UserAddress;
+  destinationAddressType: DestinationAddressType;
+};
+
+export type FailedPaymentTransaction = PendingPaymentTransaction & {
+  failedReason: string;
+  failedDate: Timestamp;
+};
+
+export type CreditedPaymentTransaction = PendingPaymentTransaction & {
+  creditedDate: Timestamp;
+  blockHeight: number;
+};
+
+export type CreatePendingTransactionParams = Omit<
+  PendingPaymentTransaction,
+  "createdDate"
+> & {
+  adjustments: PaymentAdjustment[];
+};
+
+export type CreateNewCreditedTransactionParams = Omit<
+  CreditedPaymentTransaction,
+  "creditedDate" | "createdDate"
+> & {
+  adjustments: PaymentAdjustment[];
+};
+
+export type PendingPaymentTransactionDBInsert = {
+  transaction_id: string;
+  token_type: string;
+  transaction_quantity: string;
+  winston_credit_amount: string;
+  destination_address: string;
+  destination_address_type: string;
+  created_date?: string;
+};
+
+export type PendingPaymentTransactionDBResult =
+  Required<PendingPaymentTransactionDBInsert>;
+
+export type FailedPaymentTransactionDBInsert =
+  PendingPaymentTransactionDBResult & {
+    failed_reason: string;
+  };
+
+export type FailedPaymentTransactionDBResult =
+  FailedPaymentTransactionDBInsert & {
+    failed_date: string;
+  };
+
+export type CreditedPaymentTransactionDBInsert = Omit<
+  PendingPaymentTransactionDBResult,
+  "created_date"
+> & {
+  created_date?: string;
+  credited_transaction_date?: string;
+  block_height: number;
+};
+
+export type CreditedPaymentTransactionDBResult =
+  Required<CreditedPaymentTransactionDBInsert>;
+
 export type CreateTopUpQuoteParams = Omit<TopUpQuote, "quoteCreationDate"> & {
   adjustments: PaymentAdjustment[];
 };
+
+export function isFailedPaymentTransactionDBResult(
+  transaction:
+    | PendingPaymentTransactionDBResult
+    | FailedPaymentTransaction
+    | CreditedPaymentTransaction
+): transaction is FailedPaymentTransactionDBResult {
+  return (
+    (transaction as FailedPaymentTransactionDBResult).failed_reason !==
+    undefined
+  );
+}
+
+export function isCreditedPaymentTransactionDBResult(
+  transaction:
+    | PendingPaymentTransactionDBResult
+    | CreditedPaymentTransaction
+    | FailedPaymentTransaction
+): transaction is CreditedPaymentTransactionDBResult {
+  return (
+    (transaction as CreditedPaymentTransactionDBResult).block_height !==
+    undefined
+  );
+}
 
 export interface FailedTopUpQuote extends TopUpQuote {
   failedReason: "expired" | string;
@@ -121,6 +219,17 @@ export interface CreatePaymentReceiptParams {
   currencyType: CurrencyType;
   senderEmail?: string;
 }
+
+export type CreateBypassedPaymentReceiptParams = Omit<
+  CreatePaymentReceiptParams,
+  "topUpQuoteId" | "paymentReceiptId"
+> & {
+  destinationAddress: UserAddress;
+  destinationAddressType: DestinationAddressType;
+  paymentProvider: PaymentProvider;
+  winc: WC;
+  giftMessage?: string;
+};
 
 export interface ChargebackReceipt extends PaymentReceipt {
   chargebackReceiptId: ChargebackReceiptId;
@@ -146,6 +255,7 @@ export interface BalanceReservation {
 export type CreateBalanceReservationParams = {
   dataItemId: DataItemId;
   userAddress: UserAddress;
+  userAddressType: UserAddressType;
   reservedWincAmount: FinalPrice;
   networkWincAmount: NetworkPrice;
   adjustments: UploadAdjustment[];
@@ -162,7 +272,12 @@ export interface AdjustmentCatalog {
   priority: number;
 }
 
-export type UploadAdjustmentCatalog = AdjustmentCatalog;
+export type UploadAdjustmentCatalog = AdjustmentCatalog & {
+  byteCountThreshold: ByteCount;
+  wincLimitation: WC;
+  limitationInterval: number;
+  limitationIntervalUnit: IntervalUnit;
+};
 
 export interface PaymentAdjustmentCatalog extends AdjustmentCatalog {
   exclusivity: Exclusivity;
@@ -185,10 +300,14 @@ export interface UserDBInsert {
 export type AuditChangeReason =
   | "upload"
   | "payment"
+  | "crypto_payment"
+  | "bypassed_payment"
   | "account_creation"
+  | "bypassed_account_creation"
   | "chargeback"
   | "refund"
   | "gifted_payment"
+  | "bypassed_gifted_payment"
   | "gifted_payment_redemption"
   | "gifted_account_creation";
 
@@ -276,7 +395,12 @@ interface AdjustmentCatalogDBInsert {
   adjustment_priority?: number;
 }
 
-export type UploadAdjustmentCatalogDBInsert = AdjustmentCatalogDBInsert;
+export type UploadAdjustmentCatalogDBInsert = AdjustmentCatalogDBInsert & {
+  byte_count_threshold?: string;
+  winc_limitation?: string;
+  limitation_interval?: string;
+  limitation_interval_unit?: string;
+};
 
 export const exclusivity = ["inclusive", "exclusive"] as const;
 export type Exclusivity = (typeof exclusivity)[number];
@@ -304,7 +428,12 @@ export interface AdjustmentCatalogDBResult extends AdjustmentCatalogDBInsert {
 }
 
 export type UploadAdjustmentCatalogDBResult = AdjustmentCatalogDBResult &
-  UploadAdjustmentCatalogDBInsert;
+  UploadAdjustmentCatalogDBInsert & {
+    byte_count_threshold: string;
+    winc_limitation: string;
+    limitation_interval: string;
+    limitation_interval_unit: string;
+  };
 
 export type PaymentAdjustmentCatalogDBResult = AdjustmentCatalogDBResult &
   PaymentAdjustmentCatalogDBInsert & {
@@ -385,3 +514,5 @@ export interface RedeemedGift extends UnredeemedGift {
   destinationAddress: UserAddress;
   redemptionDate: Timestamp;
 }
+
+export type IntervalUnit = "year" | "month" | "day" | "hour" | "minute";

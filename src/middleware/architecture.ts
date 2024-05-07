@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -28,5 +28,6 @@ export async function architectureMiddleware(
   ctx.state.pricingService = arch.pricingService;
   ctx.state.stripe = arch.stripe;
   ctx.state.emailProvider = arch.emailProvider;
+  ctx.state.gatewayMap = arch.gatewayMap;
   return next();
 }

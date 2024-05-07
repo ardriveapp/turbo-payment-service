@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ import {
   createAxiosInstance,
 } from "../../axiosClient";
 import { msPerMinute } from "../../constants";
-import logger from "../../logger";
+import globalLogger from "../../logger";
 import { ByteCount, Winston } from "../../types";
 
 export interface BytesToWinstonOracle {
@@ -42,6 +42,8 @@ export class ArweaveBytesToWinstonOracle implements BytesToWinstonOracle {
 
   async getWinstonForBytes(bytes: ByteCount): Promise<Winston> {
     const url = `https://arweave.net/price/${bytes}`;
+
+    globalLogger.debug(`Getting AR price URL: ${url}`);
     try {
       const response = await this.axiosInstance.get(url);
       if (typeof response.data === "number") {
@@ -52,7 +54,7 @@ export class ArweaveBytesToWinstonOracle implements BytesToWinstonOracle {
         );
       }
     } catch (error) {
-      logger.error(`Error getting AR price URL: ${url}`, error);
+      globalLogger.error(`Error getting AR price URL: ${url}`, error);
       throw error;
     }
   }

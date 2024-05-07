@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,8 +20,12 @@ import validator from "validator";
 import { User } from "../database/dbTypes";
 import { GiftRedemptionError } from "../database/errors";
 import { KoaContext } from "../server";
-import { isValidArweaveBase64URL } from "../utils/base64";
-import { validateSingularQueryParameter } from "../utils/validators";
+import { WC } from "../types";
+import { isValidUserAddress } from "../utils/base64";
+import {
+  validateSingularQueryParameter,
+  validateUserAddressType,
+} from "../utils/validators";
 
 export async function redeem(ctx: KoaContext, next: Next): Promise<void> {
   const { paymentDatabase, logger: _logger } = ctx.state;
@@ -31,6 +35,7 @@ export async function redeem(ctx: KoaContext, next: Next): Promise<void> {
     email: rawEmail,
     destinationAddress: rawDestinationAddress,
     id: rawPaymentReceiptId,
+    token: rawUserAddressType = "arweave",
   } = ctx.query;
 
   const email = validateSingularQueryParameter(ctx, rawEmail);
@@ -42,15 +47,14 @@ export async function redeem(ctx: KoaContext, next: Next): Promise<void> {
     ctx,
     rawPaymentReceiptId
   );
-  if (!email || !destinationAddress || !paymentReceiptId) {
+  const userAddressType = validateUserAddressType(ctx, rawUserAddressType);
+  if (!email || !destinationAddress || !paymentReceiptId || !userAddressType) {
     return next();
   }
 
-  if (!isValidArweaveBase64URL(destinationAddress)) {
+  if (!isValidUserAddress(destinationAddress, userAddressType)) {
     ctx.response.status = 400;
-    ctx.body =
-      "Provided destination address is not a valid Arweave native address!";
-    logger.info("top-up GET -- Invalid destination address", ctx.params);
+    ctx.body = "Provided destination address is not a valid native address!";
     return next();
   }
 
@@ -68,13 +72,17 @@ export async function redeem(ctx: KoaContext, next: Next): Promise<void> {
   });
 
   let user: User;
+  let wincRedeemed: WC;
   try {
     logger.info("Redeeming payment receipt");
-    user = await paymentDatabase.redeemGift({
+    const res = await paymentDatabase.redeemGift({
       destinationAddress,
+      destinationAddressType: userAddressType,
       paymentReceiptId,
       recipientEmail,
     });
+    user = res.user;
+    wincRedeemed = res.wincRedeemed;
   } catch (error) {
     if (error instanceof GiftRedemptionError) {
       ctx.response.status = 400;
@@ -90,7 +98,7 @@ export async function redeem(ctx: KoaContext, next: Next): Promise<void> {
     return next();
   }
 
-  const message = `Payment receipt redeemed for ${user.winstonCreditBalance} winc!`;
+  const message = `Payment receipt redeemed for ${wincRedeemed} winc!`;
 
   logger = logger.child({ user });
   logger.info(message);

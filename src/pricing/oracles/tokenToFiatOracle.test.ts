@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,45 +17,45 @@
 import { expect } from "chai";
 import { stub } from "sinon";
 
-import { expectedArPrices } from "../../../tests/helpers/stubs";
+import { expectedTokenPrices } from "../../../tests/helpers/stubs";
 import { createAxiosInstance } from "../../axiosClient";
-import { supportedPaymentCurrencyTypes } from "../../types/supportedCurrencies";
+import { supportedFiatPaymentCurrencyTypes } from "../../types/supportedCurrencies";
 import {
-  CoingeckoArweaveToFiatOracle,
-  ReadThroughArweaveToFiatOracle,
-} from "./arweaveToFiatOracle";
+  CoingeckoTokenToFiatOracle,
+  ReadThroughTokenToFiatOracle,
+} from "./tokenToFiatOracle";
 
-describe("CoingeckoArweaveToFiatOracle", () => {
+describe("CoingeckoTokenToFiatOracle", () => {
   const axios = createAxiosInstance({});
-  const oracle = new CoingeckoArweaveToFiatOracle(axios);
+  const oracle = new CoingeckoTokenToFiatOracle(axios);
 
-  describe("getFiatPricesForOneAR", () => {
+  describe("getFiatPricesForOneToken", () => {
     it("should return an object for the AR price with each supported fiat currency", async () => {
       stub(axios, "get").resolves({
-        data: expectedArPrices,
+        data: expectedTokenPrices,
       });
 
-      const arPrices = await oracle.getFiatPricesForOneAR();
-      expect(arPrices).to.deep.equal(expectedArPrices.arweave);
+      const arPrices = await oracle.getFiatPricesForOneToken();
+      expect(arPrices).to.deep.equal(expectedTokenPrices);
     });
   });
 });
 
-describe("ReadThroughArweaveToFiatOracle", () => {
+describe("ReadThroughTokenToFiatOracle", () => {
   const axios = createAxiosInstance({});
-  const oracle = new CoingeckoArweaveToFiatOracle(axios);
+  const oracle = new CoingeckoTokenToFiatOracle(axios);
 
-  const readThroughOracle = new ReadThroughArweaveToFiatOracle({ oracle });
+  const readThroughOracle = new ReadThroughTokenToFiatOracle({ oracle });
 
   describe("getFiatPriceForOneAR", () => {
     it("should return the AR price for each supported fiat currency", async () => {
       stub(axios, "get").resolves({
-        data: expectedArPrices,
+        data: expectedTokenPrices,
       });
 
-      for (const curr of supportedPaymentCurrencyTypes) {
+      for (const curr of supportedFiatPaymentCurrencyTypes) {
         const arPrice = await readThroughOracle.getFiatPriceForOneAR(curr);
-        expect(arPrice).to.equal(expectedArPrices.arweave[curr]);
+        expect(arPrice).to.equal(expectedTokenPrices.arweave[curr]);
       }
     });
   });

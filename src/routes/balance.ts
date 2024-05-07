@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -35,7 +35,11 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
 
   try {
     const balance = await paymentDatabase.getBalance(walletAddress);
-    ctx.body = { winc: balance.toString() };
+    ctx.body = {
+      winc: balance.toString(),
+      // For compatibility with the existing ecosystem APIs
+      balance: balance.toString(),
+    };
     logger.info("Balance found!", { balance, walletAddress });
   } catch (error) {
     if (error instanceof UserNotFoundWarning) {

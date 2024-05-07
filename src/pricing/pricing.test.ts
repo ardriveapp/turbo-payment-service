@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -17,36 +17,38 @@
 import { expect } from "chai";
 import { SinonFakeTimers, stub, useFakeTimers } from "sinon";
 
-import { expectedArPrices } from "../../tests/helpers/stubs";
+import { expectedTokenPrices } from "../../tests/helpers/stubs";
 import {
   expectAsyncErrorThrow,
   removeCatalogIdMap,
 } from "../../tests/helpers/testHelpers";
 import { tableNames } from "../database/dbConstants";
 import {
+  PaymentAdjustmentCatalogDBResult,
   SingleUseCodePaymentCatalogDBInsert,
   SingleUseCodePaymentCatalogDBResult,
   UploadAdjustmentCatalogDBInsert,
 } from "../database/dbTypes";
 import { PostgresDatabase } from "../database/postgres";
-import { ByteCount, Winston } from "../types";
+import { ByteCount, W, Winston } from "../types";
 import { Payment } from "../types/payment";
+import { filterKeysFromObject } from "../utils/common";
 import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
-import {
-  CoingeckoArweaveToFiatOracle,
-  ReadThroughArweaveToFiatOracle,
-} from "./oracles/arweaveToFiatOracle";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
+import {
+  CoingeckoTokenToFiatOracle,
+  ReadThroughTokenToFiatOracle,
+} from "./oracles/tokenToFiatOracle";
 import { TurboPricingService } from "./pricing";
 
 describe("TurboPricingService class", () => {
   const paymentDatabase = new PostgresDatabase();
   const bytesToWinstonOracle = new ReadThroughBytesToWinstonOracle({});
-  const oracle = new CoingeckoArweaveToFiatOracle();
-  const arweaveToFiatOracle = new ReadThroughArweaveToFiatOracle({ oracle });
+  const oracle = new CoingeckoTokenToFiatOracle();
+  const tokenToFiatOracle = new ReadThroughTokenToFiatOracle({ oracle });
 
   const pricing = new TurboPricingService({
-    arweaveToFiatOracle,
+    tokenToFiatOracle,
     bytesToWinstonOracle,
     paymentDatabase,
   });
@@ -221,7 +223,7 @@ describe("TurboPricingService class", () => {
 
   describe("getWCForPayment", () => {
     beforeEach(() => {
-      stub(oracle, "getFiatPricesForOneAR").resolves(expectedArPrices.arweave);
+      stub(oracle, "getFiatPricesForOneToken").resolves(expectedTokenPrices);
     });
 
     it("returns the expected price for a given payment", async () => {
@@ -682,6 +684,75 @@ describe("TurboPricingService class", () => {
           },
         ]);
       });
+    });
+  });
+
+  describe("getWCForCryptoPayment", () => {
+    it("returns the expected price for a given arweave payment", async () => {
+      const { inclusiveAdjustments, finalPrice } =
+        await pricing.getWCForCryptoPayment({
+          amount: W(100),
+          token: "arweave",
+        });
+      expect(finalPrice.winc.toString()).to.equal("76");
+      expect(
+        inclusiveAdjustments.map((a) => filterKeysFromObject(a, ["catalogId"]))
+      ).to.deep.equal([
+        {
+          adjustmentAmount: W(-24),
+          currencyType: "arweave",
+          description:
+            "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+          name: "Turbo Infrastructure Fee",
+          operator: "multiply",
+          operatorMagnitude: 0.766,
+        },
+      ]);
+    });
+
+    it("returns the expected price when an inclusive add operator subsidy event is applied to an arweave payment", async () => {
+      const farInThePast = new Date("2005-01-01T00:00:00.000Z");
+      const oneDayLater = new Date("2005-01-02T00:00:00.000Z");
+      const twoDaysLater = new Date("2005-01-03T00:00:00.000Z");
+
+      const clock = useFakeTimers(oneDayLater.getTime());
+
+      await paymentDatabase["writer"]<PaymentAdjustmentCatalogDBResult>(
+        tableNames.paymentAdjustmentCatalog
+      ).insert({
+        adjustment_name: "Turbo 1 Dollar-ino off",
+        adjustment_exclusivity: "inclusive",
+        catalog_id: "best_stub_id_ever ITS REALLY UNIQUE!",
+        operator: "add",
+        operator_magnitude: "-100", // 1 dollar
+        adjustment_priority: 1,
+        // Use a specific date range to ensure the event is active only for this test
+        adjustment_start_date: farInThePast.toISOString(),
+        adjustment_end_date: twoDaysLater.toISOString(),
+      });
+
+      stub(oracle, "getFiatPricesForOneToken").resolves(expectedTokenPrices);
+      const { inclusiveAdjustments, finalPrice } =
+        await pricing.getWCForCryptoPayment({
+          amount: W(1_000_000_000_000), // 1 AR
+          token: "arweave",
+        });
+
+      expect(finalPrice.winc.toString()).to.equal("857549857550");
+      expect(
+        inclusiveAdjustments.map((a) => filterKeysFromObject(a, ["catalogId"]))
+      ).to.deep.equal([
+        {
+          adjustmentAmount: W(-142450142450),
+          currencyType: "arweave",
+          description: "",
+          name: "Turbo 1 Dollar-ino off",
+          operator: "add",
+          operatorMagnitude: -100,
+        },
+      ]);
+
+      clock.restore();
     });
   });
 });
