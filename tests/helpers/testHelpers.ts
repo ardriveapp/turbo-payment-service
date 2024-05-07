@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -23,9 +23,18 @@ import { createAxiosInstance } from "../../src/axiosClient";
 import { PostgresDatabase } from "../../src/database/postgres";
 import { MandrillEmailProvider } from "../../src/emailProvider";
 import {
-  CoingeckoArweaveToFiatOracle,
-  ReadThroughArweaveToFiatOracle,
-} from "../../src/pricing/oracles/arweaveToFiatOracle";
+  ArweaveGateway,
+  EthereumGateway,
+  SolanaGateway,
+} from "../../src/gateway";
+import {
+  ArweaveBytesToWinstonOracle,
+  ReadThroughBytesToWinstonOracle,
+} from "../../src/pricing/oracles/bytesToWinstonOracle";
+import {
+  CoingeckoTokenToFiatOracle,
+  ReadThroughTokenToFiatOracle,
+} from "../../src/pricing/oracles/tokenToFiatOracle";
 import { TurboPricingService } from "../../src/pricing/pricing";
 import { JWKInterface } from "../../src/types/jwkTypes";
 import { DbTestHelper } from "../dbTestHelper";
@@ -106,17 +115,38 @@ export const dbTestHelper = new DbTestHelper(paymentDatabase);
 export const coinGeckoAxios = createAxiosInstance({
   config: { validateStatus: () => true },
 });
-export const coinGeckoOracle = new CoingeckoArweaveToFiatOracle(coinGeckoAxios);
-export const arweaveToFiatOracle = new ReadThroughArweaveToFiatOracle({
+
+export const coinGeckoOracle = new CoingeckoTokenToFiatOracle(coinGeckoAxios);
+export const arweaveOracle = new ArweaveBytesToWinstonOracle();
+export const tokenToFiatOracle = new ReadThroughTokenToFiatOracle({
   oracle: coinGeckoOracle,
 });
+export const bytesToWinstonOracle = new ReadThroughBytesToWinstonOracle({
+  oracle: arweaveOracle,
+});
 export const stripe = new Stripe("test", { apiVersion: "2023-10-16" });
-export const pricingService = new TurboPricingService({ arweaveToFiatOracle });
+export const pricingService = new TurboPricingService({
+  tokenToFiatOracle,
+  bytesToWinstonOracle,
+});
 export const axios = axiosPackage.create({
   baseURL: localTestUrl,
   validateStatus: () => true,
 });
 export const emailProvider = new MandrillEmailProvider("test");
+export const gatewayMap = {
+  arweave: new ArweaveGateway({
+    axiosInstance: axios,
+    // fail polling strategy fast in test environment
+    paymentTxPollingWaitTimeMs: 0,
+  }),
+  ethereum: new EthereumGateway({
+    paymentTxPollingWaitTimeMs: 0,
+  }),
+  solana: new SolanaGateway({
+    paymentTxPollingWaitTimeMs: 0,
+  }),
+};
 
 export const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:disable-line
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -71,5 +71,21 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
   } catch (error) {
     logger.error(error);
   }
+  return next();
+}
+
+export async function addressFromQuery(
+  ctx: Context,
+  next: Next
+): Promise<void> {
+  const address = (ctx.request.query["address"] as string) || "";
+
+  if (!address) {
+    ctx.status = 400;
+    ctx.body = "Missing address in query parameters";
+    return;
+  }
+
+  ctx.state.walletAddress = address;
   return next();
 }

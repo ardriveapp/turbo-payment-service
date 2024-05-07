@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -29,6 +29,12 @@ import {
 } from "./constants";
 import { PostgresDatabase } from "./database/postgres";
 import { MandrillEmailProvider } from "./emailProvider";
+import {
+  ArweaveGateway,
+  EthereumGateway,
+  GatewayMap,
+  SolanaGateway,
+} from "./gateway";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
 import { architectureMiddleware, loggerMiddleware } from "./middleware";
@@ -82,11 +88,16 @@ export async function createServer(
   // an error if the user is not authenticated
   app.use(jwt({ secret: sharedSecret, passthrough: true }));
 
-  const pricingService = arch.pricingService ?? new TurboPricingService({});
+  const pricingService = arch.pricingService ?? new TurboPricingService();
   const paymentDatabase =
     arch.paymentDatabase ?? new PostgresDatabase({ migrate: migrateOnStartup });
   const stripe =
     arch.stripe ?? new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
+  const gatewayMap: GatewayMap = arch.gatewayMap ?? {
+    arweave: new ArweaveGateway(),
+    ethereum: new EthereumGateway(),
+    solana: new SolanaGateway(),
+  };
 
   const emailProvider = (() => {
     if (!isGiftingEnabled) {
@@ -108,6 +119,7 @@ export async function createServer(
       paymentDatabase,
       stripe,
       emailProvider,
+      gatewayMap,
     })
   );
 

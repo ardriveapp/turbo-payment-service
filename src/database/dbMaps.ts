@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -14,19 +14,30 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { Winston } from "../types/winston";
+import BigNumber from "bignumber.js";
+
+import { TokenType } from "../gateway";
+import { PositiveFiniteInteger } from "../types";
+import { W, Winston } from "../types/winston";
 import {
   AdjustmentCatalog,
   AdjustmentCatalogDBResult,
   ChargebackReceipt,
   ChargebackReceiptDBResult,
+  CreditedPaymentTransaction,
+  CreditedPaymentTransactionDBResult,
   DestinationAddressType,
+  FailedPaymentTransaction,
+  FailedPaymentTransactionDBResult,
   FailedTopUpQuote,
   FailedTopUpQuoteDBResult,
+  IntervalUnit,
   PaymentAdjustmentCatalog,
   PaymentAdjustmentCatalogDBResult,
   PaymentReceipt,
   PaymentReceiptDBResult,
+  PendingPaymentTransaction,
+  PendingPaymentTransactionDBResult,
   PromotionalInfo,
   SingleUseCodePaymentCatalog,
   SingleUseCodePaymentCatalogDBResult,
@@ -139,7 +150,15 @@ function priceAdjustmentCatalogDBMap({
 export function uploadAdjustmentCatalogDBMap(
   dbResult: UploadAdjustmentCatalogDBResult
 ): UploadAdjustmentCatalog {
-  return priceAdjustmentCatalogDBMap(dbResult);
+  return {
+    ...priceAdjustmentCatalogDBMap(dbResult),
+    byteCountThreshold: new PositiveFiniteInteger(
+      +dbResult.byte_count_threshold
+    ),
+    wincLimitation: W(dbResult.winc_limitation),
+    limitationInterval: +dbResult.limitation_interval,
+    limitationIntervalUnit: dbResult.limitation_interval_unit as IntervalUnit,
+  };
 }
 
 export function paymentAdjustmentCatalogDBMap(
@@ -175,5 +194,40 @@ export function unredeemedGiftDBMap(
     giftCreationDate: dbResult.creation_date,
     giftExpirationDate: dbResult.expiration_date,
     senderEmail: dbResult.sender_email,
+  };
+}
+
+export function pendingPaymentTransactionDBMap(
+  dbResult: PendingPaymentTransactionDBResult
+): PendingPaymentTransaction {
+  return {
+    transactionQuantity: BigNumber(dbResult.transaction_quantity),
+    transactionId: dbResult.transaction_id,
+    tokenType: dbResult.token_type as TokenType,
+    destinationAddress: dbResult.destination_address,
+    destinationAddressType:
+      dbResult.destination_address_type as DestinationAddressType,
+    createdDate: dbResult.created_date,
+    winstonCreditAmount: W(dbResult.winston_credit_amount),
+  };
+}
+
+export function failedTransactionDBMap(
+  dbResult: FailedPaymentTransactionDBResult
+): FailedPaymentTransaction {
+  return {
+    ...pendingPaymentTransactionDBMap(dbResult),
+    failedDate: dbResult.failed_date,
+    failedReason: dbResult.failed_reason,
+  };
+}
+
+export function creditedTransactionDBMap(
+  dbResult: CreditedPaymentTransactionDBResult
+): CreditedPaymentTransaction {
+  return {
+    ...pendingPaymentTransactionDBMap(dbResult),
+    creditedDate: dbResult.credited_transaction_date,
+    blockHeight: dbResult.block_height,
   };
 }

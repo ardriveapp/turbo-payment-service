@@ -81,6 +81,11 @@ components:
       description: Currency type for a given payment amount
       example: usd
 
+    TokenType:
+      type: string
+      description: Token type for a given transaction
+      example: arweave
+
     PaymentAmount:
       type: integer
       description: Payment amount in a given currency's smallest unit value. For example, $10 USD is 1000
@@ -102,6 +107,71 @@ components:
       type: string
       description: Comma-separated list of promo codes
 
+    DestinationAddress:
+      type: string
+      description: Destination wallet address for payment
+      example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+
+    DestinationAddressType:
+      type: string
+      description: Destination wallet address type
+      example: arweave
+
+    WinstonCreditAmount:
+      type: string
+      description: A big number string representing an amount of credits in winc. One credit is equivalent to 10^12 winc
+      example: "332824926"
+
+    PendingPaymentTx:
+      type: object
+      description: A payment transaction as our service sees it
+      properties:
+        transactionId:
+          type: string
+          description: The transaction ID of the pending payment transaction
+        transactionQuantity:
+          type: integer
+          description: The quantity of the pending payment transaction
+        createdAt:
+          type: string
+          description: The date and time the transaction was entered into the service
+        tokenType:
+          "$ref": "#/components/schemas/TokenType"
+        destinationAddress:
+          "$ref": "#/components/schemas/DestinationAddress"
+        destinationAddressType:
+          "$ref": "#/components/schemas/DestinationAddressType"
+        winstonCreditAmount:
+          "$ref": "#/components/schemas/WinstonCreditAmount"
+        adjustments:
+          "$ref": "#/components/schemas/Adjustment"
+
+    CreditedPaymentTx:
+      type: object
+      description: A payment transaction as our service sees it
+      properties:
+        allOf:
+          "$ref": "#/components/schemas/PendingPaymentTx"
+        blockHeight:
+          type: integer
+          description: The block height at which the transaction was credited
+        creditedAt:
+          type: string
+          description: The date and time the transaction was credited in the service
+
+    FailedPaymentTx:
+      type: object
+      description: A payment transaction as our service sees it
+      properties:
+        allOf:
+          "$ref": "#/components/schemas/PendingPaymentTx"
+        failedAt:
+          type: string
+          description: The date and time the transaction failed in the service
+        failureReason:
+          type: string
+          description: The reason the transaction failed in the service
+
     TopUpQuote:
       type: object
       description: A copy of the top up quote that was saved to the service's database
@@ -110,11 +180,9 @@ components:
           type: string
           example: caa8b54a-eb5e-4134-8ae2-a3946a428ec7
         destinationAddress:
-          type: string
-          example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+          "$ref": "#/components/schemas/DestinationAddress"
         destinationAddressType:
-          type: string
-          example: arweave
+          "$ref": "#/components/schemas/DestinationAddressType"
         paymentAmount:
           "$ref": "#/components/schemas/ActualPaymentAmount"
         quotedPaymentAmount:
@@ -123,8 +191,7 @@ components:
           type: string
           example: usd
         winstonCreditAmount:
-          type: string
-          example: 1000000000
+          "$ref": "#/components/schemas/WinstonCreditAmount"
         quoteExpirationDate:
           type: string
           example: 2023-05-17T21:46:38.404Z
@@ -618,3 +685,89 @@ paths:
               schema:
                 type: string
                 default: "Error while redeeming payment receipt. Unable to reach Database!"
+
+  /account/balance/{token}:
+    post:
+      summary: Post a pending payment transaction
+      description: Post a transaction ID that has been sent to the payment service's wallet
+
+      requestBody:
+        required: true
+        description: JSON with `tx_id` key of the pending payment transaction
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tx_id:
+                  type: string
+                  description: The transaction ID of the pending payment transaction
+
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            "$ref": "#/components/schemas/TokenType"
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Transaction credited
+                  creditedTransaction:
+                    "$ref": "#/components/schemas/CreditedPaymentTx"
+
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Transaction pending
+                  pendingTransaction:
+                    "$ref": "#/components/schemas/PendingPaymentTx"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Transaction ID is invalid!"
+
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Transaction has already failed!
+                  failedTransaction:
+                    "$ref": "#/components/schemas/FailedPaymentTx"
+
+        "404":
+          description: Not Found
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Transaction ID not found!"
+
+        "500":
+          description: Internal Server Error
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Error while processing transaction!"

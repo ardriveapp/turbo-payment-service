@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 import { ByteCount } from "./types/byteCount";
-import { SupportedPaymentCurrencyTypes } from "./types/supportedCurrencies";
+import { SupportedFiatPaymentCurrencyType } from "./types/supportedCurrencies";
 
 export const isTestEnv = process.env.NODE_ENV === "test";
 export const migrateOnStartup = process.env.MIGRATE_ON_STARTUP === "true";
@@ -107,12 +107,12 @@ export interface ExposedCurrencyLimitation extends CurrencyLimitation {
 }
 
 export type ExposedCurrencyLimitations = Record<
-  SupportedPaymentCurrencyTypes,
+  SupportedFiatPaymentCurrencyType,
   ExposedCurrencyLimitation
 >;
 
 export type CurrencyLimitations = Record<
-  SupportedPaymentCurrencyTypes,
+  SupportedFiatPaymentCurrencyType,
   CurrencyLimitation
 >;
 
@@ -318,10 +318,22 @@ export const promoCodeBackfills = {
 export const maxGiftMessageLength = process.env.MAX_GIFT_MESSAGE_LENGTH ?? 250;
 
 export const giftingEmailAddress =
-  process.env.GIFTING_EMAILL_ADDRESS ?? "gift@ardrive.io";
+  process.env.GIFTING_EMAIL_ADDRESS ?? "gift@ardrive.io";
 
 /** gifting on top up via email depends on GIFTING_ENABLED="true" env var */
 export const isGiftingEnabled = process.env.GIFTING_ENABLED === "true";
+
+export const arweaveGatewayUrl = new URL(
+  process.env.ARWEAVE_GATEWAY || "https://arweave.net:443"
+);
+
+export const ethereumGatewayUrl = new URL(
+  process.env.ETHEREUM_GATEWAY || "https://cloudflare-eth.com/"
+);
+
+export const solanaGatewayUrl = new URL(
+  process.env.SOLANA_GATEWAY || "https://api.mainnet-beta.solana.com/"
+);
 
 const thirtyMinutesMs = 1000 * 60 * 30;
 export const topUpQuoteExpirationMs = +(

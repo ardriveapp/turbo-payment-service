@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -18,12 +18,14 @@ import { Next } from "koa";
 import Router from "koa-router";
 import * as promClient from "prom-client";
 
-import { verifySignature } from "./middleware";
+import { addressFromQuery, verifySignature } from "./middleware";
+import { addPendingPaymentTx } from "./routes/addPendingPaymentTx";
 import { arweaveCompatiblePrice } from "./routes/arweaveCompatiblePrice";
 import { balanceRoute } from "./routes/balance";
 import { checkBalance } from "./routes/checkBalance";
 import { countriesHandler } from "./routes/countries";
 import { currenciesRoute } from "./routes/currencies";
+import { rootResponse } from "./routes/info";
 import { priceRoutes } from "./routes/priceRoutes";
 import { fiatToArRateHandler, ratesHandler } from "./routes/rates";
 import { redeem } from "./routes/redeem";
@@ -65,49 +67,75 @@ router.get("/v1/countries", countriesHandler);
 router.get("/v1/rates", ratesHandler);
 router.get("/v1/rates/:currency", fiatToArRateHandler);
 
-// temporary route for backwards compatibility
-router.get(
-  "/v1/reserve-balance/:walletAddress/:byteCount",
-  (ctx: KoaContext, next: Next) => {
-    const { byteCount } = ctx.params;
-    ctx.query.byteCount = byteCount;
-    return reserveBalance(ctx, next);
+router.get(["/info", "/v1/info", "/", "/v1"], rootResponse);
+
+// routes for existing ecosystem compatibility
+router.get("/account/balance/:token", (ctx) => {
+  // on /account/*, we will temporarily stub balance requests
+  ctx.body = "99999999999999999999999999999999999999";
+  return;
+});
+
+router.get("/account/balance", (ctx) => {
+  // on /account/*, we will temporarily stub balance requests
+  ctx.body = "99999999999999999999999999999999999999";
+  return;
+});
+router.post("/account/balance/:token", addPendingPaymentTx);
+
+// Balance routes exposed at /v1 for stable API
+router.get("/v1/account/balance/:token", addressFromQuery, balanceRoute);
+router.get("/v1/account/balance", addressFromQuery, balanceRoute);
+router.post("/v1/account/balance/:token", addPendingPaymentTx);
+
+function getAddressFromQuery(ctx: KoaContext, next: Next) {
+  const { token, walletAddress } = ctx.params;
+  // For backwards compatibility with upload service reserve-balance, get wallet address from token if not provided
+  // This can be removed once the upload service is updated to provide the wallet address in the request
+  if (!walletAddress) {
+    ctx.params.walletAddress = token;
+    ctx.params.token = "arweave";
   }
-);
+  return next();
+}
 
-router.get("/v1/reserve-balance/:walletAddress", reserveBalance);
+router.get("/v1/reserve-balance/:token", getAddressFromQuery, reserveBalance);
+router.get("/v1/refund-balance/:token", getAddressFromQuery, refundBalance);
+router.get("/v1/check-balance/:token", getAddressFromQuery, checkBalance);
 
-// temporary route for backwards compatibility
 router.get(
-  "/v1/refund-balance/:walletAddress/:winstonCredits",
-  (ctx: KoaContext, next: Next) => {
-    const { winstonCredits } = ctx.params;
-    ctx.query.winstonCredits = winstonCredits;
-    return refundBalance(ctx, next);
-  }
+  "/v1/reserve-balance/:token/:walletAddress",
+  getAddressFromQuery,
+  reserveBalance
 );
-
-router.get("/v1/refund-balance/:walletAddress", refundBalance);
-
-router.get("/v1/check-balance/:walletAddress", checkBalance);
+router.get(
+  "/v1/refund-balance/:token/:walletAddress",
+  getAddressFromQuery,
+  refundBalance
+);
+router.get(
+  "/v1/check-balance/:token/:walletAddress",
+  getAddressFromQuery,
+  checkBalance
+);
 
 // Health
-router.get("/health", async (ctx: KoaContext, next: Next) => {
+router.get("/health", async (ctx: KoaContext) => {
   ctx.body = "OK";
-  return next();
+  return;
 });
 
 // Prometheus
-router.get("/metrics", async (ctx: KoaContext, next: Next) => {
+router.get("/metrics", async (ctx: KoaContext) => {
   ctx.body = await metricsRegistry.metrics();
-  return next();
+  return;
 });
 
 router.get("/openapi.json", swaggerDocsJSON);
 router.get("/api-docs", swaggerDocs);
 
 // In order to integrate with existing ecosystem tools (e.g. Arconnect), we need to support the following route:
-router.get("/price/arweave/:amount", verifySignature, arweaveCompatiblePrice);
+router.get("/price/:token/:amount", verifySignature, arweaveCompatiblePrice);
 // This endpoint will return the price in winc, as a string, without any additional metadata.
 // This is the same as the /v1/price/bytes/:amount endpoint, but without the metadata.
 

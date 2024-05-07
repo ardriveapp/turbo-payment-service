@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -811,6 +811,7 @@ describe("PostgresDatabase class", () => {
         networkWincAmount: new NetworkPrice(new Winston(500)),
         dataItemId: stubTxId1,
         adjustments,
+        userAddressType: "arweave",
       });
 
       const richUser = await db.getUser(richAddress);
@@ -868,6 +869,7 @@ describe("PostgresDatabase class", () => {
           networkWincAmount: new NetworkPrice(new Winston(200)),
           adjustments: [],
           dataItemId: stubTxId1,
+          userAddressType: "arweave",
         }),
         errorType: "InsufficientBalance",
         errorMessage: `Insufficient balance for '${poorAddress}'`,
@@ -885,6 +887,7 @@ describe("PostgresDatabase class", () => {
           networkWincAmount: new NetworkPrice(new Winston(200)),
           adjustments: [],
           dataItemId: stubTxId1,
+          userAddressType: "arweave",
         }),
         errorType: "UserNotFoundWarning",
         errorMessage:

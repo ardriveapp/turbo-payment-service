@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -20,44 +20,51 @@ import {
 } from "@ardrive/ardrive-promise-cache";
 
 import { createAxiosInstance } from "../../axiosClient";
+import { TokenType, supportedPaymentTokens } from "../../gateway";
 import logger from "../../logger";
-import { supportedPaymentCurrencyTypes } from "../../types/supportedCurrencies";
+import {
+  SupportedFiatPaymentCurrencyType,
+  supportedFiatPaymentCurrencyTypes,
+} from "../../types/supportedCurrencies";
 
-interface CoinGeckoResponse {
-  [currencyType: string]: number;
-}
+type CoinGeckoResponse = Record<
+  TokenType,
+  Record<SupportedFiatPaymentCurrencyType, number>
+>;
 
 const coinGeckoUrl =
   process.env.COINGECKO_API_URL ?? "https://api.coingecko.com/api/v3/";
 
 /** Type guard thats checks that each supported payment currency type exists on response */
 function isCoinGeckoResponse(response: unknown): response is CoinGeckoResponse {
-  for (const curr of supportedPaymentCurrencyTypes) {
-    if (typeof (response as CoinGeckoResponse)[curr] !== "number") {
+  for (const curr of supportedFiatPaymentCurrencyTypes) {
+    if (typeof (response as CoinGeckoResponse).arweave[curr] !== "number") {
       return false;
     }
   }
   return true;
 }
 
-export interface ArweaveToFiatOracle {
-  getFiatPricesForOneAR: () => Promise<CoinGeckoResponse>;
+export interface TokenToFiatOracle {
+  getFiatPricesForOneToken: () => Promise<CoinGeckoResponse>;
 }
 
-export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
+export class CoingeckoTokenToFiatOracle implements TokenToFiatOracle {
   constructor(private readonly axiosInstance = createAxiosInstance({})) {}
 
-  public async getFiatPricesForOneAR(): Promise<CoinGeckoResponse> {
-    const currencyTypesString = supportedPaymentCurrencyTypes
+  public async getFiatPricesForOneToken(): Promise<CoinGeckoResponse> {
+    const currencyTypesString = supportedFiatPaymentCurrencyTypes
       .toString()
       .replace("'", "");
 
-    const url = `${coinGeckoUrl}simple/price?ids=arweave&vs_currencies=${currencyTypesString}`;
+    const tokenTypesString = supportedPaymentTokens.toString().replace("'", "");
+
+    const url = `${coinGeckoUrl}simple/price?ids=${tokenTypesString}&vs_currencies=${currencyTypesString}`;
     try {
       logger.info(`Getting AR prices from Coingecko`, { url });
       const { data } = await this.axiosInstance.get(url);
 
-      const coinGeckoResponse = data.arweave;
+      const coinGeckoResponse = data;
 
       if (!isCoinGeckoResponse(coinGeckoResponse)) {
         const errorMsg = "Unexpected response shape from coin gecko!";
@@ -68,7 +75,7 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
         throw Error(errorMsg);
       }
 
-      return coinGeckoResponse;
+      return data;
     } catch (error) {
       logger.error(`Error getting AR price in from Coingecko`, { url });
       logger.error(error);
@@ -79,8 +86,8 @@ export class CoingeckoArweaveToFiatOracle implements ArweaveToFiatOracle {
 
 const oneMinuteMs = 60 * 1000;
 
-export class ReadThroughArweaveToFiatOracle {
-  private readonly oracle: ArweaveToFiatOracle;
+export class ReadThroughTokenToFiatOracle {
+  private readonly oracle: TokenToFiatOracle;
   private readonly readThroughPromiseCache: ReadThroughPromiseCache<
     "arweave",
     CoinGeckoResponse
@@ -90,10 +97,10 @@ export class ReadThroughArweaveToFiatOracle {
     oracle,
     cacheParams,
   }: {
-    oracle?: ArweaveToFiatOracle;
+    oracle?: TokenToFiatOracle;
     cacheParams?: CacheParams;
   }) {
-    this.oracle = oracle ?? new CoingeckoArweaveToFiatOracle();
+    this.oracle = oracle ?? new CoingeckoTokenToFiatOracle();
     this.readThroughPromiseCache = new ReadThroughPromiseCache({
       cacheParams: cacheParams ?? {
         cacheCapacity: 10,
@@ -101,12 +108,21 @@ export class ReadThroughArweaveToFiatOracle {
       },
       readThroughFunction: () =>
         // TODO: Get from service level cache before oracle (elasticache)
-        this.oracle.getFiatPricesForOneAR(),
+        this.oracle.getFiatPricesForOneToken(),
     });
   }
 
   async getFiatPriceForOneAR(fiat: string): Promise<number> {
     const cachedValue = await this.readThroughPromiseCache.get("arweave");
-    return cachedValue[fiat];
+    return cachedValue.arweave[fiat as SupportedFiatPaymentCurrencyType];
+  }
+
+  async getPriceRatioForToken(token: TokenType): Promise<number> {
+    const cachedValue = await this.readThroughPromiseCache.get("arweave");
+    const arweaveUsdPrice = cachedValue.arweave.usd;
+
+    const tokenUsdPrice = cachedValue[token].usd;
+
+    return tokenUsdPrice / arweaveUsdPrice;
   }
 }

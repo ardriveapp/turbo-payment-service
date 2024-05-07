@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -19,14 +19,17 @@ import knex, { Knex } from "knex";
 import path from "path";
 import winston from "winston";
 
-import logger from "../logger";
-import { TransactionId, WC, Winston } from "../types";
-import { Database } from "./database";
+import globalLogger from "../logger";
+import { TransactionId, W, WC, Winston } from "../types";
+import { Database, WincUsedForUploadAdjustmentParams } from "./database";
 import { columnNames, tableNames } from "./dbConstants";
 import {
   chargebackReceiptDBMap,
+  creditedTransactionDBMap,
+  failedTransactionDBMap,
   paymentAdjustmentCatalogDBMap,
   paymentReceiptDBMap,
+  pendingPaymentTransactionDBMap,
   singleUseCodePaymentCatalogDBMap,
   topUpQuoteDBMap,
   unredeemedGiftDBMap,
@@ -40,16 +43,30 @@ import {
   ChargebackReceipt,
   ChargebackReceiptDBResult,
   CreateBalanceReservationParams,
+  CreateBypassedPaymentReceiptParams,
   CreateChargebackReceiptParams,
+  CreateNewCreditedTransactionParams,
   CreatePaymentReceiptParams,
+  CreatePendingTransactionParams,
   CreateTopUpQuoteParams,
+  CreditedPaymentTransaction,
+  CreditedPaymentTransactionDBInsert,
+  CreditedPaymentTransactionDBResult,
+  FailedPaymentTransaction,
+  FailedPaymentTransactionDBInsert,
+  FailedPaymentTransactionDBResult,
   FailedTopUpQuoteDBResult,
+  PaymentAdjustment,
   PaymentAdjustmentCatalog,
   PaymentAdjustmentCatalogDBResult,
   PaymentAdjustmentDBInsert,
   PaymentAdjustmentDBResult,
   PaymentReceipt,
+  PaymentReceiptDBInsert,
   PaymentReceiptDBResult,
+  PendingPaymentTransaction,
+  PendingPaymentTransactionDBInsert,
+  PendingPaymentTransactionDBResult,
   PromotionalInfo,
   RedeemedGiftDBInsert,
   RedeemedGiftDBResult,
@@ -64,14 +81,19 @@ import {
   UploadAdjustmentCatalog,
   UploadAdjustmentCatalogDBResult,
   UploadAdjustmentDBInsert,
+  UploadAdjustmentDBResult,
   User,
+  UserAddressType,
   UserDBInsert,
   UserDBResult,
+  isCreditedPaymentTransactionDBResult,
+  isFailedPaymentTransactionDBResult,
 } from "./dbTypes";
 import {
   GiftAlreadyRedeemed,
   GiftRedemptionError,
   InsufficientBalance,
+  PaymentTransactionNotFound,
   PromoCodeExceedsMaxUses,
   PromoCodeExpired,
   PromoCodeNotFound,
@@ -89,10 +111,12 @@ export class PostgresDatabase implements Database {
     writer = knex(getWriterConfig()),
     reader = knex(getReaderConfig()),
     migrate = false,
+    logger = globalLogger,
   }: {
     writer?: Knex;
     reader?: Knex;
     migrate?: boolean;
+    logger?: winston.Logger;
   } = {}) {
     this.log = logger.child({ class: this.constructor.name });
 
@@ -109,7 +133,6 @@ export class PostgresDatabase implements Database {
         });
     }
   }
-
   public async createTopUpQuote(
     topUpQuote: CreateTopUpQuoteParams
   ): Promise<void> {
@@ -401,15 +424,146 @@ export class PostgresDatabase implements Database {
     });
   }
 
+  /**
+   *  Creates a batch of payment receipt and its corresponding db entities without the requirement of
+   *  a pre-existing top up quote. This is meant as an admin tool for creating bypassed payments
+   */
+  public async createBypassedPaymentReceipts(
+    paymentReceipts: CreateBypassedPaymentReceiptParams[]
+  ): Promise<UnredeemedGift[]> {
+    this.log.info("Inserting new bypassed payment receipts...", {
+      paymentReceipts,
+    });
+    return this.writer.transaction(async (knexTransaction) => {
+      const unredeemedGifts: UnredeemedGift[] = [];
+      for (const paymentReceipt of paymentReceipts) {
+        const {
+          paymentAmount,
+          currencyType,
+          destinationAddress,
+          destinationAddressType,
+          paymentProvider,
+          senderEmail,
+          winc,
+          giftMessage,
+        } = paymentReceipt;
+
+        const paymentReceiptId = randomUUID();
+
+        const paymentReceiptDbInsert: PaymentReceiptDBInsert = {
+          payment_amount: paymentAmount.toString(),
+          currency_type: currencyType,
+          destination_address: destinationAddress,
+          destination_address_type: destinationAddressType,
+          payment_provider: paymentProvider,
+          quote_expiration_date: new Date().toISOString(),
+          quote_creation_date: new Date().toISOString(),
+          payment_receipt_id: paymentReceiptId,
+          quoted_payment_amount: paymentAmount.toString(),
+          top_up_quote_id: paymentReceiptId,
+          winston_credit_amount: winc.toString(),
+          gift_message: giftMessage,
+        };
+
+        await knexTransaction<PaymentReceiptDBResult>(
+          tableNames.paymentReceipt
+        ).insert(paymentReceiptDbInsert);
+
+        if (destinationAddressType === "email") {
+          const unredeemedGiftDbInsert: UnredeemedGiftDBInsert = {
+            recipient_email: destinationAddress,
+            payment_receipt_id: paymentReceiptId,
+            gifted_winc_amount: winc.toString(),
+            gift_message: giftMessage,
+            sender_email: senderEmail,
+          };
+          const unredeemedGift = await knexTransaction<UnredeemedGiftDBResult>(
+            tableNames.unredeemedGift
+          )
+            .insert(unredeemedGiftDbInsert)
+            .returning("*");
+
+          const auditLogInsert: AuditLogInsert = {
+            user_address: destinationAddress,
+            winston_credit_amount: "0",
+            change_reason: "bypassed_gifted_payment",
+            change_id: paymentReceiptId,
+          };
+
+          await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+
+          unredeemedGifts.push(unredeemedGift.map(unredeemedGiftDBMap)[0]);
+        } else {
+          // Increment balance of existing user
+          const destinationUser = (
+            await knexTransaction<UserDBResult>(tableNames.user).where({
+              user_address: destinationAddress,
+            })
+          )[0];
+
+          if (destinationUser === undefined) {
+            this.log.info("No existing user was found; creating new user...", {
+              userAddress: destinationAddress,
+              newBalance: winc.toString(),
+            });
+            await knexTransaction<UserDBResult>(tableNames.user).insert({
+              user_address: destinationAddress,
+              user_address_type: destinationAddressType,
+              winston_credit_balance: winc.toString(),
+            });
+
+            const auditLogInsert: AuditLogInsert = {
+              user_address: destinationAddress,
+              winston_credit_amount: winc.toString(),
+              change_reason: "bypassed_account_creation",
+              change_id: paymentReceiptId,
+            };
+            await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+          } else {
+            // Increment balance of existing user
+            const currentBalance = new Winston(
+              destinationUser.winston_credit_balance
+            );
+            const newBalance = currentBalance.plus(winc);
+
+            this.log.info("Incrementing balance...", {
+              userAddress: destinationAddress,
+              currentBalance,
+              newBalance,
+            });
+
+            await knexTransaction<UserDBResult>(tableNames.user)
+              .where({
+                user_address: destinationAddress,
+              })
+              .update({ winston_credit_balance: newBalance.toString() });
+
+            const auditLogInsert: AuditLogInsert = {
+              user_address: destinationAddress,
+              winston_credit_amount: winc.toString(),
+              change_reason: "bypassed_payment",
+              change_id: paymentReceiptId,
+            };
+
+            await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+          }
+        }
+      }
+      return unredeemedGifts;
+    });
+  }
+
   public async redeemGift({
     destinationAddress,
     paymentReceiptId,
     recipientEmail,
+    destinationAddressType,
   }: {
     paymentReceiptId: string;
     recipientEmail: string;
     destinationAddress: string;
-  }): Promise<User> {
+    destinationAddressType: UserAddressType;
+  }): Promise<{ user: User; wincRedeemed: WC }> {
     return this.writer.transaction(async (knexTransaction) => {
       const unredeemedGiftDbResults =
         await knexTransaction<UnredeemedGiftDBResult>(
@@ -419,7 +573,7 @@ export class PostgresDatabase implements Database {
         });
 
       if (unredeemedGiftDbResults.length === 0) {
-        logger.warn(
+        this.log.warn(
           `No unredeemed gift found in database with payment receipt ID '${paymentReceiptId}'`
         );
 
@@ -429,7 +583,7 @@ export class PostgresDatabase implements Database {
           payment_receipt_id: paymentReceiptId,
         });
         if (redeemedDbResults.length > 0) {
-          logger.warn(
+          this.log.warn(
             `Payment receipt ID '${paymentReceiptId}' has already been redeemed!`
           );
           throw new GiftAlreadyRedeemed();
@@ -446,7 +600,7 @@ export class PostgresDatabase implements Database {
         });
 
       if (paymentReceiptDbResults.length === 0) {
-        logger.warn(
+        this.log.warn(
           `No payment receipt found in database with payment receipt ID '${paymentReceiptId}'`
         );
         throw new GiftRedemptionError();
@@ -455,7 +609,7 @@ export class PostgresDatabase implements Database {
       const unredeemedGiftDbResult = unredeemedGiftDbResults[0];
 
       if (unredeemedGiftDbResult.recipient_email !== recipientEmail) {
-        logger.warn(
+        this.log.warn(
           `Recipient email '${recipientEmail}' does not match unredeemed gift recipient email '${unredeemedGiftDbResult.recipient_email}'`
         );
         throw new GiftRedemptionError();
@@ -489,7 +643,7 @@ export class PostgresDatabase implements Database {
         });
         const userDbInsert: UserDBInsert = {
           user_address: destinationAddress,
-          user_address_type: "arweave",
+          user_address_type: destinationAddressType,
           winston_credit_balance: unredeemedGiftDbResult.gifted_winc_amount,
         };
         const userDbResult = await knexTransaction<UserDBResult>(
@@ -505,7 +659,10 @@ export class PostgresDatabase implements Database {
           change_id: paymentReceiptId,
         };
         await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
-        return userDbResult.map(userDBMap)[0];
+        return {
+          user: userDbResult.map(userDBMap)[0],
+          wincRedeemed: new Winston(unredeemedGiftDbResult.gifted_winc_amount),
+        };
       } else {
         // Increment balance of existing user
         const currentBalance = new Winston(
@@ -538,7 +695,10 @@ export class PostgresDatabase implements Database {
         };
         await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
 
-        return userDbResult.map(userDBMap)[0];
+        return {
+          user: userDbResult.map(userDBMap)[0],
+          wincRedeemed: new Winston(unredeemedGiftDbResult.gifted_winc_amount),
+        };
       }
     });
   }
@@ -674,7 +834,7 @@ export class PostgresDatabase implements Database {
         };
         await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
       } else {
-        logger.warn(
+        this.log.warn(
           `Chargeback receipt created for payment receipt ID '${paymentReceiptId}' but user has not redeemed gift yet!`
         );
       }
@@ -721,6 +881,7 @@ export class PostgresDatabase implements Database {
     reservedWincAmount,
     dataItemId,
     adjustments = [],
+    userAddressType,
   }: CreateBalanceReservationParams): Promise<void> {
     await this.writer.transaction(async (knexTransaction) => {
       let user: User;
@@ -728,7 +889,7 @@ export class PostgresDatabase implements Database {
         user = await this.getUser(userAddress, knexTransaction);
       } catch (error) {
         if (error instanceof UserNotFoundWarning) {
-          if (reservedWincAmount.winc.isNonZeroNegativeInteger()) {
+          if (reservedWincAmount.winc.isNonZeroPositiveInteger()) {
             throw new UserNotFoundWarning(userAddress);
           }
           this.log.info(
@@ -736,8 +897,7 @@ export class PostgresDatabase implements Database {
           );
           const userDbInsert: UserDBInsert = {
             user_address: userAddress,
-            // TODO: user_address_type should be injected as a parameter
-            user_address_type: "arweave",
+            user_address_type: userAddressType,
             winston_credit_balance: "0",
           };
           const dbResult = await knexTransaction<UserDBResult>(tableNames.user)
@@ -747,11 +907,12 @@ export class PostgresDatabase implements Database {
             userAddress,
             winstonCreditBalance: new Winston("0"),
             promotionalInfo: {},
-            userAddressType: "arweave",
+            userAddressType: userAddressType,
             userCreationDate: dbResult[0].user_creation_date,
           };
+        } else {
+          throw error; // Re throw the error if it's not a UserNotFoundWarning
         }
-        throw error; // Re throw the error if it's not a UserNotFoundWarning
       }
 
       const currentWinstonBalance = user.winstonCreditBalance;
@@ -1034,5 +1195,346 @@ export class PostgresDatabase implements Database {
 
       return qualifiedAdjustments.map(singleUseCodePaymentCatalogDBMap);
     });
+  }
+
+  private insertPaymentAdjustments(
+    knexTransaction: Knex.Transaction,
+    adjustments: PaymentAdjustment[],
+    userAddress: string,
+    paymentId: string
+  ) {
+    return knexTransaction.batchInsert(
+      tableNames.paymentAdjustment,
+      adjustments.map(
+        ({ adjustmentAmount, catalogId, currencyType }, index) => {
+          const adjustmentDbInsert: PaymentAdjustmentDBInsert = {
+            adjusted_payment_amount: adjustmentAmount.toString(),
+            adjusted_currency_type: currencyType,
+            user_address: userAddress,
+            catalog_id: catalogId,
+            adjustment_index: index,
+            top_up_quote_id: paymentId,
+          };
+          return adjustmentDbInsert;
+        }
+      )
+    );
+  }
+
+  public async createPendingTransaction(
+    params: CreatePendingTransactionParams
+  ): Promise<void> {
+    this.log.info("Inserting new pending transaction...", params);
+
+    const {
+      destinationAddress,
+      winstonCreditAmount,
+      adjustments,
+      destinationAddressType,
+      transactionId,
+      transactionQuantity,
+      tokenType,
+    } = params;
+
+    await this.writer.transaction(async (knexTransaction) => {
+      const pendingTransactionDbInsert: PendingPaymentTransactionDBInsert = {
+        destination_address: destinationAddress,
+        winston_credit_amount: winstonCreditAmount.toString(),
+        destination_address_type: destinationAddressType,
+        transaction_id: transactionId,
+        transaction_quantity: transactionQuantity.toString(),
+        token_type: tokenType,
+      };
+
+      await knexTransaction<PendingPaymentTransactionDBResult>(
+        tableNames.pendingPaymentTransaction
+      ).insert(pendingTransactionDbInsert);
+
+      await this.insertPaymentAdjustments(
+        knexTransaction,
+        adjustments,
+        destinationAddress,
+        transactionId
+      );
+    });
+  }
+
+  public async creditPendingTransaction(
+    transactionId: string,
+    blockHeight: number
+  ): Promise<void> {
+    await this.writer.transaction(async (knexTransaction) => {
+      const pendingTransactionDbResults =
+        await knexTransaction<PendingPaymentTransactionDBResult>(
+          tableNames.pendingPaymentTransaction
+        )
+          .where({
+            transaction_id: transactionId,
+          })
+          .del()
+          .returning("*");
+
+      if (pendingTransactionDbResults.length === 0) {
+        throw new PaymentTransactionNotFound(transactionId);
+      }
+
+      const pendingTransaction = pendingTransactionDbResults[0];
+
+      const creditedTransactionDbInsert: CreditedPaymentTransactionDBInsert = {
+        ...pendingTransaction,
+        block_height: blockHeight,
+      };
+
+      await knexTransaction<CreditedPaymentTransactionDBResult>(
+        tableNames.creditedPaymentTransaction
+      ).insert(creditedTransactionDbInsert);
+
+      await this.creditOrCreateUser({
+        userAddress: pendingTransaction.destination_address,
+        userAddressType:
+          pendingTransaction.destination_address_type as UserAddressType,
+        changeReason: "crypto_payment",
+        changeId: transactionId,
+        winstonCreditAmount: new Winston(
+          pendingTransaction.winston_credit_amount
+        ),
+        knexTransaction,
+      });
+    });
+  }
+
+  public async failPendingTransaction(
+    transactionId: string,
+    failedReason: string
+  ): Promise<void> {
+    await this.writer.transaction(async (knexTransaction) => {
+      const pendingTransactionDbResults =
+        await knexTransaction<PendingPaymentTransactionDBResult>(
+          tableNames.pendingPaymentTransaction
+        )
+          .where({
+            transaction_id: transactionId,
+          })
+          .del()
+          .returning("*");
+
+      if (pendingTransactionDbResults.length === 0) {
+        throw new PaymentTransactionNotFound(transactionId);
+      }
+
+      const pendingTransaction = pendingTransactionDbResults[0];
+
+      const failedTransactionDbInsert: FailedPaymentTransactionDBInsert = {
+        ...pendingTransaction,
+        failed_reason: failedReason,
+      };
+
+      await knexTransaction<FailedPaymentTransactionDBResult>(
+        tableNames.failedPaymentTransaction
+      ).insert(failedTransactionDbInsert);
+    });
+  }
+
+  public async checkForPendingTransaction(
+    transactionId: TransactionId
+  ): Promise<
+    | PendingPaymentTransaction
+    | FailedPaymentTransaction
+    | CreditedPaymentTransaction
+    | false
+  > {
+    const tables = [
+      tableNames.pendingPaymentTransaction,
+      tableNames.failedPaymentTransaction,
+      tableNames.creditedPaymentTransaction,
+    ];
+
+    return this.reader.transaction(async (knexTransaction) => {
+      try {
+        const result = await Promise.any<
+          | PendingPaymentTransactionDBResult
+          | FailedPaymentTransactionDBResult
+          | CreditedPaymentTransactionDBResult
+        >(
+          tables.map(async (tableName) => {
+            const res = await knexTransaction(tableName)
+              .where({
+                transaction_id: transactionId,
+              })
+              .first();
+            return res || Promise.reject(new Error("No results found"));
+          })
+        );
+
+        if (isFailedPaymentTransactionDBResult(result)) {
+          return failedTransactionDBMap(result);
+        }
+        if (isCreditedPaymentTransactionDBResult(result)) {
+          return creditedTransactionDBMap(result);
+        }
+        return pendingPaymentTransactionDBMap(result);
+      } catch (error) {
+        if (error instanceof AggregateError) {
+          return false;
+        }
+        throw error;
+      }
+    });
+  }
+
+  public async getPendingTransactions(): Promise<PendingPaymentTransaction[]> {
+    const dbResults = await this.reader<PendingPaymentTransactionDBResult>(
+      tableNames.pendingPaymentTransaction
+    );
+    return dbResults.map(pendingPaymentTransactionDBMap);
+  }
+
+  private async creditOrCreateUser({
+    changeId,
+    changeReason,
+    knexTransaction,
+    userAddress,
+    userAddressType,
+    winstonCreditAmount,
+  }: {
+    userAddress: string;
+    userAddressType: UserAddressType;
+    changeReason: "payment" | "gifted_payment" | "crypto_payment";
+    changeId: string;
+    winstonCreditAmount: Winston;
+    knexTransaction: Knex.Transaction;
+  }): Promise<void> {
+    try {
+      const user = await this.getUser(userAddress, knexTransaction);
+      const currentBalance = user.winstonCreditBalance;
+      const newBalance = currentBalance.plus(winstonCreditAmount);
+
+      this.log.info("Incrementing balance...", {
+        userAddress,
+        currentBalance,
+        newBalance,
+      });
+
+      await knexTransaction<UserDBResult>(tableNames.user)
+        .where({
+          user_address: userAddress,
+        })
+        .update({ winston_credit_balance: newBalance.toString() });
+
+      const auditLogInsert: AuditLogInsert = {
+        user_address: userAddress,
+        winston_credit_amount: winstonCreditAmount.toString(),
+        change_reason: changeReason,
+        change_id: changeId,
+      };
+      await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+    } catch (error) {
+      if (error instanceof UserNotFoundWarning) {
+        this.log.info(
+          `No user found with address '${userAddress}'. Creating a new user with balance of credited winc amount.`
+        );
+        const userDbInsert: UserDBInsert = {
+          user_address: userAddress,
+          user_address_type: userAddressType,
+          winston_credit_balance: winstonCreditAmount.toString(),
+        };
+        await knexTransaction<UserDBResult>(tableNames.user).insert(
+          userDbInsert
+        );
+        const auditLogInsert: AuditLogInsert = {
+          user_address: userAddress,
+          winston_credit_amount: winstonCreditAmount.toString(),
+          change_reason:
+            changeReason === "payment"
+              ? "account_creation"
+              : "gifted_account_creation",
+          change_id: changeId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  public async createNewCreditedTransaction(
+    params: CreateNewCreditedTransactionParams
+  ): Promise<void> {
+    this.log.info("Inserting new credited transaction...", {
+      params,
+    });
+
+    const {
+      destinationAddress,
+      winstonCreditAmount,
+      adjustments,
+      destinationAddressType,
+      transactionId,
+      transactionQuantity,
+      tokenType,
+      blockHeight,
+    } = params;
+
+    await this.writer.transaction(async (knexTransaction) => {
+      const creditedTransactionDbInsert: CreditedPaymentTransactionDBInsert = {
+        destination_address: destinationAddress,
+        winston_credit_amount: winstonCreditAmount.toString(),
+        destination_address_type: destinationAddressType,
+        transaction_id: transactionId,
+        transaction_quantity: transactionQuantity.toString(),
+        token_type: tokenType,
+        block_height: blockHeight,
+      };
+
+      await knexTransaction<CreditedPaymentTransactionDBResult>(
+        tableNames.creditedPaymentTransaction
+      ).insert(creditedTransactionDbInsert);
+
+      await knexTransaction.batchInsert(
+        tableNames.paymentAdjustment,
+        adjustments.map(
+          ({ adjustmentAmount, catalogId, currencyType }, index) => {
+            const adjustmentDbInsert: PaymentAdjustmentDBInsert = {
+              adjusted_payment_amount: adjustmentAmount.toString(),
+              adjusted_currency_type: currencyType,
+              user_address: destinationAddress,
+              catalog_id: catalogId,
+              adjustment_index: index,
+              top_up_quote_id: transactionId,
+            };
+            return adjustmentDbInsert;
+          }
+        )
+      );
+
+      await this.creditOrCreateUser({
+        userAddress: destinationAddress,
+        userAddressType: tokenType,
+        changeReason: "crypto_payment",
+        changeId: transactionId,
+        winstonCreditAmount,
+        knexTransaction,
+      });
+    });
+  }
+
+  public async getWincUsedForUploadAdjustmentCatalog({
+    userAddress,
+    catalogId,
+    limitationInterval,
+    limitationIntervalUnit,
+  }: WincUsedForUploadAdjustmentParams): Promise<WC> {
+    const uploadAdjustmentDbResult =
+      await this.reader<UploadAdjustmentDBResult>(
+        tableNames.uploadAdjustment
+      ).where({ catalog_id: catalogId, user_address: userAddress })
+        .andWhereRaw(`
+        ${columnNames.adjustmentDate} > NOW() - interval '${limitationInterval} ${limitationIntervalUnit}'
+      `);
+
+    return uploadAdjustmentDbResult.reduce(
+      (acc, { adjusted_winc_amount }) => acc.plus(W(adjusted_winc_amount)),
+      W(0)
+    );
   }
 }

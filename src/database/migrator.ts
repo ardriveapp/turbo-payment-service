@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -227,6 +227,139 @@ export class GiftByEmailMigrator extends Migrator {
 
         await this.knex.schema.dropTable(tableNames.unredeemedGift);
         await this.knex.schema.dropTable(tableNames.redeemedGift);
+      },
+    });
+  }
+}
+
+export class LimitedSubsidyEventMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to limited subsidy event",
+      operation: async () => {
+        await this.knex.schema.alterTable(
+          tableNames.uploadAdjustmentCatalog,
+          (table) => {
+            table
+              .string(columnNames.byteCountThreshold)
+              .notNullable()
+              .defaultTo("0");
+            table
+              .string(columnNames.wincLimitation)
+              .notNullable()
+              .defaultTo("0");
+            table
+              .string(columnNames.limitationInterval)
+              .notNullable()
+              .defaultTo("24"); // 24 hours
+            table
+              .string(columnNames.limitationIntervalUnit)
+              .notNullable()
+              .defaultTo("hour"); // 24 hours
+          }
+        );
+      },
+    });
+  }
+
+  public rollback() {
+    return this.operate({
+      name: "rollback from limited subsidy event",
+      operation: async () => {
+        await this.knex.schema.alterTable(
+          tableNames.singleUseCodePaymentAdjustmentCatalog,
+          (table) => {
+            table.dropColumn(columnNames.byteCountThreshold);
+            table.dropColumn(columnNames.wincLimitation);
+            table.dropColumn(columnNames.limitationInterval);
+            table.dropColumn(columnNames.limitationIntervalUnit);
+          }
+        );
+      },
+    });
+  }
+}
+
+export class ArPaymentMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  private pendingPaymentTables(tableBuilder: Knex.TableBuilder) {
+    tableBuilder.string(columnNames.transactionId).notNullable().primary();
+    tableBuilder.string(columnNames.tokenType).notNullable();
+
+    tableBuilder.string(columnNames.transactionQuantity).notNullable();
+    tableBuilder.string(columnNames.winstonCreditAmount).notNullable();
+
+    tableBuilder.string(columnNames.destinationAddress).notNullable();
+    tableBuilder.string(columnNames.destinationAddressType).notNullable();
+
+    tableBuilder
+      .timestamp(columnNames.createdDate)
+      .notNullable()
+      .defaultTo(this.knex.fn.now());
+  }
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to crypto payment",
+      operation: async () => {
+        await this.knex.schema.createTable(
+          tableNames.pendingPaymentTransaction,
+          (table) => {
+            this.pendingPaymentTables(table);
+          }
+        );
+
+        await this.knex.schema.createTable(
+          tableNames.failedPaymentTransaction,
+          (table) => {
+            this.pendingPaymentTables(table);
+
+            table
+              .timestamp(columnNames.failedDate)
+              .notNullable()
+              .defaultTo(this.knex.fn.now());
+            table.string(columnNames.failedReason).notNullable();
+          }
+        );
+
+        await this.knex.schema.createTable(
+          tableNames.creditedPaymentTransaction,
+
+          (table) => {
+            this.pendingPaymentTables(table);
+
+            table.string(columnNames.blockHeight).notNullable().index();
+            table
+              .timestamp(columnNames.creditedDate)
+              .notNullable()
+              .defaultTo(this.knex.fn.now())
+              .index();
+          }
+        );
+      },
+    });
+  }
+
+  public rollback() {
+    return this.operate({
+      name: "rollback from crypto payment",
+      operation: async () => {
+        await this.knex.schema.dropTableIfExists(
+          tableNames.pendingPaymentTransaction
+        );
+        await this.knex.schema.dropTableIfExists(
+          tableNames.failedPaymentTransaction
+        );
+        await this.knex.schema.dropTableIfExists(
+          tableNames.creditedPaymentTransaction
+        );
       },
     });
   }

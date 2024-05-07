@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,25 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { Base64URLString } from "../types";
+import { createHash } from "crypto";
+
+import { UserAddressType } from "../database/dbTypes";
+import { Base64URLString, PublicArweaveAddress } from "../types";
+
+export function ownerToAddress(owner: Base64URLString): PublicArweaveAddress {
+  return sha256B64Url(fromB64Url(owner));
+}
+
+export function fromB64Url(input: Base64URLString) {
+  const paddingLength = input.length % 4 == 0 ? 0 : 4 - (input.length % 4);
+
+  const base64 = input
+    .replace(/-/g, "+")
+    .replace(/_/g, "/")
+    .concat("=".repeat(paddingLength));
+
+  return Buffer.from(base64, "base64");
+}
 
 export function fromB64UrlToBuffer(input: Base64URLString): Buffer {
   return Buffer.from(input, "base64url");
@@ -24,8 +42,38 @@ export function toB64Url(buffer: Buffer): Base64URLString {
   return buffer.toString("base64url");
 }
 
+export function sha256B64Url(input: Buffer): Base64URLString {
+  return toB64Url(createHash("sha256").update(input).digest());
+}
+
 // check if it is a valid arweave base64url for a wallet public address, transaction id or smartweave contract
-export function isValidArweaveBase64URL(base64URL: string) {
+export function isValidArweaveBase64URL(base64URL: Base64URLString) {
   const base64URLRegex = new RegExp("^[a-zA-Z0-9_-]{43}$");
   return base64URLRegex.test(base64URL);
+}
+
+export function isValidSolanaAddress(address: string) {
+  const solanaAddressRegex = new RegExp("^[A-Za-z0-9]{44}$");
+  return solanaAddressRegex.test(address);
+}
+
+export function isValidEthAddress(address: string) {
+  const ethAddressRegex = new RegExp("^0x[a-fA-F0-9]{40}$");
+  return ethAddressRegex.test(address);
+}
+
+export function isValidUserAddress(
+  address: string,
+  type: UserAddressType
+): boolean {
+  switch (type) {
+    case "arweave":
+      return isValidArweaveBase64URL(address);
+    case "solana":
+      return isValidSolanaAddress(address);
+    case "ethereum":
+      return isValidEthAddress(address);
+    default:
+      return false;
+  }
 }

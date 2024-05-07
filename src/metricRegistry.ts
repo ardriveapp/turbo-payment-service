@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -69,6 +69,11 @@ export class MetricRegistry {
 
   public static giftEmailTriggerFailure = new promClient.Counter({
     name: "gift_email_trigger_failure",
+    help: "Count of gift email trigger failures for unredeemed gifts",
+  });
+
+  public static creditPendingTxJobFailure = new promClient.Counter({
+    name: "credit_pending_tx_job_failure",
     help: "Count of gift email trigger failures for unredeemed gifts",
   });
 

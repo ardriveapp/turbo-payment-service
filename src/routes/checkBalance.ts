@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2022-2023 Permanent Data Solutions, Inc. All Rights Reserved.
+ * Copyright (C) 2022-2024 Permanent Data Solutions, Inc. All Rights Reserved.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as published by
@@ -53,7 +53,10 @@ export async function checkBalance(ctx: KoaContext, next: Next) {
       walletAddress,
       byteCount,
     });
-    priceWithAdjustments = await pricingService.getWCForBytes(byteCount);
+    priceWithAdjustments = await pricingService.getWCForBytes(
+      byteCount,
+      walletAddress
+    );
   } catch (error) {
     ctx.response.status = 502;
     ctx.body = "Error getting base credit amount";
