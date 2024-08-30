@@ -33,6 +33,7 @@ import {
   ArweaveGateway,
   EthereumGateway,
   GatewayMap,
+  KyveGateway,
   SolanaGateway,
 } from "./gateway";
 import logger from "./logger";
@@ -97,6 +98,7 @@ export async function createServer(
     arweave: new ArweaveGateway(),
     ethereum: new EthereumGateway(),
     solana: new SolanaGateway(),
+    kyve: new KyveGateway(),
   };
 
   const emailProvider = (() => {

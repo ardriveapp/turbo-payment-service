@@ -17,6 +17,7 @@
 import { Next } from "koa";
 import getRawBody from "raw-body";
 
+import { cryptoFundExcludedAddresses } from "../constants";
 import {
   CreatePendingTransactionParams,
   CreditedPaymentTransaction,
@@ -28,6 +29,7 @@ import {
   PaymentTransactionHasWrongTarget,
   PaymentTransactionNotFound,
   PaymentTransactionNotMined,
+  PaymentTransactionRecipientOnExcludedList,
 } from "../database/errors";
 import { isSupportedPaymentToken } from "../gateway";
 import { KoaContext } from "../server";
@@ -100,6 +102,14 @@ export async function addPendingPaymentTx(ctx: KoaContext, _next: Next) {
     if (+pendingTx.transactionQuantity <= 0) {
       throw new BadRequest("Transaction quantity must be greater than 0");
     }
+    if (
+      cryptoFundExcludedAddresses.includes(pendingTx.transactionSenderAddress)
+    ) {
+      throw new PaymentTransactionRecipientOnExcludedList(
+        tx_id,
+        pendingTx.transactionSenderAddress
+      );
+    }
     if (pendingTx.transactionRecipientAddress !== walletAddresses[token]) {
       throw new PaymentTransactionHasWrongTarget(
         tx_id,
@@ -169,6 +179,9 @@ export async function addPendingPaymentTx(ctx: KoaContext, _next: Next) {
     } else if (error instanceof PaymentTransactionNotFound) {
       ctx.status = 404; // Matches Irys -- but should it be 400?
       ctx.body = "Transaction not found";
+    } else if (error instanceof PaymentTransactionRecipientOnExcludedList) {
+      ctx.status = 403;
+      ctx.body = error.message;
     } else {
       ctx.status = 500;
       logger.error("Error adding pending payment transaction", error);

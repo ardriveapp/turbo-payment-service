@@ -62,6 +62,11 @@ export function isValidEthAddress(address: string) {
   return ethAddressRegex.test(address);
 }
 
+export function isValidKyveAddress(address: string) {
+  const kyveAddressRegex = new RegExp("^kyve[a-zA-Z0-9]{39}$");
+  return kyveAddressRegex.test(address);
+}
+
 export function isValidUserAddress(
   address: string,
   type: UserAddressType
@@ -73,6 +78,8 @@ export function isValidUserAddress(
       return isValidSolanaAddress(address);
     case "ethereum":
       return isValidEthAddress(address);
+    case "kyve":
+      return isValidKyveAddress(address);
     default:
       return false;
   }

@@ -19,11 +19,11 @@ import { Logger } from "winston";
 import { Database } from "../database/database";
 import { DestinationAddressType } from "../database/dbTypes";
 import { PostgresDatabase } from "../database/postgres";
-import { EmailProvider, MandrillEmailProvider } from "../emailProvider";
+import { EmailProvider } from "../emailProvider";
 import globalLogger from "../logger";
 import { triggerEmail } from "../triggerEmail";
 import { wincFromCredits } from "../types";
-import { loadSecretsToEnv } from "../utils/loadSecretsToEnv";
+import { sendSlackMessage } from "../utils/slack";
 
 /**
  * Admin tool for adding credits to a list of email or wallet addresses
@@ -31,10 +31,9 @@ import { loadSecretsToEnv } from "../utils/loadSecretsToEnv";
 export async function addCreditsToAddresses({
   logger = globalLogger.child({ job: "addCreditsToAddresses" }),
   paymentDatabase = new PostgresDatabase(),
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  emailProvider = new MandrillEmailProvider(process.env.MANDRILL_API_KEY!),
+  emailProvider,
   addresses,
-  addressType = "email",
+  addressType = "arweave",
   creditAmount = 1,
   giftMessage,
 }: {
@@ -69,38 +68,10 @@ export async function addCreditsToAddresses({
   for (const unredeemedGift of unredeemedGifts) {
     await triggerEmail(unredeemedGift, emailProvider);
   }
-}
 
-export async function handler({
-  addresses,
-  creditAmount,
-  addressType,
-  giftMessage,
-}: {
-  addresses: string[];
-  giftMessage?: string;
-  addressType?: DestinationAddressType;
-  creditAmount: number;
-}) {
-  await loadSecretsToEnv();
-  // TODO: SQS Queue Handler -> Event -> Message -> Body
-  return addCreditsToAddresses({
-    addresses,
-    creditAmount,
-    addressType,
-    giftMessage,
+  await sendSlackMessage({
+    message: `Added ${creditAmount} Turbo Credit(s) to the following addresses:\n\`\`\`${addresses.map(
+      (address) => `\n${address}`
+    )}\`\`\``,
   });
 }
-
-// To Credit Email Addresses with 1 Credit each:
-// - Supply env vars for DB_HOST,DB_PASSWORD,MANDRILL_API_KEY and set GIFTING_ENABLED=true
-// - Supply CSV email list at ADDRESSES env var
-// - Uncomment the following code
-// - Run `yarn ts-node src/jobs/addCreditsToAddresses.ts`
-// void (async () => {
-//   await loadSecretsToEnv();
-//   await addCreditsToAddresses({
-//     addresses: process.env.ADDRESSES!.split(","), // eslint-disable-line @typescript-eslint/no-non-null-assertion
-//     giftMessage: "Thank you for visiting us at ETH Denver!",
-//   });
-// })();

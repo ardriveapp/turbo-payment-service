@@ -47,52 +47,52 @@ export const electronicallySuppliedServicesTaxCode = "txcd_10000000"; //cspell:d
 export const paymentAmountLimits: CurrencyLimitations = {
   aud: {
     minimumPaymentAmount: 7500,
-    maximumPaymentAmount: 15_000_00,
+    maximumPaymentAmount: 3_000_00,
     suggestedPaymentAmounts: [25_00, 75_00, 150_00],
   },
   brl: {
     minimumPaymentAmount: 2500,
-    maximumPaymentAmount: 50_000_00,
+    maximumPaymentAmount: 10_000_00,
     suggestedPaymentAmounts: [125_00, 250_00, 500_00],
   },
   cad: {
     minimumPaymentAmount: 500,
-    maximumPaymentAmount: 15_000_00,
+    maximumPaymentAmount: 2_000_00,
     suggestedPaymentAmounts: [25_00, 50_00, 100_00],
   },
   eur: {
     minimumPaymentAmount: 500,
-    maximumPaymentAmount: 10_000_00,
+    maximumPaymentAmount: 2_000_00,
     suggestedPaymentAmounts: [25_00, 50_00, 100_00],
   },
   gbp: {
     minimumPaymentAmount: 500,
-    maximumPaymentAmount: 10_000_00,
+    maximumPaymentAmount: 2_000_00,
     suggestedPaymentAmounts: [20_00, 40_00, 80_00],
   },
   hkd: {
     minimumPaymentAmount: 5000,
-    maximumPaymentAmount: 100_000_00,
+    maximumPaymentAmount: 20_000_00,
     suggestedPaymentAmounts: [200_00, 400_00, 800_00],
   },
   inr: {
     minimumPaymentAmount: 50_000,
-    maximumPaymentAmount: 900_000_00,
+    maximumPaymentAmount: 180_000_00,
     suggestedPaymentAmounts: [2000_00, 4000_00, 8000_00],
   },
   jpy: {
     minimumPaymentAmount: 750,
-    maximumPaymentAmount: 1_500_000,
+    maximumPaymentAmount: 300_000,
     suggestedPaymentAmounts: [3_500, 6_500, 15_000],
   },
   sgd: {
     minimumPaymentAmount: 750,
-    maximumPaymentAmount: 15_000_00,
+    maximumPaymentAmount: 3_000_00,
     suggestedPaymentAmounts: [25_00, 75_00, 150_00],
   },
   usd: {
     minimumPaymentAmount: 500,
-    maximumPaymentAmount: 10_000_00,
+    maximumPaymentAmount: 2_000_00,
     suggestedPaymentAmounts: [25_00, 50_00, 100_00],
   },
 };
@@ -335,7 +335,16 @@ export const solanaGatewayUrl = new URL(
   process.env.SOLANA_GATEWAY || "https://api.mainnet-beta.solana.com/"
 );
 
+export const kyveGatewayUrl = new URL(
+  process.env.KYVE_GATEWAY || "https://api.kyve.network/"
+);
+
 const thirtyMinutesMs = 1000 * 60 * 30;
 export const topUpQuoteExpirationMs = +(
   process.env.TOP_UP_QUOTE_EXPIRATION_MS ?? thirtyMinutesMs
 );
+
+export const cryptoFundExcludedAddresses = process.env
+  .CRYPTO_FUND_EXCLUDED_ADDRESSES
+  ? process.env.CRYPTO_FUND_EXCLUDED_ADDRESSES.split(",")
+  : [];

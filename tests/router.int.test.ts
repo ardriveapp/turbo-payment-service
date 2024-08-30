@@ -2197,7 +2197,7 @@ describe("Router tests", () => {
     expect(data).to.deep.equal({ winc: "1000000000", balance: "1000000000" });
   });
 
-  const tokens = ["arweave", "ethereum", "solana"] as const;
+  const tokens = ["arweave", "ethereum", "solana", "kyve"] as const;
 
   for (const token of tokens) {
     it(`GET /account/balance/${token} returns 200 for valid params`, async () => {
@@ -2278,7 +2278,8 @@ describe("Router tests", () => {
 
       const turboInfraFeeMagnitude = 0.766;
       const ratio =
-        expectedTokenPrices[token].usd / expectedTokenPrices.arweave.usd;
+        expectedTokenPrices[token === "kyve" ? "kyve-network" : token].usd /
+        expectedTokenPrices.arweave.usd;
       const wc = W(
         baseAmountToTokenAmount(tokenAmount, token)
           .times(ratio)
@@ -2340,7 +2341,8 @@ describe("Router tests", () => {
 
       const turboInfraFeeMagnitude = 0.766;
       const ratio =
-        expectedTokenPrices[token].usd / expectedTokenPrices.arweave.usd;
+        expectedTokenPrices[token === "kyve" ? "kyve-network" : token].usd /
+        expectedTokenPrices.arweave.usd;
       const wc = W(
         baseAmountToTokenAmount(tokenAmount, token)
           .times(ratio)
@@ -2503,6 +2505,27 @@ describe("Router tests", () => {
       tokenType: "arweave",
       winstonCreditAmount: "0",
     });
+  });
+
+  it("POST /account/balance/arweave returns 403 for tx that has a sender on the excluded address list", async () => {
+    stub(gatewayMap.arweave, "getTransaction").resolves({
+      transactionSenderAddress: "testExcludedAddress",
+      transactionQuantity: BigNumber("500"),
+      transactionRecipientAddress: walletAddresses.arweave,
+    });
+
+    const { status, statusText, data } = await axios.post(
+      `/v1/account/balance/arweave`,
+      {
+        tx_id: "testTxId",
+      }
+    );
+
+    expect(status).to.equal(403);
+    expect(statusText).to.equal("Forbidden");
+    expect(data).to.equal(
+      "Payment transaction 'testTxId' has sender that is on the excluded address list: 'testExcludedAddress'"
+    );
   });
 
   it("POST /account/balance/arweave returns 400 for tx that is less than one winston in quantity", async () => {
