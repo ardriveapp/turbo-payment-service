@@ -148,11 +148,29 @@ export class PaymentTransactionNotFound extends Error {
 }
 
 export class PaymentTransactionHasWrongTarget extends Error {
-  constructor(transactionId: string, targetAddress: string) {
+  constructor(transactionId: string, targetAddress?: string) {
     super(
       `Payment transaction '${transactionId}' has wrong target address '${targetAddress}'`
     );
     this.name = "PaymentTransactionHasWrongTarget";
+  }
+}
+
+export class TransactionNotAPaymentTransaction extends Error {
+  constructor(transactionId: string) {
+    super(
+      `Transaction with id '${transactionId}' is not a payment transaction!`
+    );
+    this.name = "TransactionNotAPaymentTransaction";
+  }
+}
+
+export class PaymentTransactionRecipientOnExcludedList extends Error {
+  constructor(transactionId: string, senderAddress: string) {
+    super(
+      `Payment transaction '${transactionId}' has sender that is on the excluded address list: '${senderAddress}'`
+    );
+    this.name = "PaymentTransactionRecipientOnExcludedList";
   }
 }
 

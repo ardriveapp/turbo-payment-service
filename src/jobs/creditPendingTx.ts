@@ -16,7 +16,12 @@
  */
 import { Architecture } from "../architecture";
 import { PostgresDatabase } from "../database/postgres";
-import { ArweaveGateway, EthereumGateway, SolanaGateway } from "../gateway";
+import {
+  ArweaveGateway,
+  EthereumGateway,
+  KyveGateway,
+  SolanaGateway,
+} from "../gateway";
 import globalLogger from "../logger";
 
 export type CreditPendingTxParams = Partial<
@@ -33,6 +38,7 @@ export async function creditPendingTransactionsHandler({
     arweave: new ArweaveGateway(),
     ethereum: new EthereumGateway(),
     solana: new SolanaGateway(),
+    kyve: new KyveGateway(),
   },
   paymentDatabase = new PostgresDatabase(),
   logger = globalLogger.child({ job: "credit-pending-transactions-job" }),

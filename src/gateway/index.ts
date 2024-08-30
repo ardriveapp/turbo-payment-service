@@ -14,17 +14,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { startConsumers } from "./consumer";
-import globalLogger from "./logger";
-import { createServer } from "./server";
 
-// Here is our server 🙌
-createServer({}).catch((e) => {
-  globalLogger.error(`Exiting with error: ${e}`);
-  process.exit(1);
-});
-
-// Here are our consumers 🙌
-startConsumers().catch((e) => {
-  globalLogger.error(`Consumers have failed to start!`, e);
-});
+export * from "./gateway";
+export * from "./kyve";
+export * from "./solana";
+export * from "./ethereum";
+export * from "./arweave";

@@ -74,7 +74,12 @@ export class MetricRegistry {
 
   public static creditPendingTxJobFailure = new promClient.Counter({
     name: "credit_pending_tx_job_failure",
-    help: "Count of gift email trigger failures for unredeemed gifts",
+    help: "Count of failed credit pending tx jobs",
+  });
+
+  public static adminCreditToolJobFailure = new promClient.Counter({
+    name: "admin_credit_tool_job_failure",
+    help: "Count of failed admin credit tool jobs",
   });
 
   private constructor() {

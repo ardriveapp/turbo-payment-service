@@ -27,8 +27,24 @@ import {
   supportedFiatPaymentCurrencyTypes,
 } from "../../types/supportedCurrencies";
 
+const coinGeckoTokenNames = [
+  "arweave",
+  "ethereum",
+  "solana",
+  "kyve-network",
+] as const;
+
+type CoinGeckoTokenName = (typeof coinGeckoTokenNames)[number];
+
+const tokenNameToCoinGeckoTokenName: Record<TokenType, CoinGeckoTokenName> = {
+  arweave: "arweave",
+  ethereum: "ethereum",
+  solana: "solana",
+  kyve: "kyve-network",
+};
+
 type CoinGeckoResponse = Record<
-  TokenType,
+  CoinGeckoTokenName,
   Record<SupportedFiatPaymentCurrencyType, number>
 >;
 
@@ -57,12 +73,15 @@ export class CoingeckoTokenToFiatOracle implements TokenToFiatOracle {
       .toString()
       .replace("'", "");
 
-    const tokenTypesString = supportedPaymentTokens.toString().replace("'", "");
+    const tokenTypesString = supportedPaymentTokens
+      .map((t) => tokenNameToCoinGeckoTokenName[t])
+      .toString()
+      .replace("'", "");
 
     const url = `${coinGeckoUrl}simple/price?ids=${tokenTypesString}&vs_currencies=${currencyTypesString}`;
     try {
       logger.info(`Getting AR prices from Coingecko`, { url });
-      const { data } = await this.axiosInstance.get(url);
+      const { data } = await this.axiosInstance.get<CoinGeckoResponse>(url);
 
       const coinGeckoResponse = data;
 
@@ -75,7 +94,7 @@ export class CoingeckoTokenToFiatOracle implements TokenToFiatOracle {
         throw Error(errorMsg);
       }
 
-      return data;
+      return coinGeckoResponse;
     } catch (error) {
       logger.error(`Error getting AR price in from Coingecko`, { url });
       logger.error(error);
@@ -121,7 +140,9 @@ export class ReadThroughTokenToFiatOracle {
     const cachedValue = await this.readThroughPromiseCache.get("arweave");
     const arweaveUsdPrice = cachedValue.arweave.usd;
 
-    const tokenUsdPrice = cachedValue[token].usd;
+    const coinGeckoToken = tokenNameToCoinGeckoTokenName[token];
+
+    const tokenUsdPrice = cachedValue[coinGeckoToken].usd;
 
     return tokenUsdPrice / arweaveUsdPrice;
   }

@@ -105,6 +105,7 @@ export const checkoutSessionStub = ({
     automatic_tax: {
       status: null,
       enabled: false,
+      liability: null,
     },
     custom_text: {
       shipping_address: null,
@@ -332,6 +333,18 @@ export const expectedTokenPrices = {
     cad: 237.39,
     hkd: 1358.73,
     brl: 878.79,
+  },
+  "kyve-network": {
+    usd: 0.02336109,
+    jpy: 3.43,
+    eur: 0.02107705,
+    gbp: 0.01798402,
+    inr: 1.96,
+    aud: 0.03470311,
+    sgd: 0.03055981,
+    cad: 0.03185612,
+    hkd: 0.181921,
+    brl: 0.126463,
   },
 };
 

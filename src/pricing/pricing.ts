@@ -796,6 +796,10 @@ export function lamportsToSol(lamports: BigNumber.Value): BigNumber {
   return BigNumber(lamports).shiftedBy(-9);
 }
 
+export function ukyveToKyve(ukyve: BigNumber.Value): BigNumber {
+  return BigNumber(ukyve).shiftedBy(-6);
+}
+
 export function baseAmountToTokenAmount(
   amount: BigNumber.Value,
   token: TokenType
@@ -807,6 +811,8 @@ export function baseAmountToTokenAmount(
       return weiToEth(amount);
     case "solana":
       return lamportsToSol(amount);
+    case "kyve":
+      return ukyveToKyve(amount);
     default:
       return BigNumber(amount);
   }

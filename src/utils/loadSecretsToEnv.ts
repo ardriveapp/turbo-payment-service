@@ -31,6 +31,7 @@ const dbPasswordSecretName = "payment-db-password";
 const wincSubsidizedPercentageParamName =
   "/payment-service/subsidized-winc-percentage";
 const mandrillApiKeySecretName = "mandrill-api-key";
+const slackOathTokenParamName = "slack-oauth-token";
 
 export async function loadSecretsToEnv() {
   try {
@@ -64,6 +65,7 @@ export async function loadSecretsToEnv() {
   });
 
   const getSSMParameterCommand = async (Name: string) => {
+    logger.debug("Getting SSM parameter", { Name });
     return (
       await SSMParameterClient.send(
         new GetParameterCommand({
@@ -90,5 +92,9 @@ export async function loadSecretsToEnv() {
 
   process.env.SUBSIDIZED_WINC_PERCENTAGE ??= await getSSMParameterCommand(
     wincSubsidizedPercentageParamName
+  );
+
+  process.env.SLACK_OAUTH_TOKEN ??= await getSSMParameterCommand(
+    slackOathTokenParamName
   );
 }

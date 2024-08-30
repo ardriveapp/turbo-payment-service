@@ -31,17 +31,14 @@ export const walletAddresses = {
     "Bg5HnSVtgHVXEGqJYWqxWad9Vrcgva9JrKw3XFSEGvaB",
   matic:
     process.env.MATIC_ADDRESS ?? "0x9B13eb5096264B12532b8C648Eba4A662b4078ce",
+  kyve:
+    process.env.KYVE_ADDRESS ?? "kyve18yazy0nuyvctmygxr7uhddwd5clxltmgtqgc8p",
 } as const; // cspell:enable
 
 export async function rootResponse(ctx: KoaContext, next: Next) {
   ctx.body = {
     version: "0.2.0",
-    addresses: {
-      arweave: walletAddresses.arweave,
-      ethereum: walletAddresses.ethereum,
-      solana: walletAddresses.solana,
-      matic: walletAddresses.matic,
-    },
+    addresses: walletAddresses,
     gateway: ctx.state.gatewayMap.arweave.endpoint,
   };
   return next();

@@ -46,7 +46,12 @@ export interface PaymentAdjustment extends Adjustment {
 
 export type UserAddress = string | PublicArweaveAddress;
 
-export const userAddressTypes = ["arweave", "solana", "ethereum"] as const;
+export const userAddressTypes = [
+  "arweave",
+  "solana",
+  "ethereum",
+  "kyve",
+] as const;
 export type UserAddressType = (typeof userAddressTypes)[number];
 
 export const destinationAddressTypes = [...userAddressTypes, "email"] as const;
