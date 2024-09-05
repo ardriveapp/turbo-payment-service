@@ -792,6 +792,10 @@ export function weiToEth(wei: BigNumber.Value): BigNumber {
   return BigNumber(wei).shiftedBy(-18);
 }
 
+export function baseToMatic(base: BigNumber.Value): BigNumber {
+  return BigNumber(base).shiftedBy(-18);
+}
+
 export function lamportsToSol(lamports: BigNumber.Value): BigNumber {
   return BigNumber(lamports).shiftedBy(-9);
 }
@@ -813,6 +817,8 @@ export function baseAmountToTokenAmount(
       return lamportsToSol(amount);
     case "kyve":
       return ukyveToKyve(amount);
+    case "matic":
+      return baseToMatic(amount);
     default:
       return BigNumber(amount);
   }

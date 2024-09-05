@@ -32,6 +32,7 @@ const coinGeckoTokenNames = [
   "ethereum",
   "solana",
   "kyve-network",
+  "matic-network"
 ] as const;
 
 type CoinGeckoTokenName = (typeof coinGeckoTokenNames)[number];
@@ -41,6 +42,7 @@ const tokenNameToCoinGeckoTokenName: Record<TokenType, CoinGeckoTokenName> = {
   ethereum: "ethereum",
   solana: "solana",
   kyve: "kyve-network",
+  matic: "matic-network"
 };
 
 type CoinGeckoResponse = Record<

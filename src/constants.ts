@@ -331,6 +331,10 @@ export const ethereumGatewayUrl = new URL(
   process.env.ETHEREUM_GATEWAY || "https://cloudflare-eth.com/"
 );
 
+export const maticGatewayUrl = new URL(
+  process.env.MATIC_GATEWAY || "https://polygon-mainnet.infura.io/"
+);
+
 export const solanaGatewayUrl = new URL(
   process.env.SOLANA_GATEWAY || "https://api.mainnet-beta.solana.com/"
 );
