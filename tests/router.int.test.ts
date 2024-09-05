@@ -2197,7 +2197,7 @@ describe("Router tests", () => {
     expect(data).to.deep.equal({ winc: "1000000000", balance: "1000000000" });
   });
 
-  const tokens = ["arweave", "ethereum", "solana", "kyve"] as const;
+  const tokens = ["arweave", "ethereum", "solana", "kyve", "matic"] as const;
 
   for (const token of tokens) {
     it(`GET /account/balance/${token} returns 200 for valid params`, async () => {
