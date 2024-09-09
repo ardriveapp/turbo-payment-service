@@ -86,9 +86,14 @@ components:
       description: Token type for a given transaction
       example: arweave
 
+    PriceFiatOrTokenType:
+      type: string
+      description: Type for a given price request. Either "fiat" type or "token" type
+      example: kyve
+
     PaymentAmount:
       type: integer
-      description: Payment amount in a given currency's smallest unit value. For example, $10 USD is 1000
+      description: Payment amount in a given currency's smallest unit value. For example, $10 USD is 1000. 1 AR is 1000000000000
       example: 1000
 
     SignatureHeader:
@@ -242,6 +247,27 @@ components:
           description: Available on a checkout-session top up flow, this is the URL in which to fulfill the quote
           example: https://checkout.stripe.com/c/pay/cs_test_a1lFM2vIpifSqH8VtIjnbSGnr0RAQtEx6R2OMbhvbeK7fradNG7357Roxy#fidkdWxOYHwnPyd1blpxYHZxWjA0T1BEcXJGPWR1VUpSbkFJbTdDVV9uVG5sTl9AblFqM3J0YklGcVRqRmlJM1YxaTdvaWdnZjBIYkphckpQYVA8UWs8NktLc3REQmdwNDQwaW5PRm1IbG5CNTVdUGNRaGo3fycpJ2N3amhWYHdzYHcnP3F3cGApJ2lkfGpwcVF8dWAnPyd2bGtiaWBabHFgaCcpJ2BrZGdpYFVpZGZgbWppYWB3dic%2FcXdwYHgl
 
+    ReturnUrl:
+      type: string
+      description: The URL to return to after a successful payment
+      default: https://app.ardrive.io
+
+    SuccessUrl:
+      type: string
+      description: The URL to return to after a successful payment
+      default: https://app.ardrive.io
+
+    CancelUrl:
+      type: string
+      description: The URL to return to after a canceled payment
+      default: https://app.ardrive.io
+
+    UiMode:
+      type: string
+      description: Which UI Mode to create the checkout session in
+      default: hosted
+      example: embedded
+
 paths:
   # winc Price for ByteCount of Data Items
   /price/bytes/{byteCount}:
@@ -272,8 +298,8 @@ paths:
                 type: string
                 default: "Invalid byte count"
 
-        "502":
-          description: Bad Gateway
+        "503":
+          description: Service Unavailable
           content:
             text/plain:
               schema:
@@ -309,7 +335,7 @@ paths:
           in: path
           required: true
           schema:
-            "$ref": "#/components/schemas/CurrencyType"
+            "$ref": "#/components/schemas/PriceFiatOrTokenType"
 
         - name: amount
           in: path
@@ -347,8 +373,8 @@ paths:
                 description: "Error message string dependent on cause"
                 example: "Payment Amount is Invalid"
 
-        "502":
-          description: Bad Gateway
+        "503":
+          description: Service Unavailable
           content:
             text/plain:
               schema:
@@ -378,7 +404,7 @@ paths:
 
     get:
       summary: Get Current Balance of winc
-      description: Use a signed request or a previously obtained JWT to get the the signing wallet's current service balance in winc
+      description: Use a signed request or a previously obtained JWT to get the signing wallet's current service balance in winc
 
       responses:
         "200":
@@ -472,10 +498,25 @@ paths:
           in: query
           required: false
           schema:
-            type: string
-            description: Which UI Mode to create the checkout session in
-            default: hosted
-            example: embedded
+            "$ref": "#/components/schemas/UiMode"
+
+        - name: returnUrl
+          in: query
+          required: false
+          schema:
+            "$ref": "#/components/schemas/ReturnUrl"
+
+        - name: successUrl
+          in: query
+          required: false
+          schema:
+            "$ref": "#/components/schemas/SuccessUrl"
+
+        - name: cancelUrl
+          in: query
+          required: false
+          schema:
+            "$ref": "#/components/schemas/CancelUrl"
 
       responses:
         "200":
@@ -513,8 +554,8 @@ paths:
                 description: "Error message string dependent on cause"
                 example: "Payment Amount is Invalid!"
 
-        "502":
-          description: Bad Gateway
+        "503":
+          description: Service Unavailable
           content:
             text/plain:
               schema:
@@ -764,8 +805,8 @@ paths:
                 type: string
                 default: "Transaction ID not found!"
 
-        "500":
-          description: Internal Server Error
+        "503":
+          description: Service Unavailable
           content:
             text/plain:
               schema:

@@ -52,7 +52,7 @@ export async function currenciesRoute(ctx: KoaContext, next: Next) {
     ctx.set("Cache-Control", `max-age=${oneHourInSeconds}`);
   } catch (error) {
     ctx.body = "Fiat Oracle Unavailable";
-    ctx.status = 502;
+    ctx.status = 503;
   }
 
   return next();

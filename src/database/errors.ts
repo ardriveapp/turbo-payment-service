@@ -16,28 +16,32 @@
  */
 import { CurrencyType, PaymentAmount, Timestamp, UserAddress } from "./dbTypes";
 
-export class UserNotFoundWarning extends Error {
+abstract class BaseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+  }
+}
+
+export class UserNotFoundWarning extends BaseError {
   constructor(userAddress: UserAddress) {
     super(`No user found in database with address '${userAddress}'`);
-    this.name = "UserNotFoundWarning";
   }
 }
 
-export class InsufficientBalance extends Error {
+export class InsufficientBalance extends BaseError {
   constructor(userAddress: UserAddress) {
     super(`Insufficient balance for '${userAddress}'`);
-    this.name = "InsufficientBalance";
   }
 }
 
-export abstract class PaymentValidationError extends Error {}
+export abstract class PaymentValidationError extends BaseError {}
 
 export class UnsupportedCurrencyType extends PaymentValidationError {
   constructor(currencyType: CurrencyType) {
     super(
       `The currency type '${currencyType}' is currently not supported by this API!`
     );
-    this.name = "UnsupportedCurrencyType";
   }
 }
 
@@ -46,7 +50,6 @@ export class InvalidPaymentAmount extends PaymentValidationError {
     super(
       `The provided payment amount (${paymentAmount}) is invalid; it must be a positive non-decimal integer!`
     );
-    this.name = "InvalidPaymentAmount";
   }
 }
 
@@ -59,7 +62,6 @@ export class PaymentAmountTooSmall extends PaymentValidationError {
     super(
       `The provided payment amount (${paymentAmount}) is too small for the currency type "${currencyType}"; it must be above ${minimumAllowedAmount}!`
     );
-    this.name = "PaymentAmountTooSmall";
   }
 }
 
@@ -72,32 +74,28 @@ export class PaymentAmountTooLarge extends PaymentValidationError {
     super(
       `The provided payment amount (${paymentAmount}) is too large for the currency type "${currencyType}"; it must be below or equal to ${maximumAllowedAmount}!`
     );
-    this.name = "PaymentAmountTooLarge";
   }
 }
 
-export abstract class PromoCodeError extends Error {}
+export abstract class PromoCodeError extends BaseError {}
 
 export class UserIneligibleForPromoCode extends PromoCodeError {
   constructor(userAddress: UserAddress, promoCode: string) {
     super(
       `The user '${userAddress}' is ineligible for the promo code '${promoCode}'`
     );
-    this.name = "UserIneligibleForPromoCode";
   }
 }
 
 export class PromoCodeNotFound extends PromoCodeError {
   constructor(promoCode: string) {
     super(`No promo code found with code '${promoCode}'`);
-    this.name = "PromoCodeNotFound";
   }
 }
 
 export class PromoCodeExpired extends PromoCodeError {
   constructor(promoCode: string, endDate: Timestamp) {
     super(`The promo code '${promoCode}' expired on '${endDate}'`);
-    this.name = "PromoCodeExpired";
   }
 }
 
@@ -106,7 +104,6 @@ export class PaymentAmountTooSmallForPromoCode extends PromoCodeError {
     super(
       `The promo code '${promoCode}' can only used on payments above '${minimumPaymentAmount}'`
     );
-    this.name = "PaymentAmountTooSmallForPromoCode";
   }
 }
 
@@ -115,77 +112,73 @@ export class PromoCodeExceedsMaxUses extends PromoCodeError {
     super(
       `The promo code '${promoCode}' has already been used the maximum number of times (${maxUses})`
     );
-    this.name = "PromoCodeExceedsMaxUses";
   }
 }
 
-export class GiftRedemptionError extends Error {
+export class GiftRedemptionError extends BaseError {
   constructor(errorMessage = "Failure to redeem payment receipt!") {
     super(errorMessage);
-    this.name = "GiftRedemptionError";
   }
 }
 
 export class GiftAlreadyRedeemed extends GiftRedemptionError {
   constructor() {
     super("Gift has already been redeemed!");
-    this.name = "GiftAlreadyRedeemed";
   }
 }
 
-export class PaymentTransactionNotMined extends Error {
+export class BadQueryParam extends BaseError {
+  constructor(message?: string) {
+    super(message ?? `Bad query parameter`);
+  }
+}
+
+export class PaymentTransactionNotMined extends BaseError {
   constructor(transactionId: string) {
     super(`Transaction with id '${transactionId}' has not been mined yet!`);
-    this.name = "PaymentTransactionNotMined";
   }
 }
 
-export class PaymentTransactionNotFound extends Error {
+export class PaymentTransactionNotFound extends BaseError {
   constructor(transactionId: string) {
     super(`No payment transaction found with id '${transactionId}'`);
-    this.name = "PaymentTransactionNotFound";
   }
 }
 
-export class PaymentTransactionHasWrongTarget extends Error {
+export class PaymentTransactionHasWrongTarget extends BaseError {
   constructor(transactionId: string, targetAddress?: string) {
     super(
       `Payment transaction '${transactionId}' has wrong target address '${targetAddress}'`
     );
-    this.name = "PaymentTransactionHasWrongTarget";
   }
 }
 
-export class TransactionNotAPaymentTransaction extends Error {
+export class TransactionNotAPaymentTransaction extends BaseError {
   constructor(transactionId: string) {
     super(
       `Transaction with id '${transactionId}' is not a payment transaction!`
     );
-    this.name = "TransactionNotAPaymentTransaction";
   }
 }
 
-export class PaymentTransactionRecipientOnExcludedList extends Error {
+export class PaymentTransactionRecipientOnExcludedList extends BaseError {
   constructor(transactionId: string, senderAddress: string) {
     super(
       `Payment transaction '${transactionId}' has sender that is on the excluded address list: '${senderAddress}'`
     );
-    this.name = "PaymentTransactionRecipientOnExcludedList";
   }
 }
 
-export class BadRequest extends Error {
+export class BadRequest extends BaseError {
   constructor(message: string) {
     super(message);
-    this.name = "BadRequest";
   }
 }
 
-export class CryptoPaymentTooSmallError extends Error {
+export class CryptoPaymentTooSmallError extends BadRequest {
   constructor() {
     super(
       `Crypto payment amount is too small! Token value must convert to at least one winc`
     );
-    this.name = "CryptoPaymentTooSmallError";
   }
 }

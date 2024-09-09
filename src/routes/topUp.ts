@@ -21,6 +21,7 @@ import validator from "validator";
 
 import {
   CurrencyLimitations,
+  defaultCheckoutCancelUrl,
   electronicallySuppliedServicesTaxCode,
   isGiftingEnabled,
   paymentIntentTopUpMethod,
@@ -28,7 +29,11 @@ import {
   topUpQuoteExpirationMs,
 } from "../constants";
 import { CreateTopUpQuoteParams } from "../database/dbTypes";
-import { PaymentValidationError, PromoCodeError } from "../database/errors";
+import {
+  BadQueryParam,
+  PaymentValidationError,
+  PromoCodeError,
+} from "../database/errors";
 import { MetricRegistry } from "../metricRegistry";
 import { WincForPaymentResponse } from "../pricing/pricing";
 import { KoaContext } from "../server";
@@ -37,10 +42,15 @@ import { winstonToArc } from "../types/winston";
 import { isValidUserAddress } from "../utils/base64";
 import { parseQueryParams } from "../utils/parseQueryParams";
 import {
+  assertUiModeAndUrls,
   validateDestinationAddressType,
   validateGiftMessage,
-  validateUiMode,
 } from "../utils/validators";
+
+type StripeUiModeMetadata =
+  | { ui_mode: "hosted"; success_url: string; cancel_url: string | undefined }
+  | { ui_mode: "embedded"; redirect_on_completion: "never" }
+  | { ui_mode: "embedded"; return_url: string };
 
 export async function topUp(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
@@ -69,6 +79,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
     destinationAddressType: rawDestinationAddressType,
     giftMessage: rawGiftMessage,
     uiMode: rawUiMode,
+    returnUrl: rawReturnUrl,
+    successUrl: rawSuccessUrl,
+    cancelUrl: rawCancelUrl,
   } = ctx.query;
 
   // First use destinationAddressType from backwards compatible routes ("email" address type), else use token
@@ -92,8 +105,41 @@ export async function topUp(ctx: KoaContext, next: Next) {
     return next();
   }
 
-  const uiMode = rawUiMode ? validateUiMode(ctx, rawUiMode) : "hosted";
-  if (uiMode === false) {
+  let stripeUiModeMetadata: StripeUiModeMetadata;
+
+  try {
+    const validatedQueryParams = assertUiModeAndUrls({
+      cancelUrl: rawCancelUrl,
+      returnUrl: rawReturnUrl,
+      successUrl: rawSuccessUrl,
+      uiMode: rawUiMode,
+    });
+
+    if (validatedQueryParams.uiMode === "hosted") {
+      stripeUiModeMetadata = {
+        ui_mode: validatedQueryParams.uiMode,
+        success_url: validatedQueryParams.successUrl,
+        cancel_url: validatedQueryParams.cancelUrl,
+      };
+    } else {
+      stripeUiModeMetadata = {
+        ui_mode: validatedQueryParams.uiMode,
+        ...(validatedQueryParams.returnUrl
+          ? { return_url: validatedQueryParams.returnUrl }
+          : { redirect_on_completion: "never" }),
+      };
+    }
+  } catch (error) {
+    // TODO: Expand this try catch to handle all errors thrown in route with Error instanceof catch pattern
+    if (error instanceof BadQueryParam) {
+      ctx.response.status = 400;
+      ctx.body = error.message;
+      logger.error(error.message, loggerObject);
+    } else {
+      ctx.response.status = 503;
+      ctx.body = "Internal Server Error";
+      logger.error(error);
+    }
     return next();
   }
 
@@ -133,7 +179,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
     currencyLimitations = await pricingService.getCurrencyLimitations();
   } catch (error) {
     logger.error(error);
-    ctx.response.status = 502;
+    ctx.response.status = 503;
     ctx.body = "Fiat Oracle Unavailable";
     return next();
   }
@@ -152,7 +198,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
       logger.info(error.message, loggerObject);
     } else {
       logger.error(error);
-      ctx.response.status = 502;
+      ctx.response.status = 503;
       ctx.body = "Fiat Oracle Unavailable";
     }
 
@@ -178,7 +224,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
       ctx.body = error.message;
     } else {
       logger.error(error);
-      ctx.response.status = 502;
+      ctx.response.status = 503;
       ctx.body = "Fiat Oracle Unavailable";
     }
 
@@ -254,30 +300,26 @@ export async function topUp(ctx: KoaContext, next: Next) {
         ? encodeURIComponent(giftMessage)
         : undefined;
 
-      const urls:
-        | { success_url: string; cancel_url: string }
-        | { redirect_on_completion: "never" } =
-        uiMode === "embedded"
-          ? {
-              redirect_on_completion: "never",
-            }
-          : {
-              //       // TODO: Success and Cancel URLS (Do we need app origin? e.g: ArDrive Widget, Top Up Page, ario-turbo-cli)
-              success_url: "https://app.ardrive.io",
-              cancel_url:
-                destinationAddressType === "email"
-                  ? `${giftUrl}?email=${destinationAddress}&amount=${
-                      payment.amount
-                    }${
-                      urlEncodedGiftMessage
-                        ? `&giftMessage=${urlEncodedGiftMessage}`
-                        : ""
-                    }`
-                  : "https://app.ardrive.io",
-            };
+      if (
+        stripeUiModeMetadata.ui_mode === "hosted" &&
+        stripeUiModeMetadata.cancel_url === undefined
+      ) {
+        if (destinationAddressType === "email") {
+          const queryParams = new URLSearchParams({
+            email: destinationAddress,
+            amount: payment.amount.toString(),
+          });
+          if (urlEncodedGiftMessage) {
+            queryParams.append("giftMessage", urlEncodedGiftMessage);
+          }
 
+          stripeUiModeMetadata.cancel_url = `${giftUrl}?${queryParams.toString()}`;
+        } else {
+          stripeUiModeMetadata.cancel_url = defaultCheckoutCancelUrl;
+        }
+      }
       intentOrCheckout = await stripe.checkout.sessions.create({
-        ...urls,
+        ...stripeUiModeMetadata,
         currency: payment.type,
         automatic_tax: {
           enabled: !!process.env.ENABLE_AUTO_STRIPE_TAX || false,
@@ -306,12 +348,13 @@ export async function topUp(ctx: KoaContext, next: Next) {
           metadata: stripeMetadata,
         },
         mode: "payment",
-        ui_mode: uiMode,
       });
     }
   } catch (error) {
-    ctx.response.status = 502;
-    ctx.body = `Error creating stripe payment session with method: ${method}!`;
+    ctx.response.status = 503;
+    ctx.body = `Error creating stripe payment session! ${
+      error instanceof Error ? error.message : error
+    }`;
     MetricRegistry.stripeSessionCreationErrorCounter.inc();
     logger.error(error);
     return next();

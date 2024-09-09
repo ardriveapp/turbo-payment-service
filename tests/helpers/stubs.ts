@@ -357,8 +357,7 @@ export const expectedTokenPrices = {
     cad: 0.497505,
     hkd: 2.87,
     brl: 2.05,
-  }
-}
+  },
 };
 
 // TODO: we could make this a function and apply it against the arweave rates above using the turboPercentageFee constant

@@ -106,7 +106,7 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
         { payment, error },
         error
       );
-      ctx.response.status = 502;
+      ctx.response.status = 503;
       ctx.body = "Fiat Oracle Unavailable";
     }
   }

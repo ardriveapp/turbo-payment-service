@@ -76,7 +76,7 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
         winstonCreditsToRefund,
       });
     } else {
-      ctx.response.status = 502;
+      ctx.response.status = 503;
       ctx.response.message = "Error refunding balance";
       logger.error("Error refunding balance", {
         walletAddress,

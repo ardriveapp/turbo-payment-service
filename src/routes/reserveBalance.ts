@@ -115,7 +115,7 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
         error,
       });
 
-      ctx.response.status = 502;
+      ctx.response.status = 503;
       ctx.response.message = "Error reserving balance";
     }
   }

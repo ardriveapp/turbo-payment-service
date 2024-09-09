@@ -20,13 +20,15 @@ import {
   ArweaveGateway,
   EthereumGateway,
   KyveGateway,
-  SolanaGateway,
   MaticGateway,
+  SolanaGateway,
 } from "../gateway";
 import globalLogger from "../logger";
+import { TurboPricingService } from "../pricing/pricing";
+import { sendCryptoFundSlackMessage } from "../utils/slack";
 
 export type CreditPendingTxParams = Partial<
-  Pick<Architecture, "gatewayMap" | "paymentDatabase"> & {
+  Pick<Architecture, "gatewayMap" | "paymentDatabase" | "pricingService"> & {
     logger: typeof globalLogger;
   }
 >;
@@ -40,9 +42,10 @@ export async function creditPendingTransactionsHandler({
     ethereum: new EthereumGateway(),
     solana: new SolanaGateway(),
     kyve: new KyveGateway(),
-    matic: new MaticGateway()
+    matic: new MaticGateway(),
   },
   paymentDatabase = new PostgresDatabase(),
+  pricingService = new TurboPricingService(),
   logger = globalLogger.child({ job: "credit-pending-transactions-job" }),
 }: CreditPendingTxParams = {}) {
   logger.debug("Starting credit pending transactions job");
@@ -56,7 +59,8 @@ export async function creditPendingTransactionsHandler({
   }
 
   // for each tx check if tx has been confirmed
-  for (const { transactionId, tokenType, createdDate } of pendingTx) {
+  for (const tx of pendingTx) {
+    const { transactionId, tokenType, createdDate } = tx;
     try {
       const gateway = gatewayMap[tokenType];
 
@@ -66,6 +70,15 @@ export async function creditPendingTransactionsHandler({
           `Transaction ${transactionId} has been confirmed, moving to credited tx`,
           { txStatus }
         );
+
+        await sendCryptoFundSlackMessage({
+          ...tx,
+          usdEquivalent: await pricingService.getUsdPriceForCryptoAmount({
+            amount: tx.transactionQuantity,
+            token: tx.tokenType,
+          }),
+        });
+
         await paymentDatabase.creditPendingTransaction(
           transactionId,
           txStatus.blockHeight

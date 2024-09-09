@@ -50,6 +50,7 @@ import logger from "../src/logger";
 import {
   CoingeckoTokenToFiatOracle,
   ReadThroughTokenToFiatOracle,
+  tokenNameToCoinGeckoTokenName,
 } from "../src/pricing/oracles/tokenToFiatOracle";
 import { FinalPrice, NetworkPrice } from "../src/pricing/price";
 import {
@@ -208,14 +209,14 @@ describe("Router tests", () => {
     expect(data).to.equal("Invalid byte count");
   });
 
-  it("GET /price/arweave/:bytes returns 502 if bytes pricing oracle fails to get a price", async () => {
+  it("GET /price/arweave/:bytes returns 503 if bytes pricing oracle fails to get a price", async () => {
     stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
     const { status, statusText, data } = await axios.get(
       `/price/arweave/1321321`
     );
-    expect(status).to.equal(502);
+    expect(status).to.equal(503);
     expect(data).to.equal("Pricing Oracle Unavailable");
-    expect(statusText).to.equal("Bad Gateway");
+    expect(statusText).to.equal("Service Unavailable");
   });
 
   it("GET /price/bytes returns 400 for bytes > max safe integer", async () => {
@@ -236,32 +237,32 @@ describe("Router tests", () => {
     expect(data).to.equal("Invalid byte count");
   });
 
-  it("GET /price/bytes returns 502 if bytes pricing oracle fails to get a price", async () => {
+  it("GET /price/bytes returns 503 if bytes pricing oracle fails to get a price", async () => {
     stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
     const { status, statusText, data } = await axios.get(
       `/v1/price/bytes/1321321`
     );
-    expect(status).to.equal(502);
+    expect(status).to.equal(503);
     expect(data).to.equal("Pricing Oracle Unavailable");
-    expect(statusText).to.equal("Bad Gateway");
+    expect(statusText).to.equal("Service Unavailable");
   });
 
-  it("GET /price/:currency/:value returns 502 if fiat pricing oracle response is unexpected", async () => {
+  it("GET /price/:currency/:value returns 503 if fiat pricing oracle response is unexpected", async () => {
     stub(pricingService, "getWCForPayment").throws();
     const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
 
-    expect(status).to.equal(502);
-    expect(statusText).to.equal("Bad Gateway");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
     expect(data).to.equal("Fiat Oracle Unavailable");
   });
 
-  it("GET /rates returns 502 if unable to fetch prices", async () => {
+  it("GET /rates returns 503 if unable to fetch prices", async () => {
     stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
 
     const { status, statusText } = await axios.get(`/v1/rates`);
 
-    expect(status).to.equal(502);
-    expect(statusText).to.equal("Bad Gateway");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
   });
 
   it("GET /rates returns the correct response", async () => {
@@ -366,11 +367,11 @@ describe("Router tests", () => {
     expect(data).to.equal("Invalid currency.");
   });
 
-  it("GET /rates/:currency returns 502 if unable to fetch prices", async () => {
+  it("GET /rates/:currency returns 503 if unable to fetch prices", async () => {
     stub(pricingService, "getFiatPriceForOneAR").throws();
     const { status, statusText } = await axios.get(`/v1/rates/usd`);
-    expect(status).to.equal(502);
-    expect(statusText).to.equal("Bad Gateway");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
   });
 
   it("GET /rates/:currency returns the correct response for supported currency", async () => {
@@ -646,12 +647,12 @@ describe("Router tests", () => {
     expect(statusText).to.equal("Bad Request");
   });
 
-  it("GET /price/:currency/:value returns 502 if fiat pricing oracle fails to get a price", async () => {
+  it("GET /price/:currency/:value returns 503 if fiat pricing oracle fails to get a price", async () => {
     stub(pricingService, "getWCForPayment").throws(Error("Really bad failure"));
     const { data, status, statusText } = await axios.get(`/v1/price/usd/5000`);
 
-    expect(status).to.equal(502);
-    expect(statusText).to.equal("Bad Gateway");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
     expect(data).to.equal("Fiat Oracle Unavailable");
   });
 
@@ -1101,15 +1102,15 @@ describe("Router tests", () => {
     expect(statusText).to.equal("Bad Request");
   });
 
-  it("GET /top-up returns 502 when fiat pricing oracle is unreachable", async () => {
+  it("GET /top-up returns 503 when fiat pricing oracle is unreachable", async () => {
     stub(pricingService, "getWCForPayment").throws(Error("Oh no!"));
     const { status, data, statusText } = await axios.get(
       `/v1/top-up/checkout-session/${testAddress}/usd/1337`
     );
 
     expect(data).to.equal("Fiat Oracle Unavailable");
-    expect(status).to.equal(502);
-    expect(statusText).to.equal("Bad Gateway");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
   });
 
   // Ensure that we can handle all of our own exposed currency limitations
@@ -1194,7 +1195,7 @@ describe("Router tests", () => {
     });
   });
 
-  it("GET /top-up returns 502 when stripe fails to create payment session", async () => {
+  it("GET /top-up returns 503 when stripe fails to create payment session", async () => {
     const checkoutStub = stub(stripe.checkout.sessions, "create").throws(
       Error("Oh no!")
     );
@@ -1202,11 +1203,9 @@ describe("Router tests", () => {
       `/v1/top-up/checkout-session/${testAddress}/usd/1337`
     );
 
-    expect(data).to.equal(
-      "Error creating stripe payment session with method: checkout-session!"
-    );
-    expect(status).to.equal(502);
-    expect(statusText).to.equal("Bad Gateway");
+    expect(data).to.equal("Error creating stripe payment session! Oh no!");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
     checkoutStub.restore();
   });
 
@@ -1977,13 +1976,13 @@ describe("Router tests", () => {
     expect(data).to.equal("Webhook Error!");
   });
 
-  it("GET /rates returns 502 if unable to fetch prices", async () => {
+  it("GET /rates returns 503 if unable to fetch prices", async () => {
     stub(pricingService, "getWCForBytes").throws(Error("Serious failure"));
 
     const { status, statusText } = await axios.get(`/v1/rates`);
 
-    expect(status).to.equal(502);
-    expect(statusText).to.equal("Bad Gateway");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
   });
 
   it("GET /redeem returns 200 for valid params", async () => {
@@ -2257,7 +2256,7 @@ describe("Router tests", () => {
       const transactionSenderAddress =
         "TotallyUniqueUserForThisPostBalTest1" + token;
 
-      const tokenAmount = "100000";
+      const tokenAmount = "100000000";
 
       stub(gatewayMap[token], "getTransaction").resolves({
         transactionQuantity: BigNumber(tokenAmount),
@@ -2278,7 +2277,7 @@ describe("Router tests", () => {
 
       const turboInfraFeeMagnitude = 0.766;
       const ratio =
-        expectedTokenPrices[token === "kyve" ? "kyve-network" : token].usd /
+        expectedTokenPrices[tokenNameToCoinGeckoTokenName[token]].usd /
         expectedTokenPrices.arweave.usd;
       const wc = W(
         baseAmountToTokenAmount(tokenAmount, token)
@@ -2321,7 +2320,7 @@ describe("Router tests", () => {
       const transactionSenderAddress =
         "TotallyUniqueUserForThisPostBalTest2" + token;
 
-      const tokenAmount = "100000";
+      const tokenAmount = "100000000";
 
       stub(gatewayMap[token], "getTransaction").resolves({
         transactionSenderAddress,
@@ -2341,7 +2340,7 @@ describe("Router tests", () => {
 
       const turboInfraFeeMagnitude = 0.766;
       const ratio =
-        expectedTokenPrices[token === "kyve" ? "kyve-network" : token].usd /
+        expectedTokenPrices[tokenNameToCoinGeckoTokenName[token]].usd /
         expectedTokenPrices.arweave.usd;
       const wc = W(
         baseAmountToTokenAmount(tokenAmount, token)
@@ -2593,8 +2592,8 @@ describe("Router tests", () => {
       }
     );
 
-    expect(status).to.equal(500);
-    expect(statusText).to.equal("Internal Server Error");
+    expect(status).to.equal(503);
+    expect(statusText).to.equal("Service Unavailable");
     expect(data).to.equal("Gateway not found for currency!");
   });
 });

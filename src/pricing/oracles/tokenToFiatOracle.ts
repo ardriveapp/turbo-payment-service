@@ -32,17 +32,20 @@ const coinGeckoTokenNames = [
   "ethereum",
   "solana",
   "kyve-network",
-  "matic-network"
+  "matic-network",
 ] as const;
 
 type CoinGeckoTokenName = (typeof coinGeckoTokenNames)[number];
 
-const tokenNameToCoinGeckoTokenName: Record<TokenType, CoinGeckoTokenName> = {
+export const tokenNameToCoinGeckoTokenName: Record<
+  TokenType,
+  CoinGeckoTokenName
+> = {
   arweave: "arweave",
   ethereum: "ethereum",
   solana: "solana",
   kyve: "kyve-network",
-  matic: "matic-network"
+  matic: "matic-network",
 };
 
 type CoinGeckoResponse = Record<
@@ -147,5 +150,11 @@ export class ReadThroughTokenToFiatOracle {
     const tokenUsdPrice = cachedValue[coinGeckoToken].usd;
 
     return tokenUsdPrice / arweaveUsdPrice;
+  }
+
+  async getUsdPriceForOneToken(token: TokenType): Promise<number> {
+    const cachedValue = await this.readThroughPromiseCache.get("arweave");
+    const coinGeckoToken = tokenNameToCoinGeckoTokenName[token];
+    return cachedValue[coinGeckoToken].usd;
   }
 }
