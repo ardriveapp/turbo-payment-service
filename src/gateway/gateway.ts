@@ -29,6 +29,7 @@ export const supportedPaymentTokens = [
   "ethereum",
   "solana",
   "kyve",
+  "matic"
 ] as const;
 export type TokenType = (typeof supportedPaymentTokens)[number];
 export function isSupportedPaymentToken(token: string): token is TokenType {

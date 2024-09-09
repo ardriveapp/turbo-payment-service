@@ -51,6 +51,7 @@ export const userAddressTypes = [
   "solana",
   "ethereum",
   "kyve",
+  "matic"
 ] as const;
 export type UserAddressType = (typeof userAddressTypes)[number];
 

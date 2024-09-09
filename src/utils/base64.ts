@@ -62,6 +62,11 @@ export function isValidEthAddress(address: string) {
   return ethAddressRegex.test(address);
 }
 
+export function isValidMaticAddress(address: string) {
+  const maticAddressRegex = new RegExp("^0x[a-fA-F0-9]{40}$");
+  return maticAddressRegex.test(address);
+}
+
 export function isValidKyveAddress(address: string) {
   const kyveAddressRegex = new RegExp("^kyve[a-zA-Z0-9]{39}$");
   return kyveAddressRegex.test(address);
@@ -80,6 +85,8 @@ export function isValidUserAddress(
       return isValidEthAddress(address);
     case "kyve":
       return isValidKyveAddress(address);
+    case "matic":
+      return isValidMaticAddress(address);
     default:
       return false;
   }

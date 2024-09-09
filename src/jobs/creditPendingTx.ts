@@ -21,6 +21,7 @@ import {
   EthereumGateway,
   KyveGateway,
   SolanaGateway,
+  MaticGateway,
 } from "../gateway";
 import globalLogger from "../logger";
 
@@ -39,6 +40,7 @@ export async function creditPendingTransactionsHandler({
     ethereum: new EthereumGateway(),
     solana: new SolanaGateway(),
     kyve: new KyveGateway(),
+    matic: new MaticGateway()
   },
   paymentDatabase = new PostgresDatabase(),
   logger = globalLogger.child({ job: "credit-pending-transactions-job" }),

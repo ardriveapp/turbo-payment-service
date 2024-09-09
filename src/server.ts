@@ -35,6 +35,7 @@ import {
   GatewayMap,
   KyveGateway,
   SolanaGateway,
+  MaticGateway
 } from "./gateway";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
@@ -99,6 +100,7 @@ export async function createServer(
     ethereum: new EthereumGateway(),
     solana: new SolanaGateway(),
     kyve: new KyveGateway(),
+    matic: new MaticGateway()
   };
 
   const emailProvider = (() => {

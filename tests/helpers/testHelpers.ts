@@ -27,6 +27,7 @@ import {
   EthereumGateway,
   KyveGateway,
   SolanaGateway,
+  MaticGateway,
 } from "../../src/gateway";
 import {
   ArweaveBytesToWinstonOracle,
@@ -150,6 +151,9 @@ export const gatewayMap = {
   kyve: new KyveGateway({
     paymentTxPollingWaitTimeMs: 0,
   }),
+  matic: new MaticGateway({
+    paymentTxPollingWaitTimeMs: 0,
+  })
 };
 
 export const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:disable-line
