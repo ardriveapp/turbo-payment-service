@@ -111,6 +111,10 @@ export interface PricingService {
     amount: number;
     type: CurrencyType;
   }) => Promise<number>;
+  getUsdPriceForCryptoAmount: (params: {
+    amount: BigNumber.Value;
+    token: TokenType;
+  }) => Promise<number>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -782,44 +786,33 @@ export class TurboPricingService implements PricingService {
       inclusiveAdjustments: inclusiveAdjustments,
     };
   }
+
+  public async getUsdPriceForCryptoAmount({
+    amount: baseTokenAmount,
+    token,
+  }: {
+    amount: BigNumber.Value;
+    token: TokenType;
+  }): Promise<number> {
+    const usdPriceForOneToken =
+      await this.tokenToFiatOracle.getUsdPriceForOneToken(token);
+    const tokenAmount = baseAmountToTokenAmount(baseTokenAmount, token);
+    const usdPriceForTokens = tokenAmount.times(usdPriceForOneToken);
+    return +usdPriceForTokens.toFixed(2);
+  }
 }
 
-export function wincToCredits(winc: BigNumber.Value): BigNumber {
-  return BigNumber(winc).shiftedBy(-12);
-}
-
-export function weiToEth(wei: BigNumber.Value): BigNumber {
-  return BigNumber(wei).shiftedBy(-18);
-}
-
-export function baseToMatic(base: BigNumber.Value): BigNumber {
-  return BigNumber(base).shiftedBy(-18);
-}
-
-export function lamportsToSol(lamports: BigNumber.Value): BigNumber {
-  return BigNumber(lamports).shiftedBy(-9);
-}
-
-export function ukyveToKyve(ukyve: BigNumber.Value): BigNumber {
-  return BigNumber(ukyve).shiftedBy(-6);
-}
+export const tokenExponentMap = {
+  arweave: 12,
+  ethereum: 18,
+  solana: 9,
+  kyve: 6,
+  matic: 18,
+};
 
 export function baseAmountToTokenAmount(
   amount: BigNumber.Value,
   token: TokenType
 ): BigNumber {
-  switch (token) {
-    case "arweave":
-      return wincToCredits(amount);
-    case "ethereum":
-      return weiToEth(amount);
-    case "solana":
-      return lamportsToSol(amount);
-    case "kyve":
-      return ukyveToKyve(amount);
-    case "matic":
-      return baseToMatic(amount);
-    default:
-      return BigNumber(amount);
-  }
+  return BigNumber(amount).shiftedBy(-tokenExponentMap[token]);
 }

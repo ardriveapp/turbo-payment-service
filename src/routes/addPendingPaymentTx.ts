@@ -34,6 +34,7 @@ import {
 import { isSupportedPaymentToken } from "../gateway";
 import { KoaContext } from "../server";
 import { W } from "../types";
+import { sendCryptoFundSlackMessage } from "../utils/slack";
 import { walletAddresses } from "./info";
 
 export async function addPendingPaymentTx(ctx: KoaContext, _next: Next) {
@@ -150,6 +151,14 @@ export async function addPendingPaymentTx(ctx: KoaContext, _next: Next) {
       };
       // User submitted an already confirmed transaction, credit it immediately
       await paymentDatabase.createNewCreditedTransaction(newCreditedTx);
+
+      await sendCryptoFundSlackMessage({
+        ...newCreditedTx,
+        usdEquivalent: await pricingService.getUsdPriceForCryptoAmount({
+          amount: newCreditedTx.transactionQuantity,
+          token: newCreditedTx.tokenType,
+        }),
+      });
       ctx.status = 200; // OK
       ctx.body = {
         creditedTransaction: {
@@ -183,7 +192,7 @@ export async function addPendingPaymentTx(ctx: KoaContext, _next: Next) {
       ctx.status = 403;
       ctx.body = error.message;
     } else {
-      ctx.status = 500;
+      ctx.status = 503;
       logger.error("Error adding pending payment transaction", error);
       ctx.body =
         error instanceof Error ? error.message : "Internal server error";

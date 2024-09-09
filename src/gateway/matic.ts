@@ -38,7 +38,7 @@ export class MaticGateway extends Gateway {
     endpoint = maticGatewayUrl,
     paymentTxPollingWaitTimeMs,
     pendingTxMaxAttempts,
-    minConfirmations = +(process.env.MATIC_MIN_CONFIRMATIONS || 5),
+    minConfirmations = +(process.env.MATIC_MIN_CONFIRMATIONS || 12),
   }: MaticGatewayParams = {}) {
     super({
       paymentTxPollingWaitTimeMs,

@@ -18,6 +18,8 @@ import { ByteCount } from "./types/byteCount";
 import { SupportedFiatPaymentCurrencyType } from "./types/supportedCurrencies";
 
 export const isTestEnv = process.env.NODE_ENV === "test";
+export const isDevEnv = process.env.NODE_ENV === "dev";
+
 export const migrateOnStartup = process.env.MIGRATE_ON_STARTUP === "true";
 export const defaultPort = +(process.env.PORT ?? 3000);
 export const msPerMinute = 1000 * 60;
@@ -319,6 +321,9 @@ export const maxGiftMessageLength = process.env.MAX_GIFT_MESSAGE_LENGTH ?? 250;
 
 export const giftingEmailAddress =
   process.env.GIFTING_EMAIL_ADDRESS ?? "gift@ardrive.io";
+
+export const defaultCheckoutSuccessUrl = "https://app.ardrive.io";
+export const defaultCheckoutCancelUrl = "https://app.ardrive.io";
 
 /** gifting on top up via email depends on GIFTING_ENABLED="true" env var */
 export const isGiftingEnabled = process.env.GIFTING_ENABLED === "true";

@@ -31,7 +31,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     ctx.body = { ...rates, winc: rates.winc.toString() };
     logger.info("Successfully calculated rates.", { rates });
   } catch (error) {
-    ctx.status = 502;
+    ctx.status = 503;
     ctx.body = "Failed to calculate rates.";
     logger.error("Failed to calculate rates.", error);
   }
@@ -66,7 +66,7 @@ export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
-    ctx.status = 502;
+    ctx.status = 503;
     ctx.body = "Failed to fetch fiat conversion for 1 AR.";
     logger.error("Failed to fetch fiat conversion for 1 AR.", {
       error: message,

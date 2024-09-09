@@ -20,4 +20,4 @@ export * from "./kyve";
 export * from "./solana";
 export * from "./ethereum";
 export * from "./arweave";
-export * from './matic';
+export * from "./matic";

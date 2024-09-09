@@ -58,7 +58,7 @@ export async function checkBalance(ctx: KoaContext, next: Next) {
       walletAddress
     );
   } catch (error) {
-    ctx.response.status = 502;
+    ctx.response.status = 503;
     ctx.body = "Error getting base credit amount";
     logger.error("Error getting base credit amount", {
       walletAddress,
@@ -114,7 +114,7 @@ export async function checkBalance(ctx: KoaContext, next: Next) {
         error,
       });
 
-      ctx.response.status = 502;
+      ctx.response.status = 503;
       ctx.body = "Error checking balance";
     }
   }

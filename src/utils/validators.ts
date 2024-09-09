@@ -16,13 +16,14 @@
  */
 import validator from "validator";
 
-import { maxGiftMessageLength } from "../constants";
+import { defaultCheckoutSuccessUrl, maxGiftMessageLength } from "../constants";
 import {
   DestinationAddressType,
   UserAddressType,
   destinationAddressTypes,
   userAddressTypes,
 } from "../database/dbTypes";
+import { BadQueryParam } from "../database/errors";
 import { MetricRegistry } from "../metricRegistry";
 import { KoaContext } from "../server";
 import { ByteCount, Winston } from "../types";
@@ -130,8 +131,12 @@ function isDestinationAddressType(
 
 export function validateDestinationAddressType(
   ctx: KoaContext,
-  destinationAddressType: string | string[]
+  destinationAddressType: string | string[] | undefined
 ): DestinationAddressType | false {
+  if (destinationAddressType === undefined) {
+    return "arweave";
+  }
+
   const destType = validateSingularQueryParameter(ctx, destinationAddressType);
 
   if (!destType || !isDestinationAddressType(destType)) {
@@ -196,21 +201,70 @@ export type UiMode = (typeof uiModes)[number];
 function isUiMode(uiMode: string): uiMode is UiMode {
   return uiModes.includes(uiMode as UiMode);
 }
-export function validateUiMode(
-  ctx: KoaContext,
-  uiMode: string | string[]
-): UiMode | false {
-  const mode = validateSingularQueryParameter(ctx, uiMode);
 
-  if (!mode || !isUiMode(mode)) {
-    ctx.response.status = 400;
-    ctx.body = `Invalid ui mode! Allowed modes: "${uiModes.toString()}"`;
-    ctx.state.logger.error("Invalid ui mode!", {
-      query: ctx.query,
-      params: ctx.params,
-    });
-    return false;
+function assertSingleParam(queryParam: QueryParam): string | undefined {
+  if (Array.isArray(queryParam)) {
+    if (queryParam.length > 1) {
+      throw new BadQueryParam(
+        `Expected a singular query parameter but got an array ${queryParam}`
+      );
+    }
+    return queryParam[0];
+  }
+  return queryParam;
+}
+
+function assertUiMode(uiMode: QueryParam): UiMode {
+  const mode = assertSingleParam(uiMode);
+
+  if (mode) {
+    if (!isUiMode(mode)) {
+      throw new BadQueryParam(
+        `Invalid ui mode! Allowed modes: "${uiModes.toString()}"`
+      );
+    }
+    return mode;
   }
 
-  return mode;
+  return "hosted";
+}
+
+function assertUrl(url: QueryParam): string | undefined {
+  const u = assertSingleParam(url);
+
+  if (u && !validator.isURL(u)) {
+    throw new BadQueryParam(`Invalid url provided: ${u}!`);
+  }
+  return u;
+}
+
+type QueryParam = undefined | string | string[];
+export function assertUiModeAndUrls({
+  cancelUrl,
+  returnUrl,
+  successUrl,
+  uiMode,
+}: {
+  returnUrl: QueryParam;
+  cancelUrl: QueryParam;
+  successUrl: QueryParam;
+  uiMode: QueryParam;
+}):
+  | { uiMode: "hosted"; successUrl: string; cancelUrl: string | undefined }
+  | { uiMode: "embedded"; returnUrl: string | undefined } {
+  const mode = assertUiMode(uiMode);
+  if (mode === "hosted") {
+    const success = assertUrl(successUrl) ?? defaultCheckoutSuccessUrl;
+    const cancel = assertUrl(cancelUrl) ?? undefined;
+    return {
+      uiMode: "hosted",
+      successUrl: success,
+      cancelUrl: cancel,
+    };
+  }
+  const retUrl = assertUrl(returnUrl);
+  return {
+    uiMode: "embedded",
+    returnUrl: retUrl,
+  };
 }

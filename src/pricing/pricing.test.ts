@@ -30,6 +30,7 @@ import {
   UploadAdjustmentCatalogDBInsert,
 } from "../database/dbTypes";
 import { PostgresDatabase } from "../database/postgres";
+import { TokenType } from "../gateway";
 import { ByteCount, W, Winston } from "../types";
 import { Payment } from "../types/payment";
 import { filterKeysFromObject } from "../utils/common";
@@ -754,5 +755,29 @@ describe("TurboPricingService class", () => {
 
       clock.restore();
     });
+  });
+
+  describe("getUsdPriceForCryptoAmount", () => {
+    beforeEach(() => {
+      stub(oracle, "getFiatPricesForOneToken").resolves(expectedTokenPrices);
+    });
+
+    const testMap: Record<string, number> = {
+      arweave: 0.7,
+      solana: 17341,
+      ethereum: 0,
+      kyve: 2336.11,
+    };
+
+    for (const [token, expectedPrice] of Object.entries(testMap)) {
+      it(`returns the expected price for a given ${token} payment`, async () => {
+        const price = await pricing.getUsdPriceForCryptoAmount({
+          amount: 100_000_000_000,
+          token: token as TokenType,
+        });
+
+        expect(price).to.equal(expectedPrice);
+      });
+    }
   });
 });

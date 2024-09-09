@@ -14,11 +14,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { isDevEnv } from "../constants";
+import {
+  CreateNewCreditedTransactionParams,
+  PendingPaymentTransaction,
+} from "../database/dbTypes";
 import globalLogger from "../logger";
+import { baseAmountToTokenAmount, tokenExponentMap } from "../pricing/pricing";
+
+export const slackChannels = {
+  admin: process.env.SLACK_TURBO_ADMIN_CHANNEL_ID,
+  topUp: process.env.SLACK_TURBO_TOP_UP_CHANNEL_ID,
+};
 
 export const sendSlackMessage = async ({
   message,
-  channel = process.env.SLACK_TURBO_ADMIN_CHANNEL_ID,
+  channel = slackChannels.admin,
   username = "Payment Service",
   icon_emoji = ":moneybag:",
 }: {
@@ -60,4 +71,39 @@ export const sendSlackMessage = async ({
   } catch (error) {
     globalLogger.error(`slack message delivery failed`, error);
   }
+};
+
+export const sendCryptoFundSlackMessage = async ({
+  destinationAddress,
+  transactionId,
+  transactionQuantity,
+  tokenType,
+  winstonCreditAmount,
+  usdEquivalent,
+}: (PendingPaymentTransaction | CreateNewCreditedTransactionParams) & {
+  usdEquivalent: number;
+}) => {
+  const tokens = baseAmountToTokenAmount(
+    transactionQuantity,
+    tokenType
+  ).toFixed(tokenExponentMap[tokenType]);
+  const credits = baseAmountToTokenAmount(
+    winstonCreditAmount.toString(),
+    "arweave"
+  ).toFixed(12);
+
+  if (isDevEnv) {
+    // Don't send slack messages in dev env
+    return;
+  }
+
+  return sendSlackMessage({
+    channel: slackChannels.topUp,
+    message: `New crypto payment credited:\`\`\`
+Tokens: ${tokens} ${tokenType}
+Credits: ${credits}
+USD Equivalent: ${usdEquivalent === 0 ? "less than $0.01" : `$${usdEquivalent}`}
+Address: ${destinationAddress}
+TxID: ${transactionId}\`\`\``,
+  });
 };
