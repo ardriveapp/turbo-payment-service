@@ -14,23 +14,30 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { Next } from "koa";
 import Router from "koa-router";
 import * as promClient from "prom-client";
 
 import { addressFromQuery, verifySignature } from "./middleware";
 import { addPendingPaymentTx } from "./routes/addPendingPaymentTx";
+import { arnsPurchaseQuote } from "./routes/arnsPurchaseQuote";
 import { arweaveCompatiblePrice } from "./routes/arweaveCompatiblePrice";
 import { balanceRoute } from "./routes/balance";
 import { checkBalance } from "./routes/checkBalance";
 import { countriesHandler } from "./routes/countries";
+import { createApproval } from "./routes/createApproval";
 import { currenciesRoute } from "./routes/currencies";
+import { getAllApprovals } from "./routes/getAllApprovals";
+import { getApprovals } from "./routes/getApprovals";
+import { getArNSPurchaseStatus } from "./routes/getArNSPurchaseStatus";
 import { rootResponse } from "./routes/info";
+import { initiateArNSPurchase } from "./routes/initiateArNSPurchase";
+import { priceArNSPurchaseHandler } from "./routes/priceArNSName";
 import { priceRoutes } from "./routes/priceRoutes";
 import { fiatToArRateHandler, ratesHandler } from "./routes/rates";
 import { redeem } from "./routes/redeem";
 import { refundBalance } from "./routes/refundBalance";
 import { reserveBalance } from "./routes/reserveBalance";
+import { revokeApprovals } from "./routes/revokeApprovals";
 import { stripeRoute } from "./routes/stripe/stripeRoute";
 import { swaggerDocs, swaggerDocsJSON } from "./routes/swagger";
 import { topUp } from "./routes/topUp";
@@ -51,9 +58,28 @@ router.get("/v1/price/:amount", verifySignature, priceRoutes);
 router.get("/v1/price/:currency/:amount", verifySignature, priceRoutes);
 
 router.get(
+  "/v1/arns/price/:intent/:name",
+  verifySignature,
+  priceArNSPurchaseHandler
+);
+
+router.post(
+  "/v1/arns/purchase/:intent/:name",
+  verifySignature,
+  initiateArNSPurchase
+);
+
+router.get("/v1/arns/purchase/:nonce", getArNSPurchaseStatus);
+
+router.get(
   "/v1/top-up/:method/:address/:currency/:amount",
   verifySignature,
   topUp
+);
+
+router.get(
+  "/v1/arns/quote/:method/:address/:currency/:intent/:name",
+  arnsPurchaseQuote
 );
 
 router.get("/v1/redeem", redeem);
@@ -88,37 +114,19 @@ router.get("/v1/account/balance/:token", addressFromQuery, balanceRoute);
 router.get("/v1/account/balance", addressFromQuery, balanceRoute);
 router.post("/v1/account/balance/:token", addPendingPaymentTx);
 
-function getAddressFromQuery(ctx: KoaContext, next: Next) {
-  const { token, walletAddress } = ctx.params;
-  // For backwards compatibility with upload service reserve-balance, get wallet address from token if not provided
-  // This can be removed once the upload service is updated to provide the wallet address in the request
-  if (!walletAddress) {
-    ctx.params.walletAddress = token;
-    ctx.params.token = "arweave";
-  }
-  return next();
-}
-
-router.get("/v1/reserve-balance/:token", getAddressFromQuery, reserveBalance);
-router.get("/v1/refund-balance/:token", getAddressFromQuery, refundBalance);
-router.get("/v1/check-balance/:token", getAddressFromQuery, checkBalance);
-
+const backwardsCompatibleGetApprovalRoute = "/account/approval";
 router.get(
-  "/v1/reserve-balance/:token/:walletAddress",
-  getAddressFromQuery,
-  reserveBalance
+  [backwardsCompatibleGetApprovalRoute, "/v1/account/approvals"],
+  getApprovals
 );
-router.get(
-  "/v1/refund-balance/:token/:walletAddress",
-  getAddressFromQuery,
-  refundBalance
-);
-router.get(
-  "/v1/check-balance/:token/:walletAddress",
-  getAddressFromQuery,
-  checkBalance
-);
+router.get("/v1/account/approvals/get", getAllApprovals);
 
+// Protected routes
+router.get("/v1/reserve-balance/:token/:signerAddress", reserveBalance);
+router.get("/v1/refund-balance/:token/:signerAddress", refundBalance);
+router.get("/v1/check-balance/:token/:signerAddress", checkBalance);
+router.get("/v1/account/approvals/create", createApproval);
+router.get("/v1/account/approvals/revoke", revokeApprovals);
 // Health
 router.get("/health", async (ctx: KoaContext) => {
   ctx.body = "OK";
@@ -131,6 +139,7 @@ router.get("/metrics", async (ctx: KoaContext) => {
   return;
 });
 
+// Swagger
 router.get("/openapi.json", swaggerDocsJSON);
 router.get("/api-docs", swaggerDocs);
 

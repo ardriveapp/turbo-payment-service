@@ -22,21 +22,12 @@ import {
   TransactionNotAPaymentTransaction,
 } from "../database/errors";
 import logger from "../logger";
-import { TransactionId } from "../types";
+import { TokenType, TransactionId } from "../types";
+import { ARIOGateway } from "./ario";
 
-export const supportedPaymentTokens = [
-  "arweave",
-  "ethereum",
-  "solana",
-  "kyve",
-  "matic",
-] as const;
-export type TokenType = (typeof supportedPaymentTokens)[number];
-export function isSupportedPaymentToken(token: string): token is TokenType {
-  return supportedPaymentTokens.includes(token as TokenType);
-}
-
-export type GatewayMap = Record<TokenType, Gateway>;
+export type GatewayMap = Record<TokenType, Gateway> & {
+  ario: ARIOGateway;
+};
 
 export type GatewayParams = {
   pendingTxMaxAttempts?: number;

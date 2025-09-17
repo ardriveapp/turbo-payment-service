@@ -31,7 +31,6 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
   }
 
   const stripe = ctx.state.stripe;
-  const emailProvider = ctx.state.emailProvider;
 
   // get the webhook signature and raw body for verification
   const sig = ctx.request.headers["stripe-signature"] as string;
@@ -40,11 +39,11 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
   let event;
 
   try {
-    logger.info("Verifying stripe webhook signature...");
+    logger.debug("Verifying stripe webhook signature...");
 
     event = stripe.webhooks.constructEvent(rawBody, sig, WEBHOOK_SECRET);
   } catch (err: unknown) {
-    logger.info(`⚠️ Webhook signature verification failed.`);
+    logger.warn(`⚠️ Webhook signature verification failed.`);
     logger.error(err);
     ctx.status = 400;
     ctx.response.body = `Webhook Error!`;
@@ -76,9 +75,7 @@ export async function stripeRoute(ctx: KoaContext, next: Next) {
         // eslint-disable-next-line @typescript-eslint/no-floating-promises
         handlePaymentSuccessEvent(
           data.object as Stripe.PaymentIntent,
-          ctx.state.paymentDatabase,
-          stripe,
-          emailProvider
+          ctx.state
         );
       } catch (error) {
         logger.error(

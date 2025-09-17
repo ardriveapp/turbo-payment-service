@@ -54,12 +54,10 @@ function createConsumerQueue(
   );
 
   consumer.on("message_received", (message: void | Message | Message[]) => {
-    consumerLogger.info(`[SQS] Message received`);
     consumerLogger.debug(`[SQS] Received message contents:`, message);
   });
 
   consumer.on("message_processed", (message: void | Message | Message[]) => {
-    consumerLogger.info(`[SQS] Message processed`);
     consumerLogger.debug(`[SQS] Processed message contents:`, message);
   });
 

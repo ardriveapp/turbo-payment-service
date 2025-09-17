@@ -26,7 +26,7 @@ import {
 
 export async function refundBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase, logger } = ctx.state;
-  const { walletAddress } = ctx.params;
+  const { signerAddress } = ctx.params;
 
   if (validateAuthorizedRoute(ctx) === false) {
     return next();
@@ -49,21 +49,21 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     return next();
   }
 
-  logger.info("Refunding balance for user ", {
-    walletAddress,
+  logger.debug("Refunding balance for user ", {
+    signerAddress,
     winstonCreditsToRefund,
     dataItemId,
   });
   try {
     await paymentDatabase.refundBalance(
-      walletAddress,
+      signerAddress,
       winstonCreditsToRefund,
       dataItemId
     );
     ctx.response.status = 200;
     ctx.response.message = "Balance refunded";
     logger.info("Balance refund processed", {
-      walletAddress,
+      signerAddress,
       winstonCreditsToRefund,
       dataItemId,
     });
@@ -71,15 +71,15 @@ export async function refundBalance(ctx: KoaContext, next: Next) {
     if (error instanceof UserNotFoundWarning) {
       ctx.response.status = 404;
       ctx.response.message = "User not found";
-      logger.info(error.message, {
-        walletAddress,
+      logger.error(error.message, {
+        signerAddress,
         winstonCreditsToRefund,
       });
     } else {
       ctx.response.status = 503;
       ctx.response.message = "Error refunding balance";
       logger.error("Error refunding balance", {
-        walletAddress,
+        signerAddress,
         winstonCreditsToRefund,
         error,
       });

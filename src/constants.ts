@@ -25,8 +25,8 @@ export const defaultPort = +(process.env.PORT ?? 3000);
 export const msPerMinute = 1000 * 60;
 export const oneHourInSeconds = 3600;
 export const oneMinuteInSeconds = 60;
-export const paymentIntentTopUpMethod = "payment-intent";
-export const checkoutSessionTopUpMethod = "checkout-session";
+export const paymentIntentStripeMethod = "payment-intent";
+export const checkoutSessionStripeMethod = "checkout-session";
 
 export const oneGiBInBytes = ByteCount(1024 * 1024 * 1024);
 export const oneARInWinston = 1e12;
@@ -35,10 +35,11 @@ export const maxAllowedChargebackDisputes = +(
   process.env.MAX_ALLOWED_CHARGE_BACKS ?? 1
 );
 
-export const topUpMethods = [
-  paymentIntentTopUpMethod,
-  checkoutSessionTopUpMethod,
+export const stripePaymentMethods = [
+  paymentIntentStripeMethod,
+  checkoutSessionStripeMethod,
 ] as const;
+export type StripePaymentMethod = (typeof stripePaymentMethods)[number];
 
 export const TEST_PRIVATE_ROUTE_SECRET = "test-secret";
 
@@ -49,56 +50,68 @@ export const electronicallySuppliedServicesTaxCode = "txcd_10000000"; //cspell:d
 export const paymentAmountLimits: CurrencyLimitations = {
   aud: {
     minimumPaymentAmount: 7500,
-    maximumPaymentAmount: 3_000_00,
+    maximumPaymentAmount: 15_000_00,
     suggestedPaymentAmounts: [25_00, 75_00, 150_00],
+    stripeMinimumPaymentAmount: 50,
   },
   brl: {
     minimumPaymentAmount: 2500,
     maximumPaymentAmount: 10_000_00,
     suggestedPaymentAmounts: [125_00, 250_00, 500_00],
+    stripeMinimumPaymentAmount: 50,
   },
   cad: {
     minimumPaymentAmount: 500,
-    maximumPaymentAmount: 2_000_00,
+    maximumPaymentAmount: 10_000_00,
     suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+    stripeMinimumPaymentAmount: 50,
   },
   eur: {
     minimumPaymentAmount: 500,
-    maximumPaymentAmount: 2_000_00,
+    maximumPaymentAmount: 10_000_00,
     suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+    stripeMinimumPaymentAmount: 50,
   },
   gbp: {
     minimumPaymentAmount: 500,
-    maximumPaymentAmount: 2_000_00,
+    maximumPaymentAmount: 10_000_00,
     suggestedPaymentAmounts: [20_00, 40_00, 80_00],
+    stripeMinimumPaymentAmount: 30,
   },
   hkd: {
     minimumPaymentAmount: 5000,
-    maximumPaymentAmount: 20_000_00,
+    maximumPaymentAmount: 100_000_00,
     suggestedPaymentAmounts: [200_00, 400_00, 800_00],
+    stripeMinimumPaymentAmount: 400,
   },
   inr: {
     minimumPaymentAmount: 50_000,
-    maximumPaymentAmount: 180_000_00,
+    maximumPaymentAmount: 900_000_00,
     suggestedPaymentAmounts: [2000_00, 4000_00, 8000_00],
+    stripeMinimumPaymentAmount: 1000,
   },
   jpy: {
     minimumPaymentAmount: 750,
-    maximumPaymentAmount: 300_000,
+    maximumPaymentAmount: 1_500_000,
     suggestedPaymentAmounts: [3_500, 6_500, 15_000],
+    stripeMinimumPaymentAmount: 120,
   },
   sgd: {
     minimumPaymentAmount: 750,
-    maximumPaymentAmount: 3_000_00,
+    maximumPaymentAmount: 15_000_00,
     suggestedPaymentAmounts: [25_00, 75_00, 150_00],
+    stripeMinimumPaymentAmount: 50,
   },
   usd: {
     minimumPaymentAmount: 500,
-    maximumPaymentAmount: 2_000_00,
+    maximumPaymentAmount: 10_000_00,
     suggestedPaymentAmounts: [25_00, 50_00, 100_00],
+    stripeMinimumPaymentAmount: 50,
   },
-};
+} as const;
+
 export interface CurrencyLimitation {
+  stripeMinimumPaymentAmount: number;
   minimumPaymentAmount: number;
   maximumPaymentAmount: number;
   suggestedPaymentAmounts: readonly [number, number, number];
@@ -322,34 +335,33 @@ export const maxGiftMessageLength = process.env.MAX_GIFT_MESSAGE_LENGTH ?? 250;
 export const giftingEmailAddress =
   process.env.GIFTING_EMAIL_ADDRESS ?? "gift@ardrive.io";
 
-export const defaultCheckoutSuccessUrl = "https://app.ardrive.io";
-export const defaultCheckoutCancelUrl = "https://app.ardrive.io";
+export const defaultTopUpCheckoutSuccessUrl = "https://app.ardrive.io";
+export const defaultTopUpCheckoutCancelUrl = "https://app.ardrive.io";
+
+export const defaultArNSCheckoutSuccessUrl = "https://arns.app";
+export const defaultArNSCheckoutCancelUrl = "https://arns.app";
 
 /** gifting on top up via email depends on GIFTING_ENABLED="true" env var */
 export const isGiftingEnabled = process.env.GIFTING_ENABLED === "true";
 
-export const arweaveGatewayUrl = new URL(
-  process.env.ARWEAVE_GATEWAY || "https://arweave.net:443"
-);
-
-export const ethereumGatewayUrl = new URL(
-  process.env.ETHEREUM_GATEWAY || "https://cloudflare-eth.com/"
-);
-
-export const maticGatewayUrl = new URL(
-  process.env.MATIC_GATEWAY || "https://polygon-mainnet.infura.io/"
-);
-
-export const solanaGatewayUrl = new URL(
-  process.env.SOLANA_GATEWAY || "https://api.mainnet-beta.solana.com/"
-);
-
-export const kyveGatewayUrl = new URL(
-  process.env.KYVE_GATEWAY || "https://api.kyve.network/"
-);
+export const gatewayUrls = {
+  arweave: new URL(process.env.ARWEAVE_GATEWAY || "https://arweave.net:443"),
+  ethereum: new URL(
+    process.env.ETHEREUM_GATEWAY || "https://cloudflare-eth.com/"
+  ),
+  matic: new URL(process.env.MATIC_GATEWAY || "https://polygon-rpc.com/"),
+  pol: new URL(process.env.MATIC_GATEWAY || "https://polygon-rpc.com/"),
+  solana: new URL(
+    process.env.SOLANA_GATEWAY || "https://api.mainnet-beta.solana.com/"
+  ),
+  kyve: new URL(process.env.KYVE_GATEWAY || "https://api.kyve.network/"),
+  "base-eth": new URL(
+    process.env.BASE_ETH_GATEWAY || "https://mainnet.base.org"
+  ),
+};
 
 const thirtyMinutesMs = 1000 * 60 * 30;
-export const topUpQuoteExpirationMs = +(
+export const stripePaymentQuoteExpirationMs = +(
   process.env.TOP_UP_QUOTE_EXPIRATION_MS ?? thirtyMinutesMs
 );
 

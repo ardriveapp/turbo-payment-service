@@ -39,7 +39,7 @@ import {
 } from "./dbTypes";
 
 export async function backfillBalanceReservations(knex: Knex) {
-  globalLogger.info("Starting balance reservation backfill...");
+  globalLogger.debug("Starting balance reservation backfill...");
   const backfillStartTime = Date.now();
   const isoTimestampOfSubsidy = "2023-07-18T20:20:35.000Z";
   const uploadAuditLogsSinceSubsidy = await knex<AuditLogDBResult>(
@@ -48,7 +48,7 @@ export async function backfillBalanceReservations(knex: Knex) {
     .where("change_reason", "upload")
     .andWhere("audit_date", ">", isoTimestampOfSubsidy);
 
-  globalLogger.info("Backfilling balance reservations from audit log:", {
+  globalLogger.debug("Backfilling balance reservations from audit log:", {
     lengthOfAuditLogs: uploadAuditLogsSinceSubsidy.length,
   });
 
@@ -94,7 +94,7 @@ export async function backfillBalanceReservations(knex: Knex) {
   );
 
   const reservationBatchInsertResult = await knex
-    .batchInsert<BalanceReservationDBResult>(
+    .batchInsert<BalanceReservationDBInsert>(
       tableNames.balanceReservation,
       balResInsertsAndAdjustments.map(([balRes]) => balRes),
       100
@@ -110,7 +110,7 @@ export async function backfillBalanceReservations(knex: Knex) {
 
   await knex.batchInsert(tableNames.uploadAdjustment, adjustmentInserts, 100);
 
-  globalLogger.info("Finished balance reservation backfill!", {
+  globalLogger.debug("Finished balance reservation backfill!", {
     backfillMs: Date.now() - backfillStartTime,
   });
 }
@@ -222,7 +222,7 @@ export async function addFwdResearchSubsidyUploadCatalogs(knex: Knex) {
 }
 
 export async function backfillUploadAdjustments(knex: Knex) {
-  globalLogger.info("Starting upload adjustment backfill...");
+  globalLogger.debug("Starting upload adjustment backfill...");
   const backfillStartTime = Date.now();
 
   const uploadAdjustmentCatalogs = await knex<UploadAdjustmentCatalogDBResult>(
@@ -299,7 +299,7 @@ export async function backfillUploadAdjustments(knex: Knex) {
     tablesToUpdate.map((table) => knex.raw(updateQuery(table)))
   );
 
-  globalLogger.info("Finished upload adjustment backfill!", {
+  globalLogger.debug("Finished upload adjustment backfill!", {
     backfillMs: Date.now() - backfillStartTime,
   });
 }

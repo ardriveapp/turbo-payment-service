@@ -18,19 +18,28 @@ import { JWKInterface } from "arweave/node/lib/wallet";
 import { expect } from "chai";
 import { ParsedUrlQuery } from "querystring";
 
-import { signData } from "../../tests/helpers/signData";
-import { testWallet } from "../../tests/helpers/testHelpers";
-import { fromB64UrlToBuffer } from "./base64";
-import { verifyArweaveSignature } from "./verifyArweaveSignature";
+import { signArweaveData } from "../../tests/helpers/signData";
+import {
+  testArweaveWallet,
+  testEthereumWallet,
+} from "../../tests/helpers/testHelpers";
+import { toB64Url } from "./base64";
+import {
+  signEthereumData,
+  verifyArweaveSignature,
+  verifyEthereumSignature,
+} from "./verifyArweaveSignature";
 
 describe("verifyArweaveSignature", () => {
-  const wallet: JWKInterface = testWallet;
+  const wallet: JWKInterface = testArweaveWallet;
 
   it("should pass for a valid signature without query parameters", async () => {
     const nonce =
       "should pass for a valid signature without query parameters nonce";
     const dataToSign = nonce;
-    const signature = await signData(wallet, dataToSign);
+    const signature = toB64Url(
+      Buffer.from(await signArweaveData(wallet, dataToSign))
+    );
     const { n: publicKey } = wallet;
 
     const isVerified = await verifyArweaveSignature({
@@ -53,7 +62,9 @@ describe("verifyArweaveSignature", () => {
     const additionalData = JSON.stringify(query);
     const { n: publicKey } = wallet;
 
-    const signature = await signData(wallet, additionalData + nonce);
+    const signature = toB64Url(
+      Buffer.from(await signArweaveData(wallet, additionalData + nonce))
+    );
 
     const isVerified = await verifyArweaveSignature({
       publicKey,
@@ -72,10 +83,24 @@ describe("verifyArweaveSignature", () => {
 
     const isVerified = await verifyArweaveSignature({
       publicKey,
-      signature: fromB64UrlToBuffer(invalidSignature),
+      signature: invalidSignature,
       nonce,
     });
 
     expect(isVerified).to.be.false;
+  });
+});
+
+describe("verifyEthereumSignature", () => {
+  it("should pass for a valid signature", async () => {
+    const nonce =
+      "should pass for a valid signature without query parameters nonce";
+
+    const signature = await signEthereumData(testEthereumWallet, nonce);
+    const publicKey = testEthereumWallet.publicKey;
+
+    const isVerified = verifyEthereumSignature(publicKey, signature, nonce);
+
+    expect(isVerified).to.be.true;
   });
 });

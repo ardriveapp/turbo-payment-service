@@ -74,7 +74,7 @@ export class Schema {
     return new Schema(pg).rollbackFromBalanceReservation();
   }
   private async migrateToBalanceReservation() {
-    logger.info("Starting balance reservation migration...");
+    logger.debug("Starting balance reservation migration...");
     const migrationStartTime = Date.now();
 
     await this.createBalanceReservationTable();
@@ -82,19 +82,19 @@ export class Schema {
 
     await backfillBalanceReservations(this.pg);
 
-    logger.info("Finished balance reservation migration!", {
+    logger.debug("Finished balance reservation migration!", {
       migrationMs: Date.now() - migrationStartTime,
     });
   }
 
   private async rollbackFromBalanceReservation() {
-    logger.info("Starting balance reservation rollback...");
+    logger.debug("Starting balance reservation rollback...");
     const rollbackStartTime = Date.now();
 
     await this.pg.schema.dropTable(balanceReservation);
     await this.pg.schema.dropTable(uploadAdjustment);
 
-    logger.info("Finished balance reservation rollback!", {
+    logger.debug("Finished balance reservation rollback!", {
       rollbackMs: Date.now() - rollbackStartTime,
     });
   }
@@ -108,7 +108,7 @@ export class Schema {
   }
 
   private async migrateToPromoCode() {
-    logger.info("Starting promo code migration...");
+    logger.debug("Starting promo code migration...");
     const migrationStartTime = Date.now();
 
     await this.createPaymentAdjustmentTable();
@@ -153,13 +153,13 @@ export class Schema {
         .index();
     });
 
-    logger.info("Finished promo code migration!", {
+    logger.debug("Finished promo code migration!", {
       migrationMs: Date.now() - migrationStartTime,
     });
   }
 
   private async rollbackFromPromoCode() {
-    logger.info("Starting promo code rollback...");
+    logger.debug("Starting promo code rollback...");
     const rollbackStartTime = Date.now();
 
     await this.pg.schema.dropTable(paymentAdjustment);
@@ -194,7 +194,7 @@ export class Schema {
       t.dropColumn(catalogId);
     });
 
-    logger.info("Finished promo code rollback!", {
+    logger.debug("Finished promo code rollback!", {
       rollbackMs: Date.now() - rollbackStartTime,
     });
   }
@@ -231,7 +231,7 @@ export class Schema {
   }
 
   private async rollbackFromPromoCodeBackfill() {
-    logger.info("Starting promo code backfill rollback...");
+    logger.debug("Starting promo code backfill rollback...");
     const rollbackStartTime = Date.now();
 
     // Reapply default values to columns
@@ -259,7 +259,7 @@ export class Schema {
       t.string(quotedPaymentAmount).notNullable().defaultTo("0").alter();
     });
 
-    logger.info("Finished promo code backfill rollback!", {
+    logger.debug("Finished promo code backfill rollback!", {
       rollbackMs: Date.now() - rollbackStartTime,
     });
   }
@@ -273,12 +273,12 @@ export class Schema {
   }
 
   private async migrateToTurboInfraFee() {
-    logger.info("Starting turbo infra fee migration...");
+    logger.debug("Starting turbo infra fee migration...");
     const migrationStartTime = Date.now();
 
     await addTurboInfraFee(this.pg);
 
-    logger.info("Finished turbo infra fee migration!", {
+    logger.debug("Finished turbo infra fee migration!", {
       migrationMs: Date.now() - migrationStartTime,
     });
   }
@@ -292,7 +292,7 @@ export class Schema {
   }
 
   private async migrateToTargetedPromoCodes() {
-    logger.info("Starting targeted promo codes migration...");
+    logger.debug("Starting targeted promo codes migration...");
     const migrationStartTime = Date.now();
 
     await this.pg.schema.alterTable(
@@ -325,13 +325,13 @@ export class Schema {
       })
       .where({ code_value: "TOKEN2049" });
 
-    logger.info("Finished targeted promo codes migration!", {
+    logger.debug("Finished targeted promo codes migration!", {
       migrationMs: Date.now() - migrationStartTime,
     });
   }
 
   private async rollbackForTurboInfraFee() {
-    logger.info("Starting turbo infra fee rollback...");
+    logger.debug("Starting turbo infra fee rollback...");
     const rollbackStartTime = Date.now();
 
     await this.pg(tableNames.paymentAdjustmentCatalog)
@@ -340,12 +340,12 @@ export class Schema {
       })
       .delete();
 
-    logger.info("Finished turbo infra fee rollback!", {
+    logger.debug("Finished turbo infra fee rollback!", {
       rollbackMs: Date.now() - rollbackStartTime,
     });
   }
   private async rollbackFromTargetedPromoCodes() {
-    logger.info("Starting targeted promo codes rollback...");
+    logger.debug("Starting targeted promo codes rollback...");
     const rollbackStartTime = Date.now();
 
     await this.pg.schema.alterTable(
@@ -362,7 +362,7 @@ export class Schema {
 
     // No need to un-expire TOKEN2049 on rollback
 
-    logger.info("Finished targeted promo codes rollback!", {
+    logger.debug("Finished targeted promo codes rollback!", {
       rollbackMs: Date.now() - rollbackStartTime,
     });
   }
@@ -458,7 +458,7 @@ export class Schema {
   }
 
   private async initializeSchema(): Promise<void> {
-    logger.info("Starting initial migration...");
+    logger.debug("Starting initial migration...");
     const migrationStartTime = Date.now();
 
     await this.createUserTable();
@@ -467,13 +467,13 @@ export class Schema {
     await this.createPaymentReceiptTable();
     await this.createChargebackReceiptTable();
 
-    logger.info("Finished initial migration!", {
+    logger.debug("Finished initial migration!", {
       migrationDurationMs: Date.now() - migrationStartTime,
     });
   }
 
   private async rollbackInitialSchema(): Promise<void> {
-    logger.info("Rolling back schema from initial migration...");
+    logger.debug("Rolling back schema from initial migration...");
     const rollbackStartTime = Date.now();
 
     await this.pg.schema.dropTable(user);
@@ -482,29 +482,29 @@ export class Schema {
     await this.pg.schema.dropTable(paymentReceipt);
     await this.pg.schema.dropTable(chargebackReceipt);
 
-    logger.info("Schema dropped. Initial migration rollback successful!", {
+    logger.debug("Schema dropped. Initial migration rollback successful!", {
       rollbackDurationMs: Date.now() - rollbackStartTime,
     });
   }
 
   private async migrateToAuditLog() {
-    logger.info("Starting audit log migration...");
+    logger.debug("Starting audit log migration...");
     const migrationStartTime = Date.now();
 
     await this.createAuditLogTable();
 
-    logger.info("Finished audit log migration!", {
+    logger.debug("Finished audit log migration!", {
       migrationMs: Date.now() - migrationStartTime,
     });
   }
 
   private async rollbackFromAuditLog() {
-    logger.info("Starting audit log rollback...");
+    logger.debug("Starting audit log rollback...");
     const rollbackStartTime = Date.now();
 
     await this.pg.schema.dropTable(auditLog);
 
-    logger.info("Finished audit log rollback!", {
+    logger.debug("Finished audit log rollback!", {
       rollbackMs: Date.now() - rollbackStartTime,
     });
   }
@@ -613,7 +613,7 @@ export class Schema {
 
   private async migrateAuditLogToPositiveNegativeCredits(): Promise<void> {
     const migrationStartTime = Date.now();
-    logger.info("Starting audit log credit amount migration...", {
+    logger.debug("Starting audit log credit amount migration...", {
       startTime: migrationStartTime,
     });
     const negativeCreditChangeReasons: AuditChangeReason[] = [
@@ -626,7 +626,7 @@ export class Schema {
     const negativeChangePromises = existingAuditRecords.reduce(
       (promises: Knex.QueryBuilder[], record: AuditLogDBResult) => {
         if (negativeCreditChangeReasons.includes(record.change_reason)) {
-          logger.info(
+          logger.debug(
             "Found audit record that should have negative winston_credit_amount",
             {
               ...record,
@@ -644,7 +644,7 @@ export class Schema {
       []
     );
     await Promise.all(negativeChangePromises);
-    logger.info("Finished audit log credit amount migration!", {
+    logger.debug("Finished audit log credit amount migration!", {
       migrationDurationMs: Date.now() - migrationStartTime,
       numRecords: negativeChangePromises.length,
     });
@@ -652,7 +652,7 @@ export class Schema {
 
   private async rollBackFromMigrateAuditLogToPositiveNegativeCredits(): Promise<void> {
     const migrationStartTime = Date.now();
-    logger.info(
+    logger.debug(
       "Rolling back schema from audit log positive/negative credit balance migration...",
       {
         startTime: migrationStartTime,
@@ -681,7 +681,7 @@ export class Schema {
       []
     );
     await Promise.all(negativeChangePromises);
-    logger.info("Finished audit log credit amount rollback!", {
+    logger.debug("Finished audit log credit amount rollback!", {
       migrationDurationMs: Date.now() - migrationStartTime,
       numRecords: negativeChangePromises.length,
     });

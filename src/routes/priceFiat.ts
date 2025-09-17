@@ -51,7 +51,7 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
     return next();
   }
 
-  logger.info("Payment Price GET Route :", {
+  logger.debug("Payment Price GET Route :", {
     payment,
     walletAddress,
     promoCodes,
@@ -72,7 +72,7 @@ export async function priceFiatHandler(ctx: KoaContext, next: Next) {
       inclusiveAdjustments,
     } = wincForPaymentResponse;
 
-    logger.info("Base credit amount found for payment", {
+    logger.debug("Base credit amount found for payment", {
       payment,
       wincForPaymentResponse,
     });

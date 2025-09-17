@@ -27,7 +27,7 @@ export async function handleDisputeCreatedEvent(
   paymentDatabase: Database,
   stripe: Stripe
 ) {
-  logger.info(`🔔 Webhook Dispute Created Event!`, {
+  logger.debug(`🔔 Webhook Dispute Created Event!`, {
     pi,
   });
   const chargebackReceiptId = randomUUID();
@@ -41,7 +41,7 @@ export async function handleDisputeCreatedEvent(
     // capture the payment intent destination address and top up quote id
     const { destinationAddress, topUpQuoteId } = paymentIntent.metadata;
 
-    logger.info("Found payment intent related to dispute.", {
+    logger.debug("Found payment intent related to dispute.", {
       disputeId: pi.id,
       paymentIntent,
     });
@@ -66,12 +66,12 @@ export async function handleDisputeCreatedEvent(
       ]);
 
     if (
-      walletBalanceAfterChargeback.isNonZeroNegativeInteger() ||
+      walletBalanceAfterChargeback.winc.isNonZeroNegativeInteger() ||
       // TODO: we may want to filter within a certain period (e.g. 90/180 days)
       totalWalletChargebacks.length > maxAllowedChargebackDisputes
     ) {
       // TODO: tag a user in stripe as potentially fraudulent, block payments from card/customer
-      logger.info(
+      logger.warn(
         "Wallet has suspicious number of chargebacks and/or a negative balance.",
         {
           destinationAddress,

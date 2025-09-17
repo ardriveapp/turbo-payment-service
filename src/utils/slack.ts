@@ -14,17 +14,23 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import BigNumber from "bignumber.js";
+
 import { isDevEnv } from "../constants";
 import {
+  ArNSPurchase,
   CreateNewCreditedTransactionParams,
   PendingPaymentTransaction,
 } from "../database/dbTypes";
 import globalLogger from "../logger";
 import { baseAmountToTokenAmount, tokenExponentMap } from "../pricing/pricing";
+import { winstonToCredits } from "../types";
+import { zeroDecimalCurrencyTypes } from "../types/supportedCurrencies";
 
 export const slackChannels = {
   admin: process.env.SLACK_TURBO_ADMIN_CHANNEL_ID,
   topUp: process.env.SLACK_TURBO_TOP_UP_CHANNEL_ID,
+  arnsBuys: process.env.SLACK_TURBO_ARNS_BUYS_CHANNEL_ID,
 };
 
 export const sendSlackMessage = async ({
@@ -92,6 +98,16 @@ export const sendCryptoFundSlackMessage = async ({
     "arweave"
   ).toFixed(12);
 
+  if (usdEquivalent < 5 && tokenType === "kyve") {
+    // Don't send slack messages for kyve payments under $5
+    globalLogger.info("Skipping slack message for kyve payment under $5", {
+      usdEquivalent,
+      tokenType,
+      transactionId,
+    });
+    return;
+  }
+
   if (isDevEnv) {
     // Don't send slack messages in dev env
     return;
@@ -105,5 +121,51 @@ Credits: ${credits}
 USD Equivalent: ${usdEquivalent === 0 ? "less than $0.01" : `$${usdEquivalent}`}
 Address: ${destinationAddress}
 TxID: ${transactionId}\`\`\``,
+  });
+};
+
+export const sendArNSBuySlackMessage = async ({
+  name,
+  usdArRate,
+  wincQty,
+  paymentAmount,
+  currencyType,
+  promoCodes,
+  mARIOQty,
+  owner,
+  type,
+  years,
+}: ArNSPurchase & { promoCodes: string[] }) => {
+  if (isDevEnv) {
+    // Don't send slack messages in dev env
+    return;
+  }
+  let message = "New Turbo Registration!\n";
+
+  message += `- Name: ${name}\n`;
+  message += `- Type: ${type}${years ? ` for ${years} years` : ""}\n`;
+
+  if (paymentAmount && currencyType) {
+    // Was a Fiat purchase to stripe
+    const payment = zeroDecimalCurrencyTypes.includes(currencyType)
+      ? paymentAmount.toString()
+      : // convert from 2 decimal currency
+        (paymentAmount / 100).toFixed(2);
+    message += `- Price: ${payment} ${currencyType.toUpperCase()} (${mARIOQty.toARIO()} $ARIO)\n`;
+    if (promoCodes.length > 0) {
+      message += `- Promo codes: ${promoCodes.join(", ")}\n`;
+    }
+  } else {
+    // Was existing credit purchase
+    const credits = winstonToCredits(wincQty);
+    const usd = new BigNumber(credits).times(usdArRate).toFixed(2);
+    message += `- Price: ${credits} Turbo credits ($${usd} USD or ${mARIOQty.toARIO()} $ARIO)\n`;
+  }
+  message += `- Owner: ${owner}\n`;
+
+  return sendSlackMessage({
+    channel: slackChannels.arnsBuys,
+    message,
+    icon_emoji: ":arns:",
   });
 };

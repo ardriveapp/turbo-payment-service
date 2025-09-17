@@ -14,20 +14,31 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { Knex } from "knex";
+
 import { TransactionId } from "../types";
 import { WC } from "../types/arc";
 import {
+  ArNSPurchase,
+  ArNSPurchaseParams,
+  ArNSPurchaseQuote,
+  ArNSPurchaseQuoteParams,
+  ArNSPurchaseStatusResult,
   ChargebackReceipt,
   ChargebackReceiptId,
   CreateBalanceReservationParams,
   CreateBypassedPaymentReceiptParams,
   CreateChargebackReceiptParams,
+  CreateDelegatedPaymentApprovalParams,
   CreateNewCreditedTransactionParams,
   CreatePaymentReceiptParams,
   CreatePendingTransactionParams,
   CreateTopUpQuoteParams,
   CreditedPaymentTransaction,
+  DataItemId,
+  DelegatedPaymentApproval,
   FailedPaymentTransaction,
+  GetBalanceResult,
   IntervalUnit,
   PaymentAdjustmentCatalog,
   PaymentReceipt,
@@ -53,49 +64,67 @@ export type WincUsedForUploadAdjustmentParams = {
 
 export interface Database {
   createTopUpQuote: (topUpQuote: CreateTopUpQuoteParams) => Promise<void>;
+
   getTopUpQuote: (topUpQuoteId: TopUpQuoteId) => Promise<TopUpQuote>;
+
   updatePromoInfo: (
     userAddress: UserAddress,
     promoInfo: PromotionalInfo
   ) => Promise<void>;
+
   getPromoInfo: (userAddress: UserAddress) => Promise<PromotionalInfo>;
+
   getUser: (userAddress: UserAddress) => Promise<User>;
-  getBalance: (userAddress: UserAddress) => Promise<WC>;
+
+  getBalance: (userAddress: UserAddress) => Promise<GetBalanceResult>;
+
   createPaymentReceipt: (
     paymentReceipt: CreatePaymentReceiptParams
   ) => Promise<void | UnredeemedGift>;
+
   createBypassedPaymentReceipts(
     paymentReceipts: CreateBypassedPaymentReceiptParams[]
   ): Promise<UnredeemedGift[]>;
+
   getPaymentReceipt: (
     paymentReceiptId: PaymentReceiptId
   ) => Promise<PaymentReceipt>;
+
   reserveBalance: (
     createBalanceReservationParams: CreateBalanceReservationParams
   ) => Promise<void>;
+
   refundBalance: (
     userAddress: UserAddress,
     winstonCreditAmount: WC,
-    dataItemId?: TransactionId // TODO: once the upload-service is updated with the new routes, make this required
+    dataItemId: TransactionId
   ) => Promise<void>;
+
   createChargebackReceipt: (
     createChargebackReceiptParams: CreateChargebackReceiptParams
   ) => Promise<void>;
+
   getChargebackReceiptsForAddress: (
     userAddress: UserAddress
   ) => Promise<ChargebackReceipt[]>;
+
   getChargebackReceipt: (
     chargebackReceiptId: ChargebackReceiptId
   ) => Promise<ChargebackReceipt>;
+
   checkForExistingPaymentByTopUpQuoteId: (
     topUpQuoteId: TopUpQuoteId
   ) => Promise<boolean>;
+
   getSingleUsePromoCodeAdjustments: (
     promoCodes: string[],
     userAddress: UserAddress
   ) => Promise<SingleUseCodePaymentCatalog[]>;
+
   getUploadAdjustmentCatalogs: () => Promise<UploadAdjustmentCatalog[]>;
+
   getPaymentAdjustmentCatalogs(): Promise<PaymentAdjustmentCatalog[]>;
+
   redeemGift: (params: {
     paymentReceiptId: string;
     recipientEmail: string;
@@ -110,6 +139,7 @@ export interface Database {
   createPendingTransaction: (
     params: CreatePendingTransactionParams
   ) => Promise<void>;
+
   /**
    * Creates a credited_payment_transaction where the block_height is already confirmed
    * This will credit a user's balance and add a payment notation to the audit log
@@ -150,4 +180,58 @@ export interface Database {
   getWincUsedForUploadAdjustmentCatalog(
     params: WincUsedForUploadAdjustmentParams
   ): Promise<WC>;
+
+  createDelegatedPaymentApproval: (
+    params: CreateDelegatedPaymentApprovalParams
+  ) => Promise<DelegatedPaymentApproval>;
+
+  revokeDelegatedPaymentApprovals: (params: {
+    payingAddress: UserAddress;
+    approvedAddress: UserAddress;
+    revokeDataItemId: DataItemId;
+  }) => Promise<DelegatedPaymentApproval[]>;
+
+  getApprovalsFromPayerForAddress: (
+    params: { payingAddress: UserAddress; approvedAddress: UserAddress },
+    knexTransaction?: Knex.Transaction
+  ) => Promise<DelegatedPaymentApproval[]>;
+
+  getAllApprovalsForUserAddress: (userAddress: string) => Promise<{
+    givenApprovals: DelegatedPaymentApproval[];
+    receivedApprovals: DelegatedPaymentApproval[];
+  }>;
+
+  createArNSPurchaseReceipt: (
+    createPendingArNSPurchaseParams: ArNSPurchaseParams
+  ) => Promise<ArNSPurchase>;
+
+  addMessageIdToPurchaseReceipt: (p: {
+    nonce: string;
+    messageId: string;
+  }) => Promise<void>;
+
+  updateFailedArNSPurchase: (
+    nonce: string,
+    failedReason: string
+  ) => Promise<void>;
+
+  getArNSPurchaseStatus: (
+    nonce: string
+  ) => Promise<ArNSPurchaseStatusResult | undefined>;
+
+  createArNSPurchaseQuote: (
+    params: ArNSPurchaseQuoteParams
+  ) => Promise<ArNSPurchaseQuote>;
+
+  getArNSPurchaseQuote: (
+    nonce: string
+  ) => Promise<{ quote: ArNSPurchaseQuote }>;
+  updateArNSPurchaseQuoteToSuccess: (p: {
+    nonce: string;
+    messageId: string;
+  }) => Promise<void>;
+  updateArNSPurchaseQuoteToFailure: (
+    nonce: string,
+    failedReason: string
+  ) => Promise<void>;
 }

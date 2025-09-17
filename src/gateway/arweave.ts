@@ -18,7 +18,7 @@ import { AxiosInstance } from "axios";
 import BigNumber from "bignumber.js";
 
 import { createAxiosInstance } from "../axiosClient";
-import { arweaveGatewayUrl } from "../constants";
+import { gatewayUrls } from "../constants";
 import logger from "../logger";
 import { TransactionId } from "../types";
 import {
@@ -48,7 +48,7 @@ export class ArweaveGateway extends Gateway {
   public endpoint: URL;
   private axiosInstance: AxiosInstance;
   constructor({
-    endpoint = arweaveGatewayUrl,
+    endpoint = gatewayUrls.arweave,
     axiosInstance = createAxiosInstance({}),
     pendingTxMaxAttempts,
     paymentTxPollingWaitTimeMs,
@@ -120,7 +120,7 @@ export class ArweaveGateway extends Gateway {
       query: gqlQuery,
     });
 
-    const transaction = response.data.data.transaction;
+    const transaction = response?.data?.data?.transaction;
 
     if (!transaction) {
       return undefined;

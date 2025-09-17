@@ -17,7 +17,7 @@
 import BigNumber from "bignumber.js";
 import { ethers } from "ethers";
 
-import { ethereumGatewayUrl } from "../constants";
+import { gatewayUrls } from "../constants";
 import { PaymentTransactionNotFound } from "../database/errors";
 import logger from "../logger";
 import { TransactionId } from "../types";
@@ -28,18 +28,16 @@ import {
   TransactionStatus,
 } from "./gateway";
 
-type EthereumGatewayParams = GatewayParams;
-
 export class EthereumGateway extends Gateway {
   public endpoint: URL;
   private provider: ethers.JsonRpcProvider;
 
   constructor({
-    endpoint = ethereumGatewayUrl,
+    endpoint = gatewayUrls.ethereum,
     paymentTxPollingWaitTimeMs,
     pendingTxMaxAttempts,
     minConfirmations = +(process.env.ETHEREUM_MIN_CONFIRMATIONS || 5),
-  }: EthereumGatewayParams = {}) {
+  }: GatewayParams = {}) {
     super({
       paymentTxPollingWaitTimeMs,
       pendingTxMaxAttempts,

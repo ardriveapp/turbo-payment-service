@@ -19,7 +19,10 @@ import { randomUUID } from "node:crypto";
 
 import globalLogger from "../logger";
 import { columnNames, tableNames } from "./dbConstants";
-import { SingleUseCodePaymentCatalogDBInsert } from "./dbTypes";
+import {
+  PaymentAdjustmentCatalogDBInsert,
+  SingleUseCodePaymentCatalogDBInsert,
+} from "./dbTypes";
 import { backfillTurboInfraFee, rollbackInfraFeeBackfill } from "./migration";
 
 export abstract class Migrator {
@@ -30,12 +33,12 @@ export abstract class Migrator {
     name: string;
     operation: () => Promise<void>;
   }) {
-    globalLogger.info(`Starting ${name}...`);
+    globalLogger.debug(`Starting ${name}...`);
     const startTime = Date.now();
 
     await operation();
 
-    globalLogger.info(`Finished ${name}!`, {
+    globalLogger.debug(`Finished ${name}!`, {
       durationMs: Date.now() - startTime,
     });
   }
@@ -360,6 +363,407 @@ export class ArPaymentMigrator extends Migrator {
         await this.knex.schema.dropTableIfExists(
           tableNames.creditedPaymentTransaction
         );
+      },
+    });
+  }
+}
+
+export class DelegatedPaymentsMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  private delegatedPaymentTables(tableBuilder: Knex.TableBuilder) {
+    tableBuilder.string(columnNames.approvalDataItemId).primary();
+    tableBuilder.string(columnNames.approvedAddress).notNullable().index();
+    tableBuilder.string(columnNames.payingAddress).notNullable().index();
+    tableBuilder.string(columnNames.approvedWincAmount).notNullable();
+    tableBuilder
+      .string(columnNames.usedWincAmount)
+      .notNullable()
+      .defaultTo("0");
+    tableBuilder
+      .timestamp(columnNames.creationDate)
+      .notNullable()
+      .defaultTo(this.knex.fn.now());
+    tableBuilder.timestamp(columnNames.expirationDate).nullable();
+  }
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to delegated payments",
+      operation: async () => {
+        await this.knex.schema.createTable(
+          tableNames.delegatedPaymentApproval,
+          (table) => {
+            this.delegatedPaymentTables(table);
+          }
+        );
+
+        await this.knex.schema.createTable(
+          tableNames.inactiveDelegatedPaymentApproval,
+          (table) => {
+            this.delegatedPaymentTables(table);
+            table.string(columnNames.inactiveReason).notNullable();
+            table.string(columnNames.revokeDataItemId).nullable().index();
+            table
+              .timestamp(columnNames.inactiveDate)
+              .notNullable()
+              .defaultTo(this.knex.fn.now());
+          }
+        );
+
+        await this.knex.schema.alterTable(
+          tableNames.balanceReservation,
+          (table) => {
+            table.jsonb(columnNames.overflowSpend).nullable();
+          }
+        );
+
+        // Create a GIN index on the JSONB column when it is not null
+        await this.knex.raw(`
+          CREATE INDEX ${columnNames.overflowSpend}_${columnNames.payingAddress}_idx 
+          ON ${tableNames.balanceReservation} 
+          USING GIN (${columnNames.overflowSpend} jsonb_path_ops)
+          WHERE ${columnNames.overflowSpend} IS NOT NULL;
+        `);
+      },
+    });
+  }
+
+  public rollback() {
+    return this.operate({
+      name: "rollback from delegated payments",
+      operation: async () => {
+        await this.knex.schema.dropTableIfExists(
+          tableNames.delegatedPaymentApproval
+        );
+        await this.knex.schema.dropTableIfExists(
+          tableNames.inactiveDelegatedPaymentApproval
+        );
+        await this.knex.schema.alterTable(
+          tableNames.balanceReservation,
+          (table) => {
+            table.dropColumn(columnNames.overflowSpend);
+          }
+        );
+      },
+    });
+  }
+}
+
+export class ArNSPurchaseMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  private arNSReceiptTables(tableBuilder: Knex.TableBuilder) {
+    tableBuilder.string(columnNames.owner).notNullable().index();
+    tableBuilder.string(columnNames.name).notNullable();
+    tableBuilder.string(columnNames.intent).notNullable();
+    tableBuilder.decimal(columnNames.usdArRate).notNullable();
+    tableBuilder.decimal(columnNames.usdArioRate).notNullable();
+
+    tableBuilder.string(columnNames.wincQty).notNullable();
+    tableBuilder.string(columnNames.mARIOQty).notNullable();
+
+    tableBuilder
+      .timestamp(columnNames.createdDate)
+      .notNullable()
+      .defaultTo(this.knex.fn.now());
+
+    tableBuilder.string(columnNames.type).nullable();
+    tableBuilder.integer(columnNames.years).nullable();
+    tableBuilder.string(columnNames.processId).nullable();
+    tableBuilder.integer(columnNames.increaseQty).nullable();
+  }
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to buy arns name",
+      operation: async () => {
+        await this.knex.schema.createTable(
+          tableNames.arNSPurchaseReceipt,
+          (table) => {
+            table.string(columnNames.nonce).primary();
+            this.arNSReceiptTables(table);
+          }
+        );
+
+        await this.knex.schema.createTable(
+          tableNames.failedArNSPurchase,
+          (table) => {
+            this.arNSReceiptTables(table);
+            table.string(columnNames.nonce).index();
+            table
+              .timestamp(columnNames.failedDate)
+              .notNullable()
+              .defaultTo(this.knex.fn.now());
+            table.string(columnNames.failedReason).notNullable();
+          }
+        );
+      },
+    });
+  }
+
+  public rollback() {
+    return this.operate({
+      name: "rollback from arns purchase",
+      operation: async () => {
+        await this.knex.schema.dropTableIfExists(
+          tableNames.arNSPurchaseReceipt
+        );
+        await this.knex.schema.dropTableIfExists(tableNames.failedArNSPurchase);
+      },
+    });
+  }
+}
+
+export class ArNSPurchaseQuoteMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to buy arns purchase quote",
+      operation: async () => {
+        await this.knex.schema.createTable(
+          tableNames.arNSPurchaseQuote,
+          (table) => {
+            table.string(columnNames.nonce).primary();
+
+            table.string(columnNames.owner).notNullable().index();
+            table.string(columnNames.name).notNullable();
+            table.string(columnNames.intent).notNullable();
+            table.decimal(columnNames.usdArRate).notNullable();
+            table.decimal(columnNames.usdArioRate).notNullable();
+
+            table.string(columnNames.wincQty).notNullable();
+            table.string(columnNames.mARIOQty).notNullable();
+
+            table.string(columnNames.type).nullable();
+            table.integer(columnNames.years).nullable();
+            table.string(columnNames.processId).nullable();
+            table.integer(columnNames.increaseQty).nullable();
+
+            table.string(columnNames.excessWinc).nullable();
+
+            table
+              .timestamp(columnNames.quoteCreationDate)
+              .notNullable()
+              .defaultTo(this.knex.fn.now());
+
+            table.timestamp(columnNames.quoteExpirationDate).notNullable();
+            table.string(columnNames.paymentProvider).notNullable();
+            table.integer(columnNames.paymentAmount).notNullable();
+            table.integer(columnNames.quotedPaymentAmount).notNullable();
+            table.string(columnNames.currencyType).notNullable();
+          }
+        );
+
+        await this.knex.schema.alterTable(
+          tableNames.arNSPurchaseReceipt,
+          (table) => {
+            table.timestamp(columnNames.quoteCreationDate).nullable();
+            table.timestamp(columnNames.quoteExpirationDate).nullable();
+            table.string(columnNames.paymentProvider).nullable();
+            table.integer(columnNames.paymentAmount).nullable();
+            table.integer(columnNames.quotedPaymentAmount).nullable();
+            table.string(columnNames.currencyType).nullable();
+            table.string(columnNames.excessWinc).nullable();
+          }
+        );
+
+        await this.knex.schema.alterTable(
+          tableNames.failedArNSPurchase,
+          (table) => {
+            table.timestamp(columnNames.quoteCreationDate).nullable();
+            table.timestamp(columnNames.quoteExpirationDate).nullable();
+            table.string(columnNames.paymentProvider).nullable();
+            table.integer(columnNames.paymentAmount).nullable();
+            table.integer(columnNames.quotedPaymentAmount).nullable();
+            table.string(columnNames.currencyType).nullable();
+            table.string(columnNames.excessWinc).nullable();
+          }
+        );
+      },
+    });
+  }
+
+  public rollback() {
+    return this.operate({
+      name: "rollback from arns purchase quote",
+      operation: async () => {
+        await this.knex.schema.dropTableIfExists(tableNames.arNSPurchaseQuote);
+
+        await this.knex.schema.alterTable(
+          tableNames.arNSPurchaseReceipt,
+          (table) => {
+            table.dropColumn(columnNames.quoteCreationDate);
+            table.dropColumn(columnNames.quoteExpirationDate);
+            table.dropColumn(columnNames.paymentProvider);
+            table.dropColumn(columnNames.paymentAmount);
+            table.dropColumn(columnNames.quotedPaymentAmount);
+            table.dropColumn(columnNames.currencyType);
+            table.dropColumn(columnNames.excessWinc);
+          }
+        );
+
+        await this.knex.schema.alterTable(
+          tableNames.failedArNSPurchase,
+          (table) => {
+            table.dropColumn(columnNames.quoteCreationDate);
+            table.dropColumn(columnNames.quoteExpirationDate);
+            table.dropColumn(columnNames.paymentProvider);
+            table.dropColumn(columnNames.paymentAmount);
+            table.dropColumn(columnNames.quotedPaymentAmount);
+            table.dropColumn(columnNames.currencyType);
+            table.dropColumn(columnNames.excessWinc);
+          }
+        );
+      },
+    });
+  }
+}
+
+export class ArNSPurchaseStoreMessageIdMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to buy arns purchase store message id",
+      operation: async () => {
+        await this.knex.schema.alterTable(
+          tableNames.arNSPurchaseReceipt,
+          (table) => {
+            table.string(columnNames.messageId).nullable();
+          }
+        );
+        await this.knex.schema.alterTable(
+          tableNames.failedArNSPurchase,
+          (table) => {
+            table.string(columnNames.messageId).nullable();
+          }
+        );
+      },
+    });
+  }
+
+  public rollback() {
+    return this.operate({
+      name: "rollback from buy arns purchase store message id",
+      operation: async () => {
+        await this.knex.schema.alterTable(
+          tableNames.arNSPurchaseReceipt,
+          (table) => {
+            table.dropColumn(columnNames.messageId);
+          }
+        );
+        await this.knex.schema.alterTable(
+          tableNames.failedArNSPurchase,
+          (table) => {
+            table.dropColumn(columnNames.messageId);
+          }
+        );
+      },
+    });
+  }
+}
+
+export class DelegatedArNSPurchasesMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to delegated arns purchases",
+      operation: async () => {
+        await this.knex.schema.alterTable(
+          tableNames.arNSPurchaseReceipt,
+          (table) => {
+            table.string(columnNames.paidBy).nullable();
+            table.jsonb(columnNames.overflowSpend).nullable();
+          }
+        );
+
+        // Create a GIN index on the JSONB column when it is not null
+        await this.knex.raw(`
+          CREATE INDEX ${columnNames.overflowSpend}_${columnNames.payingAddress}_arns_idx 
+          ON ${tableNames.arNSPurchaseReceipt} 
+          USING GIN (${columnNames.overflowSpend} jsonb_path_ops)
+          WHERE ${columnNames.overflowSpend} IS NOT NULL;
+        `);
+
+        await this.knex.schema.alterTable(
+          tableNames.failedArNSPurchase,
+          (table) => {
+            table.string(columnNames.paidBy).nullable();
+            table.jsonb(columnNames.overflowSpend).nullable();
+          }
+        );
+      },
+    });
+  }
+
+  public rollback() {
+    return this.operate({
+      name: "rollback from delegated arns purchases",
+      operation: async () => {
+        await this.knex.schema.alterTable(
+          tableNames.arNSPurchaseReceipt,
+          (table) => {
+            table.dropColumn(columnNames.paidBy);
+            table.dropColumn(columnNames.overflowSpend);
+          }
+        );
+        await this.knex.schema.alterTable(
+          tableNames.failedArNSPurchase,
+          (table) => {
+            table.dropColumn(columnNames.paidBy);
+            table.dropColumn(columnNames.overflowSpend);
+          }
+        );
+      },
+    });
+  }
+}
+
+export class KyveFeeMigrator extends Migrator {
+  constructor(private readonly knex: Knex) {
+    super();
+  }
+
+  public migrate() {
+    return this.operate({
+      name: "migrate to add kyve fee columns",
+      operation: async () => {
+        const kyveTurboInfraFeeDBInsert: PaymentAdjustmentCatalogDBInsert = {
+          catalog_id: randomUUID(),
+          adjustment_name: "Kyve Turbo Infrastructure Fee",
+          adjustment_description:
+            "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+          operator: "multiply",
+          operator_magnitude: "0.5", // 50% KYVE network fee
+          adjustment_exclusivity: "inclusive_kyve",
+        };
+        await this.knex(tableNames.paymentAdjustmentCatalog).insert(
+          kyveTurboInfraFeeDBInsert
+        );
+      },
+    });
+  }
+
+  public rollback(): Promise<void> {
+    return this.operate({
+      name: "rollback from add kyve fee columns",
+      operation: async () => {
+        await this.knex(tableNames.paymentAdjustmentCatalog)
+          .where("adjustment_name", "Kyve Turbo Infrastructure Fee")
+          .del();
       },
     });
   }

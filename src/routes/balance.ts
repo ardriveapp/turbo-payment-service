@@ -23,7 +23,7 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
   const { paymentDatabase } = ctx.state;
 
-  const walletAddress = ctx.state.walletAddress;
+  const walletAddress = ctx.state.walletAddress ?? ctx.request.query.address;
 
   if (!walletAddress) {
     ctx.status = 403;
@@ -31,19 +31,30 @@ export async function balanceRoute(ctx: KoaContext, next: Next) {
     return next();
   }
 
-  logger.info("Balance requested", { walletAddress });
+  logger.debug("Balance requested", { walletAddress });
 
   try {
-    const balance = await paymentDatabase.getBalance(walletAddress);
+    const {
+      effectiveBalance,
+      givenApprovals,
+      receivedApprovals,
+      controlledWinc,
+      winc: balance,
+    } = await paymentDatabase.getBalance(walletAddress);
+
     ctx.body = {
       winc: balance.toString(),
       // For compatibility with the existing ecosystem APIs
       balance: balance.toString(),
+      controlledWinc: controlledWinc.toString(),
+      effectiveBalance: effectiveBalance.toString(),
+      givenApprovals,
+      receivedApprovals,
     };
-    logger.info("Balance found!", { balance, walletAddress });
+    logger.debug("Balance found!", { balance, walletAddress });
   } catch (error) {
     if (error instanceof UserNotFoundWarning) {
-      logger.info(error.message);
+      logger.debug(error.message);
       ctx.response.status = 404;
       ctx.body = "User Not Found";
     } else {

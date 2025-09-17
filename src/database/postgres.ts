@@ -21,12 +21,19 @@ import winston from "winston";
 
 import globalLogger from "../logger";
 import { TransactionId, W, WC, Winston } from "../types";
+import { remainingWincAmountFromApprovals } from "../utils/common";
 import { Database, WincUsedForUploadAdjustmentParams } from "./database";
 import { columnNames, tableNames } from "./dbConstants";
 import {
+  arnsPurchaseDBMap,
+  arnsPurchaseQuoteDBInsertFromParams,
+  arnsPurchaseQuoteDBMap,
+  arnsPurchaseReceiptDBMap,
   chargebackReceiptDBMap,
   creditedTransactionDBMap,
+  delegatedPaymentApprovalDBMap,
   failedTransactionDBMap,
+  inactiveDelegatedPaymentApprovalDBMap,
   paymentAdjustmentCatalogDBMap,
   paymentReceiptDBMap,
   pendingPaymentTransactionDBMap,
@@ -37,6 +44,15 @@ import {
   userDBMap,
 } from "./dbMaps";
 import {
+  ArNSPurchase,
+  ArNSPurchaseDBInsert,
+  ArNSPurchaseDBResult,
+  ArNSPurchaseParams,
+  ArNSPurchaseQuote,
+  ArNSPurchaseQuoteDBResult,
+  ArNSPurchaseQuoteParams,
+  ArNSPurchaseStatusResult,
+  AuditChangeReason,
   AuditLogInsert,
   BalanceReservationDBInsert,
   BalanceReservationDBResult,
@@ -45,6 +61,7 @@ import {
   CreateBalanceReservationParams,
   CreateBypassedPaymentReceiptParams,
   CreateChargebackReceiptParams,
+  CreateDelegatedPaymentApprovalParams,
   CreateNewCreditedTransactionParams,
   CreatePaymentReceiptParams,
   CreatePendingTransactionParams,
@@ -52,21 +69,35 @@ import {
   CreditedPaymentTransaction,
   CreditedPaymentTransactionDBInsert,
   CreditedPaymentTransactionDBResult,
+  DataItemId,
+  DelegatedPaymentApproval,
+  DelegatedPaymentApprovalDBInsert,
+  DelegatedPaymentApprovalDBResult,
+  FailedArNSPurchaseDBInsert,
+  FailedArNSPurchaseDBResult,
   FailedPaymentTransaction,
   FailedPaymentTransactionDBInsert,
   FailedPaymentTransactionDBResult,
   FailedTopUpQuoteDBResult,
+  GetBalanceResult,
+  InactiveDelegatedPaymentApproval,
+  InactiveDelegatedPaymentApprovalDBInsert,
+  InactiveDelegatedPaymentApprovalDBResult,
+  KnexTransaction,
+  OverflowSpendDBResult,
   PaymentAdjustment,
   PaymentAdjustmentCatalog,
   PaymentAdjustmentCatalogDBResult,
   PaymentAdjustmentDBInsert,
   PaymentAdjustmentDBResult,
+  PaymentDirective,
   PaymentReceipt,
   PaymentReceiptDBInsert,
   PaymentReceiptDBResult,
   PendingPaymentTransaction,
   PendingPaymentTransactionDBInsert,
   PendingPaymentTransactionDBResult,
+  PendingSpend,
   PromotionalInfo,
   RedeemedGiftDBInsert,
   RedeemedGiftDBResult,
@@ -83,6 +114,7 @@ import {
   UploadAdjustmentDBInsert,
   UploadAdjustmentDBResult,
   User,
+  UserAddress,
   UserAddressType,
   UserDBInsert,
   UserDBResult,
@@ -90,9 +122,13 @@ import {
   isFailedPaymentTransactionDBResult,
 } from "./dbTypes";
 import {
+  ArNSPurchaseAlreadyExists,
+  ArNSPurchaseNotFound,
+  ConflictingApprovalFound,
   GiftAlreadyRedeemed,
   GiftRedemptionError,
   InsufficientBalance,
+  NoApprovalsFound,
   PaymentTransactionNotFound,
   PromoCodeExceedsMaxUses,
   PromoCodeExpired,
@@ -132,11 +168,15 @@ export class PostgresDatabase implements Database {
           this.log.error("Failed to migrate database!", error);
         });
     }
+    this.log.debug("Database initialized.", {
+      writer: this.writer.client.config.connection,
+      reader: this.reader.client.config.connection,
+    });
   }
   public async createTopUpQuote(
     topUpQuote: CreateTopUpQuoteParams
   ): Promise<void> {
-    this.log.info("Inserting new top up quote...", {
+    this.log.debug("Inserting new top up quote...", {
       topUpQuote,
     });
 
@@ -221,13 +261,13 @@ export class PostgresDatabase implements Database {
 
   public async getPromoInfo(userAddress: string): Promise<PromotionalInfo> {
     const promoInfo = (await this.getUser(userAddress)).promotionalInfo;
-    this.log.info("promo info:", { type: typeof promoInfo, promoInfo });
+    this.log.debug("promo info:", { type: typeof promoInfo, promoInfo });
     return promoInfo;
   }
 
   public async getUser(
     userAddress: string,
-    knexTransaction: Knex.Transaction = this.reader as Knex.Transaction
+    knexTransaction: KnexTransaction = this.reader
   ): Promise<User> {
     const userDbResult = await knexTransaction<UserDBResult>(
       tableNames.user
@@ -242,15 +282,58 @@ export class PostgresDatabase implements Database {
     return userDbResult.map(userDBMap)[0];
   }
 
-  public async getBalance(userAddress: string): Promise<WC> {
+  public async getBalance(
+    userAddress: string,
+    knexTransaction: KnexTransaction = this.reader
+  ): Promise<GetBalanceResult> {
     // TODO: getBalance should be the result of current_winc_balance - all pending balance_reservation.reserved_winc_amount once finalized_reservations are implemented
-    return (await this.getUser(userAddress)).winstonCreditBalance;
+
+    const { receivedApprovals, givenApprovals } =
+      await this.getAllApprovalsForUserAddress(userAddress, knexTransaction);
+
+    const remainingBalanceFromReceivedApprovals =
+      remainingWincAmountFromApprovals(receivedApprovals);
+    const remainingBalanceFromGivenApprovals =
+      remainingWincAmountFromApprovals(givenApprovals);
+
+    try {
+      const user = await this.getUser(userAddress, knexTransaction);
+
+      const winc = user.winstonCreditBalance;
+      const controlledWinc = winc.plus(remainingBalanceFromGivenApprovals);
+      const effectiveBalance = winc.plus(remainingBalanceFromReceivedApprovals);
+
+      return {
+        controlledWinc,
+        givenApprovals,
+        winc,
+        receivedApprovals,
+        effectiveBalance,
+      };
+    } catch (error) {
+      if (error instanceof UserNotFoundWarning) {
+        if (
+          remainingBalanceFromReceivedApprovals.isGreaterThanOrEqualTo(W(1))
+        ) {
+          // When user is not found, but has a positive balance from approvals
+          // we will gracefully return the effective balance and approvals
+          return {
+            winc: new Winston("0"),
+            givenApprovals,
+            controlledWinc: new Winston("0"),
+            receivedApprovals,
+            effectiveBalance: remainingBalanceFromReceivedApprovals,
+          };
+        }
+      }
+      throw error;
+    }
   }
 
   public async createPaymentReceipt(
     paymentReceipt: CreatePaymentReceiptParams
   ): Promise<void | UnredeemedGift> {
-    this.log.info("Inserting new payment receipt...", {
+    this.log.debug("Inserting new payment receipt...", {
       paymentReceipt,
     });
 
@@ -371,7 +454,7 @@ export class PostgresDatabase implements Database {
         )[0];
 
         if (destinationUser === undefined) {
-          this.log.info("No existing user was found; creating new user...", {
+          this.log.debug("No existing user was found; creating new user...", {
             userAddress: destination_address,
             newBalance: winston_credit_amount,
             paymentReceipt,
@@ -398,7 +481,7 @@ export class PostgresDatabase implements Database {
             new Winston(winston_credit_amount)
           );
 
-          this.log.info("Incrementing balance...", {
+          this.log.debug("Incrementing balance...", {
             userAddress: destination_address,
             currentBalance,
             newBalance,
@@ -431,7 +514,7 @@ export class PostgresDatabase implements Database {
   public async createBypassedPaymentReceipts(
     paymentReceipts: CreateBypassedPaymentReceiptParams[]
   ): Promise<UnredeemedGift[]> {
-    this.log.info("Inserting new bypassed payment receipts...", {
+    this.log.debug("Inserting new bypassed payment receipts...", {
       paymentReceipts,
     });
     return this.writer.transaction(async (knexTransaction) => {
@@ -502,7 +585,7 @@ export class PostgresDatabase implements Database {
           )[0];
 
           if (destinationUser === undefined) {
-            this.log.info("No existing user was found; creating new user...", {
+            this.log.debug("No existing user was found; creating new user...", {
               userAddress: destinationAddress,
               newBalance: winc.toString(),
             });
@@ -526,7 +609,7 @@ export class PostgresDatabase implements Database {
             );
             const newBalance = currentBalance.plus(winc);
 
-            this.log.info("Incrementing balance...", {
+            this.log.debug("Incrementing balance...", {
               userAddress: destinationAddress,
               currentBalance,
               newBalance,
@@ -637,7 +720,7 @@ export class PostgresDatabase implements Database {
       )[0];
 
       if (destinationUser === undefined) {
-        this.log.info("No existing user was found; creating new user...", {
+        this.log.debug("No existing user was found; creating new user...", {
           userAddress: destinationAddress,
           newBalance: unredeemedGiftDbResult.gifted_winc_amount,
         });
@@ -672,7 +755,7 @@ export class PostgresDatabase implements Database {
           new Winston(unredeemedGiftDbResult.gifted_winc_amount)
         );
 
-        this.log.info("Incrementing balance...", {
+        this.log.debug("Incrementing balance...", {
           userAddress: destinationAddress,
           currentBalance,
           newBalance,
@@ -705,7 +788,7 @@ export class PostgresDatabase implements Database {
 
   public async getPaymentReceipt(
     paymentReceiptId: string,
-    knexTransaction: Knex.Transaction = this.reader as Knex.Transaction
+    knexTransaction: KnexTransaction | Knex = this.reader
   ): Promise<PaymentReceipt> {
     return this.getPaymentReceiptWhere(
       { [columnNames.paymentReceiptId]: paymentReceiptId },
@@ -715,7 +798,7 @@ export class PostgresDatabase implements Database {
 
   private async getPaymentReceiptByTopUpQuoteId(
     topUpQuoteId: string,
-    knexTransaction: Knex.Transaction = this.reader as Knex.Transaction
+    knexTransaction: KnexTransaction = this.reader
   ): Promise<PaymentReceipt> {
     return this.getPaymentReceiptWhere(
       { [columnNames.topUpQuoteId]: topUpQuoteId },
@@ -725,7 +808,7 @@ export class PostgresDatabase implements Database {
 
   private async getPaymentReceiptWhere(
     where: Partial<PaymentReceiptDBResult>,
-    knexTransaction: Knex.Transaction = this.reader as Knex.Transaction
+    knexTransaction: KnexTransaction = this.reader
   ): Promise<PaymentReceipt> {
     const paymentReceiptDbResults =
       await knexTransaction<PaymentReceiptDBResult>(
@@ -745,7 +828,7 @@ export class PostgresDatabase implements Database {
 
   private async getChargebackReceiptWhere(
     where: Partial<ChargebackReceiptDBResult>,
-    knexTransaction: Knex.Transaction = this.reader as Knex.Transaction
+    knexTransaction: KnexTransaction = this.reader
   ): Promise<ChargebackReceipt[]> {
     const chargebackReceiptDbResult =
       await knexTransaction<ChargebackReceiptDBResult>(
@@ -768,7 +851,7 @@ export class PostgresDatabase implements Database {
     chargebackReason,
     chargebackReceiptId,
   }: CreateChargebackReceiptParams): Promise<void> {
-    this.log.info("Inserting new chargeback receipt...", {
+    this.log.debug("Inserting new chargeback receipt...", {
       topUpQuoteId,
     });
 
@@ -876,122 +959,76 @@ export class PostgresDatabase implements Database {
   }
 
   public async reserveBalance({
-    userAddress,
+    signerAddress,
     networkWincAmount,
     reservedWincAmount,
     dataItemId,
     adjustments = [],
-    userAddressType,
+    paidBy = [],
+    paymentDirective = "list-or-signer",
   }: CreateBalanceReservationParams): Promise<void> {
     await this.writer.transaction(async (knexTransaction) => {
-      let user: User;
-      try {
-        user = await this.getUser(userAddress, knexTransaction);
-      } catch (error) {
-        if (error instanceof UserNotFoundWarning) {
-          if (reservedWincAmount.winc.isNonZeroPositiveInteger()) {
-            throw new UserNotFoundWarning(userAddress);
-          }
-          this.log.info(
-            `No user found with address '${userAddress}', but this reservation is free. Creating a new user without balance.`
-          );
-          const userDbInsert: UserDBInsert = {
-            user_address: userAddress,
-            user_address_type: userAddressType,
-            winston_credit_balance: "0",
-          };
-          const dbResult = await knexTransaction<UserDBResult>(tableNames.user)
-            .insert(userDbInsert)
-            .returning("user_creation_date");
-          user = {
-            userAddress,
-            winstonCreditBalance: new Winston("0"),
-            promotionalInfo: {},
-            userAddressType: userAddressType,
-            userCreationDate: dbResult[0].user_creation_date,
-          };
-        } else {
-          throw error; // Re throw the error if it's not a UserNotFoundWarning
-        }
-      }
-
-      const currentWinstonBalance = user.winstonCreditBalance;
-      const newBalance = currentWinstonBalance.minus(reservedWincAmount.winc);
-
-      // throw insufficient balance error if the user would go to a negative balance
-      if (newBalance.isNonZeroNegativeInteger()) {
-        throw new InsufficientBalance(userAddress);
-      }
-
       const reservationId = randomUUID();
+
+      const overflow_spend = await this.useBalanceAndApprovals({
+        changeId: dataItemId,
+        changeReason: "upload",
+        paidBy,
+        knexTransaction,
+        signerAddress,
+        wincAmount: reservedWincAmount.winc,
+        paymentDirective,
+      });
 
       const balanceReservationDbInsert: BalanceReservationDBInsert = {
         reservation_id: reservationId,
         data_item_id: dataItemId,
         reserved_winc_amount: reservedWincAmount.toString(),
         network_winc_amount: networkWincAmount.toString(),
-        user_address: userAddress,
+        user_address: signerAddress,
+        overflow_spend: JSON.stringify(overflow_spend),
       };
-
-      await knexTransaction<BalanceReservationDBResult>(
+      await knexTransaction<BalanceReservationDBInsert>(
         tableNames.balanceReservation
       ).insert(balanceReservationDbInsert);
 
+      const batchUploadAdjustmentInserts: UploadAdjustmentDBInsert[] =
+        adjustments.map(({ adjustmentAmount, catalogId }, index) => ({
+          adjusted_winc_amount: adjustmentAmount.toString(),
+          user_address: signerAddress,
+          catalog_id: catalogId,
+          adjustment_index: index,
+          reservation_id: reservationId,
+        }));
       await knexTransaction.batchInsert(
         tableNames.uploadAdjustment,
-        adjustments.map(({ adjustmentAmount, catalogId }, index) => {
-          const adjustmentDbInsert: UploadAdjustmentDBInsert = {
-            adjusted_winc_amount: adjustmentAmount.toString(),
-            user_address: userAddress,
-            catalog_id: catalogId,
-            adjustment_index: index,
-            reservation_id: reservationId,
-          };
-          return adjustmentDbInsert;
-        })
+        batchUploadAdjustmentInserts
       );
-
-      // TODO: Move this decrement balance onto finalized_reservation once implemented
-      await knexTransaction<UserDBResult>(tableNames.user)
-        .where({
-          user_address: userAddress,
-        })
-        .update({ winston_credit_balance: newBalance.toString() });
-
-      const auditLogInsert: AuditLogInsert = {
-        user_address: userAddress,
-        winston_credit_amount: `-${reservedWincAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
-        change_reason: "upload",
-        change_id: dataItemId,
-      };
-      await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
     });
   }
 
   public async refundBalance(
-    userAddress: string,
+    signerAddress: string,
     winstonCreditAmount: Winston,
-    dataItemId?: TransactionId
+    dataItemId: TransactionId
   ): Promise<void> {
     await this.writer.transaction(async (knexTransaction) => {
-      const user = await this.getUser(userAddress, knexTransaction);
-
-      const currentWinstonBalance = user.winstonCreditBalance;
-      const newBalance = currentWinstonBalance.plus(winstonCreditAmount);
-
-      await knexTransaction<UserDBResult>(tableNames.user)
+      const reservation = await knexTransaction<BalanceReservationDBResult>(
+        tableNames.balanceReservation
+      )
         .where({
-          user_address: userAddress,
+          data_item_id: dataItemId,
         })
-        .update({ winston_credit_balance: newBalance.toString() });
-
-      const auditLogInsert: AuditLogInsert = {
-        user_address: userAddress,
-        winston_credit_amount: winstonCreditAmount.toString(), // a positive value because this amount was incremented to the users balance
-        change_reason: "refund",
-        change_id: dataItemId,
-      };
-      await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+        .orderBy("reserved_date", "desc")
+        .first();
+      await this.refundWincFromOverflowSpend({
+        signerAddress,
+        wincAmount: winstonCreditAmount,
+        changeId: dataItemId,
+        changeReason: "refunded_upload",
+        knexTransaction,
+        overflowSpend: reservation?.overflow_spend,
+      });
     });
   }
 
@@ -1062,7 +1099,7 @@ export class PostgresDatabase implements Database {
   private async checkForSingleUsePromoCodeEligibility(
     userAddress: string,
     catalogId: string,
-    knexTransaction: Knex.Transaction
+    knexTransaction: KnexTransaction
   ): Promise<boolean> {
     const existingAdjustments =
       await knexTransaction<PaymentAdjustmentDBResult>(
@@ -1092,7 +1129,7 @@ export class PostgresDatabase implements Database {
 
   private async checkForNewUsersCodeEligibility(
     userAddress: string,
-    knexTransaction: Knex.Transaction
+    knexTransaction: KnexTransaction
   ): Promise<boolean> {
     const existingPaymentReceipts =
       await knexTransaction<PaymentReceiptDBResult>(
@@ -1113,7 +1150,7 @@ export class PostgresDatabase implements Database {
       max_uses,
       adjustment_end_date,
     }: SingleUseCodePaymentCatalogDBResult,
-    knexTransaction: Knex.Transaction
+    knexTransaction: KnexTransaction
   ): Promise<void> {
     if (adjustment_end_date && new Date() > new Date(adjustment_end_date)) {
       throw new PromoCodeExpired(code_value, adjustment_end_date);
@@ -1198,7 +1235,7 @@ export class PostgresDatabase implements Database {
   }
 
   private insertPaymentAdjustments(
-    knexTransaction: Knex.Transaction,
+    knexTransaction: KnexTransaction,
     adjustments: PaymentAdjustment[],
     userAddress: string,
     paymentId: string
@@ -1224,7 +1261,7 @@ export class PostgresDatabase implements Database {
   public async createPendingTransaction(
     params: CreatePendingTransactionParams
   ): Promise<void> {
-    this.log.info("Inserting new pending transaction...", params);
+    this.log.debug("Inserting new pending transaction...", params);
 
     const {
       destinationAddress,
@@ -1402,14 +1439,14 @@ export class PostgresDatabase implements Database {
     changeReason: "payment" | "gifted_payment" | "crypto_payment";
     changeId: string;
     winstonCreditAmount: Winston;
-    knexTransaction: Knex.Transaction;
+    knexTransaction: KnexTransaction;
   }): Promise<void> {
     try {
       const user = await this.getUser(userAddress, knexTransaction);
       const currentBalance = user.winstonCreditBalance;
       const newBalance = currentBalance.plus(winstonCreditAmount);
 
-      this.log.info("Incrementing balance...", {
+      this.log.debug("Incrementing balance...", {
         userAddress,
         currentBalance,
         newBalance,
@@ -1430,7 +1467,7 @@ export class PostgresDatabase implements Database {
       await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
     } catch (error) {
       if (error instanceof UserNotFoundWarning) {
-        this.log.info(
+        this.log.debug(
           `No user found with address '${userAddress}'. Creating a new user with balance of credited winc amount.`
         );
         const userDbInsert: UserDBInsert = {
@@ -1460,7 +1497,7 @@ export class PostgresDatabase implements Database {
   public async createNewCreditedTransaction(
     params: CreateNewCreditedTransactionParams
   ): Promise<void> {
-    this.log.info("Inserting new credited transaction...", {
+    this.log.debug("Inserting new credited transaction...", {
       params,
     });
 
@@ -1536,5 +1573,1124 @@ export class PostgresDatabase implements Database {
       (acc, { adjusted_winc_amount }) => acc.plus(W(adjusted_winc_amount)),
       W(0)
     );
+  }
+
+  private async getLockedUser(
+    userAddress: string,
+    knexTransaction: KnexTransaction
+  ): Promise<User> {
+    const user = await knexTransaction<UserDBResult>(tableNames.user)
+      .where({
+        user_address: userAddress,
+      })
+      .forUpdate()
+      .first();
+
+    if (!user) {
+      throw new UserNotFoundWarning(userAddress);
+    }
+
+    return userDBMap(user);
+  }
+
+  public async createDelegatedPaymentApproval({
+    approvalDataItemId,
+    approvedAddress,
+    approvedWincAmount,
+    payingAddress,
+    expiresInSeconds,
+  }: CreateDelegatedPaymentApprovalParams): Promise<DelegatedPaymentApproval> {
+    return this.writer.transaction(async (knexTransaction) => {
+      const conflictingApprovals = await Promise.all([
+        knexTransaction<DelegatedPaymentApprovalDBResult>(
+          tableNames.delegatedPaymentApproval
+        ).where({
+          approval_data_item_id: approvalDataItemId,
+        }),
+        knexTransaction<InactiveDelegatedPaymentApprovalDBResult>(
+          tableNames.inactiveDelegatedPaymentApproval
+        ).where({
+          approval_data_item_id: approvalDataItemId,
+        }),
+      ]);
+      if (conflictingApprovals.some((approvals) => approvals.length > 0)) {
+        throw new ConflictingApprovalFound(approvalDataItemId);
+      }
+
+      const user = await this.getLockedUser(payingAddress, knexTransaction);
+      if (user.winstonCreditBalance.isLessThan(approvedWincAmount)) {
+        throw new InsufficientBalance(payingAddress);
+      }
+
+      const delegatedPaymentApprovalDbInsert: DelegatedPaymentApprovalDBInsert =
+        {
+          approval_data_item_id: approvalDataItemId,
+          approved_address: approvedAddress,
+          approved_winc_amount: approvedWincAmount.toString(),
+          paying_address: payingAddress,
+          expiration_date:
+            expiresInSeconds === undefined
+              ? undefined
+              : new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+        };
+
+      const approvalDbResult =
+        await knexTransaction<DelegatedPaymentApprovalDBResult>(
+          tableNames.delegatedPaymentApproval
+        )
+          .insert(delegatedPaymentApprovalDbInsert)
+          .returning("*");
+
+      const newBalance = user.winstonCreditBalance.minus(approvedWincAmount);
+      await knexTransaction<UserDBResult>(tableNames.user)
+        .where({
+          user_address: payingAddress,
+        })
+        .update({ winston_credit_balance: newBalance.toString() });
+
+      const auditLogInsert: AuditLogInsert = {
+        user_address: payingAddress,
+        winston_credit_amount: `-${approvedWincAmount.toString()}`, // negative value because this amount was withdrawn from the users balance
+        change_reason: "delegated_payment_approval",
+        change_id: approvalDataItemId,
+      };
+      await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+
+      return delegatedPaymentApprovalDBMap(approvalDbResult[0]);
+    });
+  }
+
+  public async revokeDelegatedPaymentApprovals({
+    approvedAddress,
+    payingAddress,
+    revokeDataItemId,
+  }: {
+    payingAddress: UserAddress;
+    approvedAddress: UserAddress;
+    revokeDataItemId: DataItemId;
+  }): Promise<InactiveDelegatedPaymentApproval[]> {
+    return this.writer.transaction(async (knexTransaction) => {
+      // TODO: Consider revokes and reserve balance happening at the same time
+      const deletedActiveApprovals =
+        await knexTransaction<DelegatedPaymentApprovalDBResult>(
+          tableNames.delegatedPaymentApproval
+        )
+          .where({
+            approved_address: approvedAddress,
+            paying_address: payingAddress,
+          })
+          .delete()
+          .returning("*");
+
+      const newInactiveApprovals: InactiveDelegatedPaymentApprovalDBResult[] =
+        [];
+      if (deletedActiveApprovals.length > 0) {
+        const newInactiveApprovalInserts: InactiveDelegatedPaymentApprovalDBInsert[] =
+          deletedActiveApprovals.map((a) => ({
+            ...a,
+            inactive_reason: "revoked",
+            revoke_data_item_id: revokeDataItemId,
+          }));
+
+        newInactiveApprovals.push(
+          ...(await knexTransaction
+            .batchInsert<InactiveDelegatedPaymentApprovalDBResult>(
+              tableNames.inactiveDelegatedPaymentApproval,
+              newInactiveApprovalInserts
+            )
+            .returning("*"))
+        );
+
+        const approvedAmount = newInactiveApprovals
+          .map((a) => W(a.approved_winc_amount))
+          .reduce((a, b) => a.plus(b), W(0));
+        const usedAmount = newInactiveApprovals
+          .map((a) => W(a.used_winc_amount))
+          .reduce((a, b) => a.plus(b), W(0));
+        const wincToRefund = approvedAmount.minus(usedAmount);
+
+        const user = await this.getLockedUser(payingAddress, knexTransaction);
+        const newBalance = user.winstonCreditBalance.plus(wincToRefund);
+
+        await knexTransaction<UserDBResult>(tableNames.user)
+          .where({
+            user_address: payingAddress,
+          })
+          .update({ winston_credit_balance: newBalance.toString() });
+
+        const auditLogInsert: AuditLogInsert = {
+          user_address: payingAddress,
+          winston_credit_amount: wincToRefund.toString(),
+          change_reason: "delegated_payment_revoke",
+          change_id: revokeDataItemId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+      }
+
+      // When paying user send a revoke action, set all used approvals to revoked
+      // so that if they are refunded the balance returns to paying user
+      const existingUsedApprovalsMovedToRevoked =
+        await knexTransaction<InactiveDelegatedPaymentApprovalDBResult>(
+          tableNames.inactiveDelegatedPaymentApproval
+        )
+          .where({
+            approved_address: approvedAddress,
+            paying_address: payingAddress,
+            inactive_reason: "used",
+          })
+          .update({
+            inactive_reason: "revoked",
+            revoke_data_item_id: revokeDataItemId,
+          })
+          .returning("*");
+
+      const returnedApprovals = [
+        ...newInactiveApprovals,
+        ...existingUsedApprovalsMovedToRevoked,
+      ];
+      if (returnedApprovals.length === 0) {
+        throw new NoApprovalsFound({ approvedAddress, payingAddress });
+      }
+
+      return returnedApprovals.map(inactiveDelegatedPaymentApprovalDBMap);
+    });
+  }
+
+  public async getAllApprovalsForUserAddress(
+    userAddress: UserAddress,
+    knexTransaction: KnexTransaction = this.reader
+  ): Promise<{
+    givenApprovals: DelegatedPaymentApproval[];
+    receivedApprovals: DelegatedPaymentApproval[];
+  }> {
+    const dbResults = await knexTransaction<DelegatedPaymentApprovalDBResult>(
+      tableNames.delegatedPaymentApproval
+    )
+      .where({
+        approved_address: userAddress,
+      })
+      .or.where({
+        paying_address: userAddress,
+      })
+      .orderBy(this.delegatedPaymentSort());
+
+    const trimmedResults = await this.trimExpiredApprovals(dbResults);
+
+    const givenApprovals: DelegatedPaymentApproval[] = [];
+    const receivedApprovals: DelegatedPaymentApproval[] = [];
+
+    trimmedResults.forEach((approval) => {
+      if (approval.paying_address === userAddress) {
+        givenApprovals.push(delegatedPaymentApprovalDBMap(approval));
+      }
+      if (approval.approved_address === userAddress) {
+        receivedApprovals.push(delegatedPaymentApprovalDBMap(approval));
+      }
+    });
+
+    return { givenApprovals, receivedApprovals };
+  }
+
+  public async getApprovalsFromPayerForAddress(
+    {
+      approvedAddress,
+      payingAddress,
+    }: { payingAddress: UserAddress; approvedAddress: UserAddress },
+    knexTransaction = this.reader
+  ): Promise<DelegatedPaymentApproval[]> {
+    const dbResults = await knexTransaction<DelegatedPaymentApprovalDBResult>(
+      tableNames.delegatedPaymentApproval
+    ).where({
+      paying_address: payingAddress,
+      approved_address: approvedAddress,
+    });
+
+    const trimmedResults = await this.trimExpiredApprovals(dbResults);
+
+    if (trimmedResults.length === 0) {
+      throw new NoApprovalsFound({ approvedAddress, payingAddress });
+    }
+
+    return trimmedResults.map(delegatedPaymentApprovalDBMap);
+  }
+
+  // always sort by:
+  // - if expiration_date exists, sort by expiration_date, the one closest to expiring is first
+  // - if expiration_date does not exist, sort by creation_date, the oldest one is first
+  // - when expiration_date exists, it is always before ones that have expiration_date of null
+  private delegatedPaymentSort() {
+    return [
+      { column: "expiration_date", order: "asc" },
+      { column: "creation_date", order: "asc" },
+    ];
+  }
+
+  private async trimExpiredApprovals(
+    approvals: DelegatedPaymentApprovalDBResult[],
+    knexTransaction: KnexTransaction = this.writer
+  ): Promise<DelegatedPaymentApprovalDBResult[]> {
+    const expiredApprovals: DelegatedPaymentApprovalDBResult[] = [];
+    const trimmedApprovals: DelegatedPaymentApprovalDBResult[] = [];
+
+    const now = new Date();
+
+    for (const approval of approvals) {
+      const { approval_data_item_id, expiration_date } = approval;
+      if (!expiration_date || new Date(expiration_date) > now) {
+        trimmedApprovals.push(approval);
+        continue; // exit early when approval is not expired
+      }
+
+      const deletedApproval = (
+        await knexTransaction<DelegatedPaymentApprovalDBResult>(
+          tableNames.delegatedPaymentApproval
+        )
+          .where({
+            approval_data_item_id,
+          })
+          .delete()
+          .returning("*")
+      )[0];
+      if (deletedApproval) {
+        // If we deleted one, we need to insert it into the inactive table
+        // Otherwise we may have encountered a race condition where another process deleted it
+        const inactiveApprovalInsert: InactiveDelegatedPaymentApprovalDBInsert =
+          {
+            ...deletedApproval,
+            inactive_reason: "expired",
+          };
+        await knexTransaction(
+          tableNames.inactiveDelegatedPaymentApproval
+        ).insert(inactiveApprovalInsert);
+      }
+
+      // Push into expired approvals whether we deleted it or not
+      expiredApprovals.push(approval);
+    }
+
+    if (expiredApprovals.length > 0) {
+      this.log.info("Trimmed expired approvals", {
+        expiredApprovals,
+        trimmedApprovals,
+      });
+
+      // sort into tuples by paying address
+      const sortedApprovals = expiredApprovals.reduce((acc, approval) => {
+        const payingAddress = approval.paying_address;
+        if (!acc[payingAddress]) {
+          acc[payingAddress] = [];
+        }
+        acc[payingAddress].push(approval);
+        return acc;
+      }, {} as Record<UserAddress, DelegatedPaymentApprovalDBResult[]>);
+
+      for (const expiredApprovals of Object.values(sortedApprovals)) {
+        const paying_address = expiredApprovals[0].paying_address;
+        const usedWincAmount = expiredApprovals.reduce(
+          (acc, approval) => acc.plus(W(approval.used_winc_amount)),
+          W(0)
+        );
+        const approvedWincAmount = expiredApprovals.reduce(
+          (acc, approval) => acc.plus(W(approval.approved_winc_amount)),
+          W(0)
+        );
+        const wincToRefund = approvedWincAmount.minus(usedWincAmount);
+
+        const user = await this.getLockedUser(paying_address, knexTransaction);
+        const newBalance = user.winstonCreditBalance.plus(wincToRefund);
+
+        await knexTransaction<UserDBResult>(tableNames.user)
+          .where({
+            user_address: paying_address,
+          })
+          .update({ winston_credit_balance: newBalance.toString() });
+
+        const auditLogInsert: AuditLogInsert = {
+          user_address: paying_address,
+          winston_credit_amount: wincToRefund.toString(),
+          change_reason: "delegated_payment_expired",
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+      }
+    }
+    return trimmedApprovals;
+  }
+
+  private safeGetApprovalsFromPayerForAddress(
+    params: {
+      approvedAddress: UserAddress;
+      payingAddress: UserAddress;
+    },
+    knexTransaction: KnexTransaction
+  ): Promise<DelegatedPaymentApproval[]> {
+    return this.getApprovalsFromPayerForAddress(params, knexTransaction).catch(
+      (error) => {
+        if (error instanceof NoApprovalsFound) {
+          return [];
+        }
+        throw error;
+      }
+    );
+  }
+
+  public async createArNSPurchaseReceipt({
+    nonce,
+    mARIOQty,
+    name,
+    owner,
+    type,
+    wincQty,
+    processId,
+    years,
+    intent,
+    increaseQty,
+    usdArRate,
+    usdArioRate,
+    paidBy,
+  }: ArNSPurchaseParams): Promise<ArNSPurchase> {
+    return this.writer.transaction(async (knexTransaction) => {
+      const overflow_spend = await this.useBalanceAndApprovals({
+        changeId: nonce,
+        changeReason: "arns_purchase_order",
+        knexTransaction,
+        paidBy,
+        signerAddress: owner,
+        wincAmount: wincQty,
+      });
+
+      const pendingArNSPurchaseDbInsert: ArNSPurchaseDBInsert = {
+        nonce,
+        mario_qty: mARIOQty.toString(),
+        intent,
+        increase_qty: increaseQty,
+        name,
+        owner,
+        type,
+        winc_qty: wincQty.toString(),
+        process_id: processId,
+        years,
+        usd_ar_rate: usdArRate,
+        usd_ario_rate: usdArioRate,
+        overflow_spend: JSON.stringify(overflow_spend),
+        paid_by: paidBy.length > 0 ? paidBy.join(",") : undefined,
+      };
+      let receipt: ArNSPurchaseDBResult[];
+      try {
+        receipt = await knexTransaction<ArNSPurchaseDBResult>(
+          tableNames.arNSPurchaseReceipt
+        )
+          .insert(pendingArNSPurchaseDbInsert)
+          .returning("*");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("arns_purchase_receipt_pkey")) {
+          throw new ArNSPurchaseAlreadyExists(name, nonce);
+        }
+        throw e;
+      }
+
+      return arnsPurchaseReceiptDBMap(receipt[0]);
+    });
+  }
+
+  public async updateFailedArNSPurchase(
+    nonce: string,
+    failedReason: string
+  ): Promise<void> {
+    await this.writer.transaction(async (knexTransaction) => {
+      const pendingArNSPurchaseDbResult =
+        await knexTransaction<ArNSPurchaseDBResult>(
+          tableNames.arNSPurchaseReceipt
+        )
+          .where({
+            nonce: nonce,
+          })
+          .del()
+          .returning("*");
+
+      if (pendingArNSPurchaseDbResult.length === 0) {
+        throw new ArNSPurchaseNotFound(nonce);
+      }
+
+      await this.refundWincFromOverflowSpend({
+        overflowSpend: pendingArNSPurchaseDbResult[0]
+          .overflow_spend as unknown as OverflowSpendDBResult,
+        signerAddress: pendingArNSPurchaseDbResult[0].owner,
+        wincAmount: W(pendingArNSPurchaseDbResult[0].winc_qty),
+        knexTransaction,
+        changeId: nonce,
+        changeReason: "arns_purchase_order_failed",
+      });
+
+      const dbInsert: FailedArNSPurchaseDBInsert = {
+        ...pendingArNSPurchaseDbResult[0],
+        failed_reason: failedReason,
+        overflow_spend: pendingArNSPurchaseDbResult[0].overflow_spend
+          ? JSON.stringify(pendingArNSPurchaseDbResult[0].overflow_spend)
+          : undefined,
+      };
+
+      await knexTransaction(tableNames.failedArNSPurchase).insert(dbInsert);
+    });
+  }
+
+  public async getArNSPurchaseStatus(
+    nonce: string,
+    knexTransaction: KnexTransaction = this.reader
+  ): Promise<ArNSPurchaseStatusResult | undefined> {
+    const tables = [
+      tableNames.arNSPurchaseReceipt,
+      tableNames.failedArNSPurchase,
+      tableNames.arNSPurchaseQuote,
+    ];
+
+    try {
+      const result = await Promise.any<
+        | ArNSPurchaseDBResult
+        | FailedArNSPurchaseDBResult
+        | ArNSPurchaseQuoteDBResult
+      >(
+        tables.map(async (tableName) => {
+          const res = await knexTransaction(tableName).where({ nonce }).first();
+
+          return res || Promise.reject(new Error("No results found"));
+        })
+      );
+
+      return arnsPurchaseDBMap(result);
+    } catch (error) {
+      if (error instanceof AggregateError) {
+        return undefined;
+      }
+      throw error;
+    }
+  }
+
+  public async createArNSPurchaseQuote(
+    params: ArNSPurchaseQuoteParams
+  ): Promise<ArNSPurchaseQuote> {
+    return this.writer.transaction(async (knexTransaction) => {
+      const receipt = await knexTransaction<ArNSPurchaseQuoteDBResult>(
+        tableNames.arNSPurchaseQuote
+      )
+        .insert(arnsPurchaseQuoteDBInsertFromParams(params))
+        .returning("*");
+
+      const { adjustments, nonce, owner, currencyType } = params;
+      await knexTransaction.batchInsert(
+        tableNames.paymentAdjustment,
+        adjustments.map(({ adjustmentAmount, catalogId }, index) => {
+          const adjustmentDbInsert: PaymentAdjustmentDBInsert = {
+            adjusted_payment_amount: adjustmentAmount.toString(),
+            adjusted_currency_type: currencyType,
+            user_address: owner,
+            catalog_id: catalogId,
+            adjustment_index: index,
+            top_up_quote_id: nonce,
+          };
+          return adjustmentDbInsert;
+        })
+      );
+
+      return arnsPurchaseQuoteDBMap(receipt[0]);
+    });
+  }
+
+  public async addMessageIdToPurchaseReceipt({
+    messageId,
+    nonce,
+  }: {
+    nonce: string;
+    messageId: string;
+  }): Promise<void> {
+    return this.writer<ArNSPurchaseDBResult>(tableNames.arNSPurchaseReceipt)
+      .where({ nonce })
+      .update({ message_id: messageId });
+  }
+
+  public async getArNSPurchaseQuote(
+    nonce: string
+  ): Promise<{ quote: ArNSPurchaseQuote }> {
+    const result = await this.reader<ArNSPurchaseQuoteDBResult>(
+      tableNames.arNSPurchaseQuote
+    )
+      .where({ nonce })
+      .first();
+
+    if (!result) {
+      throw new ArNSPurchaseNotFound(nonce);
+    }
+
+    return { quote: arnsPurchaseQuoteDBMap(result) };
+  }
+
+  public async updateArNSPurchaseQuoteToFailure(
+    nonce: string,
+    failedReason: string
+  ): Promise<void> {
+    return this.writer.transaction(async (knexTransaction) => {
+      const pendingArNSPurchaseDbResult =
+        await knexTransaction<ArNSPurchaseQuoteDBResult>(
+          tableNames.arNSPurchaseQuote
+        )
+          .where({
+            nonce: nonce,
+          })
+          .del()
+          .returning("*");
+
+      if (pendingArNSPurchaseDbResult.length === 0) {
+        throw new ArNSPurchaseNotFound(nonce);
+      }
+
+      const dbInsert: FailedArNSPurchaseDBInsert = {
+        ...pendingArNSPurchaseDbResult[0],
+        failed_reason: failedReason,
+      };
+
+      await knexTransaction(tableNames.failedArNSPurchase).insert(dbInsert);
+    });
+  }
+
+  public async updateArNSPurchaseQuoteToSuccess({
+    nonce,
+    messageId,
+  }: {
+    nonce: string;
+    messageId: string;
+  }): Promise<void> {
+    return this.writer.transaction(async (knexTransaction) => {
+      const pendingArNSPurchaseDbResult =
+        await knexTransaction<ArNSPurchaseQuoteDBResult>(
+          tableNames.arNSPurchaseQuote
+        )
+          .where({
+            nonce,
+          })
+          .del()
+          .returning("*");
+
+      if (pendingArNSPurchaseDbResult.length === 0) {
+        throw new ArNSPurchaseNotFound(nonce);
+      }
+      const { quote_expiration_date, excess_winc } =
+        pendingArNSPurchaseDbResult[0];
+      if (new Date(quote_expiration_date).getTime() < new Date().getTime()) {
+        await this.updateArNSPurchaseQuoteToFailure(nonce, "expired");
+
+        throw Error(
+          `Quote with nonce ${nonce} has expired. Quote expiration date: ${quote_expiration_date}`
+        );
+      }
+
+      const userAddress = pendingArNSPurchaseDbResult[0].owner;
+      if (excess_winc && excess_winc !== "0") {
+        if (+excess_winc < 0) {
+          throw new Error(
+            `Excess winc cannot be negative. Received: ${excess_winc}`
+          );
+        }
+
+        // Credit the excess winc from the purchase to the user
+        const user = await knexTransaction<UserDBResult>(tableNames.user)
+          .where({
+            user_address: userAddress,
+          })
+          .forUpdate()
+          .first();
+
+        if (user === undefined) {
+          // Create a new user with the excess winc
+          const userDbInsert: UserDBInsert = {
+            user_address: userAddress,
+            user_address_type: "user",
+            winston_credit_balance: excess_winc.toString(),
+          };
+          await knexTransaction<UserDBResult>(tableNames.user).insert(
+            userDbInsert
+          );
+          const auditLogInsert: AuditLogInsert = {
+            user_address: userAddress,
+            winston_credit_amount: excess_winc.toString(),
+            change_reason: "arns_account_creation",
+            change_id: nonce,
+          };
+          await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+        } else {
+          // Update the existing user with the excess winc
+          const newBalance = W(user.winston_credit_balance).plus(
+            W(excess_winc)
+          );
+          await knexTransaction<UserDBResult>(tableNames.user)
+            .where({ user_address: userAddress })
+            .update({ winston_credit_balance: newBalance.toString() });
+          const auditLogInsert: AuditLogInsert = {
+            user_address: userAddress,
+            winston_credit_amount: excess_winc.toString(),
+            change_reason: "arns_purchase_order",
+            change_id: nonce,
+          };
+          await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+        }
+      } else {
+        // Add audit log with 0 credit change to register the payment for arns interaction
+        const auditLogInsert: AuditLogInsert = {
+          user_address: userAddress,
+          winston_credit_amount: "0",
+          change_reason: "arns_purchase_order",
+          change_id: nonce,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+      }
+
+      const dbInsert: ArNSPurchaseDBInsert = {
+        ...pendingArNSPurchaseDbResult[0],
+        message_id: messageId,
+      };
+
+      await knexTransaction<ArNSPurchaseDBResult>(
+        tableNames.arNSPurchaseReceipt
+      ).insert(dbInsert);
+    });
+  }
+
+  private async useBalanceAndApprovals({
+    wincAmount,
+    changeId,
+    changeReason,
+    paidBy,
+    signerAddress,
+    knexTransaction,
+    paymentDirective = "list-or-signer",
+  }: {
+    signerAddress: string;
+    wincAmount: WC;
+    paidBy: UserAddress[];
+    changeId: string;
+    changeReason: "upload" | "arns_purchase_order";
+    knexTransaction: KnexTransaction;
+    paymentDirective?: PaymentDirective;
+  }): Promise<OverflowSpendDBResult | undefined> {
+    // Dedupe paidBy array
+    paidBy = [...new Set(paidBy)];
+
+    // Locks the signing user row and all received approvals
+    const signer = await knexTransaction<UserDBResult>(tableNames.user)
+      .forUpdate()
+      .where({
+        user_address: signerAddress,
+      })
+      .first();
+    const signerBalance = W(signer?.winston_credit_balance ?? 0);
+
+    const pendingSpend: {
+      payingAddress: UserAddress;
+      wincAmount: WC;
+      delegatedApprovals: DelegatedPaymentApproval[];
+    }[] = [];
+
+    if (paidBy.length === 0) {
+      // Always use the signing user to reserve winc when no payers are specified
+      pendingSpend.push({
+        payingAddress: signerAddress,
+        wincAmount,
+        delegatedApprovals: [],
+      });
+    } else {
+      // Lock all received approvals when signer provides paid-by addresses
+      const receivedApprovals = (
+        await knexTransaction<DelegatedPaymentApprovalDBResult>(
+          tableNames.delegatedPaymentApproval
+        )
+          .where({
+            approved_address: signerAddress,
+          })
+          .forUpdate()
+      ).map(delegatedPaymentApprovalDBMap);
+
+      let remainingWincAmount = wincAmount;
+      let signerProvidedAsPaidBy = false;
+
+      for (const payingAddress of paidBy) {
+        if (remainingWincAmount.isZero()) {
+          break;
+        }
+
+        if (payingAddress === signerAddress) {
+          // If signer is provided as a payer, use the signer's balance without needing an approval
+          // Cover the whole remainder if signer has enough balance, else continue to the next payer
+
+          const signerSpendAmount = signerBalance.isGreaterThanOrEqualTo(
+            remainingWincAmount
+          )
+            ? remainingWincAmount
+            : signerBalance;
+
+          remainingWincAmount = remainingWincAmount.minus(signerSpendAmount);
+
+          if (!signerSpendAmount.isZero()) {
+            pendingSpend.push({
+              payingAddress: signerAddress,
+              wincAmount: signerSpendAmount,
+              delegatedApprovals: [],
+            });
+            signerProvidedAsPaidBy = true;
+          }
+
+          continue;
+        }
+
+        const approvalsFromPayer = receivedApprovals.filter(
+          (approval) => approval.payingAddress === payingAddress
+        );
+
+        if (approvalsFromPayer.length === 0) {
+          // If no approvals are found for the payer, skip to the next payer
+          // Client may have out of date info about approvals, no need to throw an error
+          continue;
+        }
+
+        const approvedWincFromPayer =
+          remainingWincAmountFromApprovals(approvalsFromPayer);
+        const allocatedSpendAmount =
+          approvedWincFromPayer.isGreaterThanOrEqualTo(remainingWincAmount)
+            ? remainingWincAmount
+            : approvedWincFromPayer;
+
+        remainingWincAmount = remainingWincAmount.minus(allocatedSpendAmount);
+
+        if (!allocatedSpendAmount.isZero()) {
+          pendingSpend.push({
+            payingAddress,
+            wincAmount: allocatedSpendAmount,
+            delegatedApprovals: approvalsFromPayer,
+          });
+        }
+      }
+
+      // If there is still remaining winc after payers have been exhausted,
+      // check if the signer's balance can cover the remaining amount
+      if (
+        remainingWincAmount.isNonZeroPositiveInteger() &&
+        paymentDirective !== "list-only" && // Opt out of using the user's balance in overflow if the directive is list-only
+        !signerProvidedAsPaidBy // Skip if the signer was already provided as a payer
+      ) {
+        if (signerBalance.isGreaterThanOrEqualTo(remainingWincAmount)) {
+          // When enough balance, use the signing user as the last overflow spender
+          pendingSpend.push({
+            payingAddress: signerAddress,
+            wincAmount: remainingWincAmount,
+            delegatedApprovals: [],
+          });
+          remainingWincAmount = W(0);
+        }
+      }
+
+      if (remainingWincAmount.isNonZeroPositiveInteger()) {
+        // If there is still remaining winc after all payers have been exhausted, throw an insufficient balance error
+        throw new InsufficientBalance(signerAddress);
+      }
+    }
+
+    // If payers are only one, and it is the signer, do not store the overflow spend
+    // If payers are more than one, store the overflow spend
+    // If payer is not the signer, store the overflow spend
+    const overflowSpend =
+      pendingSpend.length > 1 || pendingSpend[0].payingAddress !== signerAddress
+        ? pendingSpend.map(({ payingAddress, wincAmount }) => ({
+            paying_address: payingAddress,
+            winc_amount: wincAmount.toString(),
+          }))
+        : undefined;
+
+    if (wincAmount.isLessThan(W(1))) {
+      return overflowSpend;
+    }
+
+    for (const {
+      payingAddress,
+      wincAmount,
+      delegatedApprovals,
+    } of pendingSpend) {
+      if (payingAddress !== signerAddress) {
+        let remainingWincToCreditToApprovals = wincAmount;
+
+        // Increment used_winc_amount on each approval, marking to "used" if the entire approval was used
+        for (const {
+          approvedWincAmount,
+          usedWincAmount,
+          approvalDataItemId,
+        } of delegatedApprovals) {
+          if (remainingWincToCreditToApprovals.isLessThan(W(1))) {
+            break;
+          }
+
+          const remainingApprovalAmount =
+            approvedWincAmount.minus(usedWincAmount);
+          const wincAmountToSpend =
+            remainingApprovalAmount.isGreaterThanOrEqualTo(
+              remainingWincToCreditToApprovals
+            )
+              ? remainingWincToCreditToApprovals
+              : remainingApprovalAmount;
+
+          remainingWincToCreditToApprovals =
+            remainingWincToCreditToApprovals.minus(wincAmountToSpend);
+
+          const newUsedWincAmount = usedWincAmount.plus(wincAmountToSpend);
+
+          if (newUsedWincAmount.isEqualTo(approvedWincAmount)) {
+            // Move the approval to used if the entire approval was used
+            const approval =
+              await knexTransaction<DelegatedPaymentApprovalDBResult>(
+                tableNames.delegatedPaymentApproval
+              )
+                .where({
+                  approval_data_item_id: approvalDataItemId,
+                })
+                .del()
+                .returning("*");
+            const inactiveApprovalDbInsert: InactiveDelegatedPaymentApprovalDBInsert =
+              {
+                ...approval[0],
+                used_winc_amount: newUsedWincAmount.toString(),
+                inactive_reason: "used",
+              };
+            await knexTransaction<InactiveDelegatedPaymentApprovalDBResult>(
+              tableNames.inactiveDelegatedPaymentApproval
+            ).insert(inactiveApprovalDbInsert);
+          } else {
+            await knexTransaction<DelegatedPaymentApprovalDBResult>(
+              tableNames.delegatedPaymentApproval
+            )
+              .where({
+                approval_data_item_id: approvalDataItemId,
+              })
+              .update({
+                used_winc_amount: newUsedWincAmount.toString(),
+              });
+          }
+        }
+
+        if (remainingWincToCreditToApprovals.isNonZeroPositiveInteger()) {
+          this.log.error(
+            "Remaining winc amount after crediting approvals. Approver did not have enough remaining approved winc to cover winc to spend",
+            {
+              payingAddress,
+              remainingWincToCreditToApprovals,
+            }
+          );
+          throw new InsufficientBalance(payingAddress);
+        }
+
+        const auditLogInsert: AuditLogInsert = {
+          user_address: payingAddress,
+          winston_credit_amount: `-${wincAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
+          change_reason: `approved_${changeReason}`,
+          change_id: changeId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+      } else {
+        // For signer, decrement their balance
+        const newBalance = signerBalance.minus(wincAmount);
+
+        if (newBalance.isNonZeroNegativeInteger()) {
+          throw new InsufficientBalance(payingAddress);
+        }
+
+        await knexTransaction<UserDBResult>(tableNames.user)
+          .where({
+            user_address: payingAddress,
+          })
+          .update({ winston_credit_balance: newBalance.toString() });
+
+        const auditLogInsert: AuditLogInsert = {
+          user_address: payingAddress,
+          winston_credit_amount: `-${wincAmount.toString()}`, // a negative value because this amount was withdrawn from the users balance
+          change_reason: changeReason,
+          change_id: changeId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+      }
+    }
+    return overflowSpend;
+  }
+
+  private async refundWincFromOverflowSpend({
+    knexTransaction,
+    overflowSpend,
+    signerAddress,
+    wincAmount,
+    changeId,
+    changeReason,
+  }: {
+    overflowSpend: OverflowSpendDBResult | undefined;
+    signerAddress: UserAddress;
+    wincAmount: WC;
+    knexTransaction: KnexTransaction;
+    changeId: string;
+    changeReason: AuditChangeReason;
+  }): Promise<void> {
+    const payers: PendingSpend[] = [];
+
+    if (!overflowSpend) {
+      payers.push({
+        paying_address: signerAddress,
+        winc_amount: wincAmount,
+      });
+    } else {
+      for (const {
+        paying_address,
+        winc_amount,
+      } of overflowSpend as unknown as OverflowSpendDBResult) {
+        payers.push({
+          paying_address,
+          winc_amount: W(winc_amount),
+        });
+      }
+    }
+
+    for (const { paying_address, winc_amount } of payers) {
+      if (paying_address !== signerAddress) {
+        let remainingWincToRefundToApprovals = winc_amount;
+        const approvalsFromPayer =
+          await this.safeGetApprovalsFromPayerForAddress(
+            {
+              approvedAddress: signerAddress,
+              payingAddress: paying_address,
+            },
+            knexTransaction
+          );
+        for (const {
+          approvalDataItemId,
+          usedWincAmount,
+        } of approvalsFromPayer) {
+          if (remainingWincToRefundToApprovals.isLessThan(W(1))) {
+            break;
+          }
+
+          if (usedWincAmount.isGreaterThanOrEqualTo(winc_amount)) {
+            const newUsedWincAmount = usedWincAmount.minus(winc_amount);
+            await knexTransaction<DelegatedPaymentApprovalDBResult>(
+              tableNames.delegatedPaymentApproval
+            )
+              .where({
+                approval_data_item_id: approvalDataItemId,
+              })
+              .update({
+                used_winc_amount: newUsedWincAmount.toString(),
+              });
+            remainingWincToRefundToApprovals = W(0);
+          } else {
+            const newUsedWincAmount = W(0);
+            await knexTransaction<DelegatedPaymentApprovalDBResult>(
+              tableNames.delegatedPaymentApproval
+            )
+              .where({
+                approval_data_item_id: approvalDataItemId,
+              })
+              .update({
+                used_winc_amount: newUsedWincAmount.toString(),
+              });
+            remainingWincToRefundToApprovals =
+              remainingWincToRefundToApprovals.minus(usedWincAmount);
+          }
+        }
+
+        // Handle refunding any inactive approvals
+        const inactiveApprovalsFromPayer =
+          await knexTransaction<InactiveDelegatedPaymentApprovalDBResult>(
+            tableNames.inactiveDelegatedPaymentApproval
+          ).where({
+            approved_address: signerAddress,
+            paying_address: paying_address,
+          });
+        for (const {
+          approval_data_item_id,
+          used_winc_amount,
+          inactive_reason,
+          paying_address,
+        } of inactiveApprovalsFromPayer) {
+          if (remainingWincToRefundToApprovals.isLessThan(W(1))) {
+            break;
+          }
+          if (inactive_reason === "expired" || inactive_reason === "revoked") {
+            // Refund the balance to the paying address when the approval is expired or revoked
+            const payer = await this.getLockedUser(
+              paying_address,
+              knexTransaction
+            );
+            const newBalance = payer.winstonCreditBalance.plus(
+              W(used_winc_amount)
+            );
+            await knexTransaction<UserDBResult>(tableNames.user)
+              .where({
+                user_address: paying_address,
+              })
+              .update({ winston_credit_balance: newBalance.toString() });
+            const auditLogInsert: AuditLogInsert = {
+              user_address: paying_address,
+              winston_credit_amount: used_winc_amount,
+              change_reason: `delegated_payment_${
+                inactive_reason === "expired" ? "expired" : "revoke"
+              }`,
+              change_id: changeId,
+            };
+            await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+
+            continue;
+          }
+          const usedWincAmount = W(used_winc_amount);
+          const newUsedWincAmount = usedWincAmount.isGreaterThanOrEqualTo(
+            remainingWincToRefundToApprovals
+          )
+            ? usedWincAmount.minus(remainingWincToRefundToApprovals)
+            : W(0);
+          const res = (
+            await knexTransaction<InactiveDelegatedPaymentApprovalDBResult>(
+              tableNames.inactiveDelegatedPaymentApproval
+            )
+              .where({
+                approval_data_item_id,
+              })
+              .del()
+              .returning("*")
+          )[0];
+
+          const delegatedDbInsert: DelegatedPaymentApprovalDBInsert = {
+            approval_data_item_id: res.approval_data_item_id,
+            approved_address: res.approved_address,
+            paying_address: res.paying_address,
+            approved_winc_amount: res.approved_winc_amount,
+            expiration_date: res.expiration_date,
+            used_winc_amount: newUsedWincAmount.toString(),
+          };
+
+          await knexTransaction<DelegatedPaymentApprovalDBResult>(
+            tableNames.delegatedPaymentApproval
+          ).insert(delegatedDbInsert);
+
+          remainingWincToRefundToApprovals =
+            remainingWincToRefundToApprovals.minus(W(used_winc_amount));
+          // end inactive approvals
+        }
+      } else {
+        // Refund to the signer
+        const user = await this.getLockedUser(paying_address, knexTransaction);
+        const newBalance = user.winstonCreditBalance.plus(winc_amount);
+        await knexTransaction<UserDBResult>(tableNames.user)
+          .where({
+            user_address: paying_address,
+          })
+          .update({ winston_credit_balance: newBalance.toString() });
+        const auditLogInsert: AuditLogInsert = {
+          user_address: paying_address,
+          winston_credit_amount: winc_amount.toString(),
+          change_reason: changeReason,
+          change_id: changeId,
+        };
+        await knexTransaction(tableNames.auditLog).insert(auditLogInsert);
+      }
+    }
   }
 }

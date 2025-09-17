@@ -32,6 +32,7 @@ const wincSubsidizedPercentageParamName =
   "/payment-service/subsidized-winc-percentage";
 const mandrillApiKeySecretName = "mandrill-api-key";
 const slackOathTokenParamName = "slack-oauth-token";
+const arioSigningJWKParamName = "ario-signing-jwk";
 
 export async function loadSecretsToEnv() {
   try {
@@ -74,6 +75,10 @@ export async function loadSecretsToEnv() {
       )
     ).Parameter?.Value;
   };
+
+  process.env.ARIO_SIGNING_JWK ??= await getSecretValueCommand(
+    arioSigningJWKParamName
+  );
 
   process.env.STRIPE_SECRET_KEY ??= await getSecretValueCommand(
     stripeSecretKeyName

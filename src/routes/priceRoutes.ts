@@ -16,8 +16,8 @@
  */
 import { Next } from "koa";
 
-import { isSupportedPaymentToken } from "../gateway";
 import { KoaContext } from "../server";
+import { isSupportedPaymentToken } from "../types";
 import { priceBytesHandler } from "./priceBytes";
 import { priceCryptoHandler } from "./priceCrypto";
 import { priceFiatHandler } from "./priceFiat";

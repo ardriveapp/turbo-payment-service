@@ -29,7 +29,7 @@ export async function ratesHandler(ctx: KoaContext, next: Next) {
     ctx.status = 200;
     ctx.set("Cache-Control", `max-age=${oneMinuteInSeconds}`);
     ctx.body = { ...rates, winc: rates.winc.toString() };
-    logger.info("Successfully calculated rates.", { rates });
+    logger.debug("Successfully calculated rates.", { rates });
   } catch (error) {
     ctx.status = 503;
     ctx.body = "Failed to calculate rates.";
@@ -42,7 +42,7 @@ export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
   const { logger, pricingService } = ctx.state;
   const { currency } = ctx.params;
 
-  logger.info("Fetching raw conversion rate for 1 AR", {
+  logger.debug("Fetching raw conversion rate for 1 AR", {
     currency,
   });
   if (!supportedFiatPaymentCurrencyTypes.includes(currency)) {
@@ -55,7 +55,7 @@ export async function fiatToArRateHandler(ctx: KoaContext, next: Next) {
     const fiatPriceForOneAR = await pricingService.getFiatPriceForOneAR(
       currency
     );
-    logger.info("Successfully fetched raw fiat conversion rate for 1 AR", {
+    logger.debug("Successfully fetched raw fiat conversion rate for 1 AR", {
       currency,
       rate: fiatPriceForOneAR,
     });

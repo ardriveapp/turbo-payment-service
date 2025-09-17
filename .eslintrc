@@ -7,7 +7,7 @@
   "plugins": ["@typescript-eslint", "header"],
   "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
   "rules": {
-    "no-console": 1,
+    "no-console": "error",
     "no-unused-vars": "off",
     "@typescript-eslint/no-floating-promises": "error",
     "@typescript-eslint/no-misused-promises": "error",

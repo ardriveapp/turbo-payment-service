@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { ARIOToken, mARIOToken } from "@ar.io/sdk";
 import Arweave from "arweave/node/common";
 import axiosPackage from "axios";
 import BigNumber from "bignumber.js";
@@ -31,7 +32,9 @@ import {
 } from "../src/constants";
 import { tableNames } from "../src/database/dbConstants";
 import {
+  ArNSPurchaseDBResult,
   ChargebackReceiptDBResult,
+  DelegatedPaymentApproval,
   PaymentReceiptDBInsert,
   PaymentReceiptDBResult,
   RedeemedGiftDBResult,
@@ -44,7 +47,8 @@ import {
   UploadAdjustmentCatalogDBResult,
   UploadAdjustmentDBInsert,
   UserDBResult,
-} from "../src/database/dbTypes.js";
+  userAddressTypes,
+} from "../src/database/dbTypes";
 import { PaymentTransactionNotFound } from "../src/database/errors";
 import logger from "../src/logger";
 import {
@@ -63,8 +67,16 @@ import { supportedFiatPaymentCurrencyTypes } from "../src/types/supportedCurrenc
 import { W, Winston } from "../src/types/winston";
 import { filterKeysFromObject } from "../src/utils/common";
 import { arweaveRSAModulusToAddress } from "../src/utils/jwkUtils";
-import { signedRequestHeadersFromJwk } from "../tests/helpers/signData";
-import { oneHourAgo, oneHourFromNow } from "./dbTestHelper";
+import {
+  signedRequestHeadersFromEthWallet,
+  signedRequestHeadersFromJwk,
+} from "../tests/helpers/signData";
+import {
+  oneHourAgo,
+  oneHourFromNow,
+  randomCharString,
+  stubArweaveUserAddress,
+} from "./dbTestHelper";
 import {
   chargeDisputeStub,
   checkoutSessionStub,
@@ -89,7 +101,8 @@ import {
   pricingService,
   stripe,
   testAddress,
-  testWallet,
+  testArweaveWallet,
+  testEthereumWallet,
 } from "./helpers/testHelpers";
 
 describe("Router tests", () => {
@@ -102,6 +115,12 @@ describe("Router tests", () => {
 
   const routerTestPromoCode = "routerTestPromoCode";
   const routerTestPromoCodeCatalogId = "routerTestPromoCodeCatalogId";
+
+  const authHeaders = {
+    headers: {
+      Authorization: `Bearer ${sign({}, TEST_PRIVATE_ROUTE_SECRET)}`,
+    },
+  } as const;
 
   beforeEach(() => {
     stub(coinGeckoOracle, "getFiatPricesForOneToken").resolves(
@@ -173,6 +192,7 @@ describe("Router tests", () => {
     stub(pricingService, "getWCForBytes").resolves({
       finalPrice: new FinalPrice(wincTotal),
       networkPrice: new NetworkPrice(wincTotal),
+      deprecatedChunkBasedNetworkPrice: new NetworkPrice(wincTotal),
       adjustments: [],
     });
 
@@ -190,6 +210,7 @@ describe("Router tests", () => {
     stub(pricingService, "getWCForBytes").resolves({
       finalPrice: new FinalPrice(wincTotal),
       networkPrice: new NetworkPrice(wincTotal),
+      deprecatedChunkBasedNetworkPrice: new NetworkPrice(wincTotal),
       adjustments: [],
     });
 
@@ -279,19 +300,19 @@ describe("Router tests", () => {
     expect(data).to.deep.equal({
       // No Infra Fee
       fiat: {
-        aud: 8.888074843239,
-        brl: 29.787061636803,
-        cad: 8.055890229538,
-        eur: 5.48212338304,
-        gbp: 4.770047888842,
-        hkd: 47.177146296308,
-        inr: 493.502634370348,
-        jpy: 809.295247212831,
-        sgd: 7.987256446965,
-        usd: 6.022614420805,
+        aud: 0.888807484328,
+        brl: 2.978706163694,
+        cad: 0.805589022957,
+        eur: 0.548212338306,
+        gbp: 0.477004788886,
+        hkd: 4.717714629652,
+        inr: 49.350263437264,
+        jpy: 80.92952472166,
+        sgd: 0.7987256447,
+        usd: 0.602261442083,
       },
       // No Subsidy
-      winc: "857922282166",
+      winc: "85792228217",
       adjustments: [],
     });
     clock.restore();
@@ -308,23 +329,8 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(data).to.deep.equal({
-      // No Subsidy
-      fiat: {
-        aud: 11.110093554049,
-        brl: 37.233827046004,
-        cad: 10.069862786923,
-        eur: 6.8526542288,
-        gbp: 5.962559861053,
-        hkd: 58.971432870385,
-        inr: 616.878292962935,
-        jpy: 1011.619059016038,
-        sgd: 9.984070558706,
-        usd: 7.528268026006,
-      },
-      winc: "857922282166",
-      adjustments: [],
-    });
+    expect(data.winc).to.equal("85792228217");
+    expect(data.fiat.usd).to.equal(0.752826802604);
     clock.restore();
   });
 
@@ -340,23 +346,11 @@ describe("Router tests", () => {
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
 
-    expect(data.fiat).to.deep.equal({
-      // 23.4% Infra Fee applied
-      aud: 6.381776976212,
-      brl: 21.387576893252,
-      cad: 5.78425538674,
-      eur: 3.936250470849,
-      gbp: 3.424969110785,
-      hkd: 33.873930108293,
-      inr: 354.34262258945,
-      jpy: 581.086665752968,
-      sgd: 5.73497525565,
-      usd: 4.324331503186,
-    });
+    expect(data.fiat.usd).to.equal(0.432433150317);
 
     // 45% Subsidy Event applied
-    expect(data.winc).to.equal("471857255191");
-    expect(data.adjustments[0].adjustmentAmount).to.equal("-386065026975");
+    expect(data.winc).to.equal("47185725519");
+    expect(data.adjustments[0].adjustmentAmount).to.equal("-38606502698");
     clock.restore();
   });
 
@@ -424,7 +418,7 @@ describe("Router tests", () => {
         validateStatus: () => true,
       })
       .get(`/v1/price/USD/123?promoCode=${routerTestPromoCode}`, {
-        headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+        headers: await signedRequestHeadersFromJwk(testArweaveWallet, "123"),
       });
 
     expect(status).to.equal(200);
@@ -523,7 +517,7 @@ describe("Router tests", () => {
       .get(
         `/v1/price/USD/1234?promoCode=${routerTestPromoCode}&promoCode=${routerTestPromoCode}`,
         {
-          headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+          headers: await signedRequestHeadersFromJwk(testArweaveWallet, "123"),
         }
       );
 
@@ -572,7 +566,7 @@ describe("Router tests", () => {
         validateStatus: () => true,
       })
       .get(`/v1/price/USD/100?promoCode=fakeCodeLOL`, {
-        headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+        headers: await signedRequestHeadersFromJwk(testArweaveWallet, "123"),
       });
 
     expect(data).to.equal("No promo code found with code 'fakeCodeLOL'");
@@ -658,7 +652,7 @@ describe("Router tests", () => {
 
   it("GET /balance returns 200 for correct signature", async () => {
     const { status, statusText, data } = await axios.get(`/v1/balance`, {
-      headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+      headers: await signedRequestHeadersFromJwk(testArweaveWallet, "123"),
     });
 
     const balance = Number(data.winc);
@@ -667,6 +661,48 @@ describe("Router tests", () => {
     expect(statusText).to.equal("OK");
 
     expect(balance).to.equal(5000000);
+  });
+
+  it("GET /balance returns 200 and all approvals for a user with given and received delegated payment approvals", async () => {
+    const userAddress =
+      "Unique User -- Get Balance With Delegated Payment Approvals";
+
+    await dbTestHelper.insertStubUser({
+      user_address: userAddress,
+      winston_credit_balance: "1000",
+    });
+
+    await dbTestHelper.db.createDelegatedPaymentApproval({
+      payingAddress: userAddress,
+      approvedAddress: randomCharString(),
+      approvedWincAmount: W("500"), // Gives approval for 500 winston
+      approvalDataItemId: randomCharString(),
+    });
+    const payingAddress = randomCharString();
+    await dbTestHelper.insertStubUser({
+      user_address: payingAddress,
+      winston_credit_balance: "1000",
+    });
+    await dbTestHelper.db.createDelegatedPaymentApproval({
+      payingAddress,
+      approvedAddress: userAddress,
+      approvedWincAmount: W("750"), // Receives approval for 750 winston
+      approvalDataItemId: randomCharString(),
+    });
+
+    const { status, statusText, data } = await axios.get(
+      `/v1/balance?address=${userAddress}`
+    );
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+
+    expect(data.controlledWinc).to.equal("1000");
+    expect(data.winc).to.equal("500"); // 1000 - 500
+    expect(data.effectiveBalance).to.equal("1250"); // 500 + 750
+
+    expect(data.givenApprovals.length).to.equal(1);
+    expect(data.receivedApprovals.length).to.equal(1);
   });
 
   it("GET /balance returns 404 for no user found", async function () {
@@ -686,7 +722,7 @@ describe("Router tests", () => {
   it("GET /balance returns 403 for bad signature", async () => {
     const { status, data, statusText } = await axios.get(`/v1/balance`, {
       headers: {
-        ...(await signedRequestHeadersFromJwk(testWallet, "123")),
+        ...(await signedRequestHeadersFromJwk(testArweaveWallet, "123")),
         "x-nonce": "a fake different nonce that will not match",
       },
     });
@@ -700,7 +736,7 @@ describe("Router tests", () => {
   it("GET /balance returns 503 when the database cannot be reached", async () => {
     stub(paymentDatabase, "getBalance").throws(Error("Whoops!"));
     const { status, data, statusText } = await axios.get(`/v1/balance`, {
-      headers: await signedRequestHeadersFromJwk(testWallet),
+      headers: await signedRequestHeadersFromJwk(testArweaveWallet),
     });
 
     expect(status).to.equal(503);
@@ -731,7 +767,7 @@ describe("Router tests", () => {
     const { object, payment_method_types, amount_total, url } = paymentSession;
 
     expect(object).to.equal("checkout.session");
-    expect(payment_method_types).to.deep.equal(["card"]);
+    expect(payment_method_types).to.deep.equal(["card", "crypto"]);
     expect(amount_total).to.equal(amount);
     expect(url).to.be.a.string;
 
@@ -835,7 +871,7 @@ describe("Router tests", () => {
       data.paymentSession;
 
     expect(object).to.equal("checkout.session");
-    expect(payment_method_types).to.deep.equal(["card"]);
+    expect(payment_method_types).to.deep.equal(["card", "crypto"]);
     expect(amount_total).to.equal(amount);
     expect(url).to.be.a.string;
     checkoutStub.restore();
@@ -926,7 +962,7 @@ describe("Router tests", () => {
       .get(
         `/v1/top-up/payment-intent/${testAddress}/usd/${topUpAmount}?promoCode=${routerTestPromoCode}`,
         {
-          headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+          headers: await signedRequestHeadersFromJwk(testArweaveWallet, "123"),
         }
       );
 
@@ -1000,7 +1036,7 @@ describe("Router tests", () => {
       .get(
         `/v1/top-up/payment-intent/${testAddress}/usd/1000?promoCode=fakeCodeLOL`,
         {
-          headers: await signedRequestHeadersFromJwk(testWallet, "123"),
+          headers: await signedRequestHeadersFromJwk(testArweaveWallet, "123"),
         }
       );
 
@@ -1224,8 +1260,9 @@ describe("Router tests", () => {
   });
 
   const testAddresses = [
+    // cspell:disable
     ["arweave", "ArweaveAddress43CharactersLong1234567890123"],
-    ["solana", "SolanaAddress44CharactersLong123456789012345"],
+    ["solana", "AHpBdKdA9jjg2TkhXg3muAUJmAKgYnatvCoTRjxs1PT"], // cspell:enable
     ["ethereum", "0x1234567890123456789012345678901234567890"],
   ];
 
@@ -1239,24 +1276,18 @@ describe("Router tests", () => {
 
     it(`GET /reserve-balance returns 200 for correct ${token} params`, async () => {
       const byteCount = 1;
-      const authToken = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-        expiresIn: "1h",
-      });
 
       const adjustedWincTotal = new Winston("100");
       stub(pricingService, "getWCForBytes").resolves({
         finalPrice: new FinalPrice(adjustedWincTotal),
         networkPrice: new NetworkPrice(adjustedWincTotal),
+        deprecatedChunkBasedNetworkPrice: new NetworkPrice(adjustedWincTotal),
         adjustments: [],
       });
 
       const { status, statusText, data } = await axios.get(
         `/v1/reserve-balance/${token}/${address}?byteCount=${byteCount}&dataItemId=${stubTxId2}`,
-        {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        }
+        authHeaders
       );
       expect(statusText).to.equal("Balance reserved");
       expect(status).to.equal(200);
@@ -1285,7 +1316,7 @@ describe("Router tests", () => {
         data.paymentSession;
 
       expect(object).to.equal("checkout.session");
-      expect(payment_method_types).to.deep.equal(["card"]);
+      expect(payment_method_types).to.deep.equal(["card", "crypto"]);
       expect(amount_total).to.equal(amount);
       expect(url).to.be.a.string;
       checkoutStub.restore();
@@ -1388,24 +1419,18 @@ describe("Router tests", () => {
     });
 
     const byteCount = 1;
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
 
     const adjustedWincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
       finalPrice: new FinalPrice(adjustedWincTotal),
       networkPrice: new NetworkPrice(adjustedWincTotal),
+      deprecatedChunkBasedNetworkPrice: new NetworkPrice(adjustedWincTotal),
       adjustments: [],
     });
 
     const { status, statusText, data } = await axios.get(
-      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId2}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/reserve-balance/arweave/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId2}`,
+      authHeaders
     );
     expect(statusText).to.equal("Balance reserved");
     expect(status).to.equal(200);
@@ -1416,32 +1441,28 @@ describe("Router tests", () => {
     const byteCount = 1000;
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`
+      `/v1/reserve-balance/arweave/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`
     );
-    expect(statusText).to.equal("Unauthorized");
+    expect(statusText).to.equal(
+      "No authorization or user provided for authorized route!"
+    );
     expect(status).to.equal(401);
   });
 
   it("GET /reserve-balance returns 200 when within the PDS Free subsidy event threshold and limitation", async () => {
     const byteCount = 100000;
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
 
     const adjustedWincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
       finalPrice: new FinalPrice(adjustedWincTotal),
       networkPrice: new NetworkPrice(adjustedWincTotal),
+      deprecatedChunkBasedNetworkPrice: new NetworkPrice(adjustedWincTotal),
       adjustments: [],
     });
 
     const { status, statusText, data } = await axios.get(
-      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/reserve-balance/arweave/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
+      authHeaders
     );
     expect(statusText).to.equal("Balance reserved");
     expect(status).to.equal(200);
@@ -1466,18 +1487,11 @@ describe("Router tests", () => {
       stubUploadAdjustment
     );
 
-    const byteCount = 10000;
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
+    const byteCount = 100000000;
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/reserve-balance/arweave/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
+      authHeaders
     );
     expect(statusText).to.equal("Insufficient balance");
     expect(status).to.equal(402);
@@ -1485,68 +1499,47 @@ describe("Router tests", () => {
 
   it("GET /reserve-balance returns 402 for insufficient balance when byte count is above PDS Free Subsidy Event threshold", async () => {
     const byteCount = 600000;
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
 
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/reserve-balance/arweave/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
+      authHeaders
     );
     expect(statusText).to.equal("Insufficient balance");
     expect(status).to.equal(402);
   });
 
-  it("GET /reserve-balance returns 404 if user not found", async () => {
+  it("GET /reserve-balance returns 402 if user not found", async () => {
     const testAddress = "TotallyUniqueUserForThisReserveBalanceTest2";
     const byteCount = 10000000;
 
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
-
     const { status, statusText } = await axios.get(
-      `/v1/reserve-balance/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/reserve-balance/arweave/${testAddress}?byteCount=${byteCount}&dataItemId=${stubTxId1}`,
+      authHeaders
     );
-    expect(statusText).to.equal("User not found");
-    expect(status).to.equal(404);
+    expect(statusText).to.equal("Insufficient balance");
+    expect(status).to.equal(402);
   });
 
   it("GET /check-balance returns 200 for correct params", async () => {
-    const testAddress = "a unique new stub address";
+    const testAddress = randomCharString();
     await dbTestHelper.insertStubUser({
       user_address: testAddress,
       winston_credit_balance: "1000000000",
     });
 
     const byteCount = 1024 * 1024; // 1 MiB
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
 
     const adjustedWincTotal = new Winston("100");
     stub(pricingService, "getWCForBytes").resolves({
       finalPrice: new FinalPrice(adjustedWincTotal),
       networkPrice: new NetworkPrice(adjustedWincTotal),
+      deprecatedChunkBasedNetworkPrice: new NetworkPrice(adjustedWincTotal),
       adjustments: [],
     });
 
     const { status, statusText, data } = await axios.get(
-      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/check-balance/arweave/${testAddress}?byteCount=${byteCount}`,
+      authHeaders
     );
     expect(statusText).to.equal("User has sufficient balance");
     expect(status).to.equal(200);
@@ -1562,7 +1555,7 @@ describe("Router tests", () => {
     const byteCount = 1000;
 
     const { status, statusText } = await axios.get(
-      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`
+      `/v1/check-balance/arweave/${testAddress}?byteCount=${byteCount}`
     );
     expect(statusText).to.equal("Unauthorized");
     expect(status).to.equal(401);
@@ -1570,75 +1563,113 @@ describe("Router tests", () => {
 
   it("GET /check-balance returns 402 for insufficient balance", async () => {
     const byteCount = 10000000;
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
 
     const { status, statusText } = await axios.get(
-      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/check-balance/arweave/${testAddress}?byteCount=${byteCount}`,
+      authHeaders
     );
     expect(statusText).to.equal("Insufficient balance");
     expect(status).to.equal(402);
   });
 
   it("GET /check-balance returns 404 if user not found and above PDS Subsidy event threshold", async () => {
-    const testAddress = "someRandomAddress";
     const byteCount = 1024 * 1024 * 100;
 
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
-
     const { status, statusText } = await axios.get(
-      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/check-balance/arweave/${randomCharString()}?byteCount=${byteCount}`,
+      authHeaders
     );
     expect(statusText).to.equal("User not found");
     expect(status).to.equal(404);
   });
 
   it("GET /check-balance returns 200 if user not found and below PDS Subsidy event threshold", async () => {
-    const testAddress = "someRandomAddress";
     const byteCount = 1024 * 4; // 4 KiB
 
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
-
     const { status, statusText } = await axios.get(
-      `/v1/check-balance/${testAddress}?byteCount=${byteCount}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/check-balance/arweave/${testAddress}?byteCount=${byteCount}`,
+      authHeaders
     );
     expect(status).to.equal(200);
     expect(statusText).to.equal("User has sufficient balance");
   });
 
-  it("GET /refund-balance returns 200 for correct params", async () => {
-    const winstonCredits = 1000;
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
+  describe("GET /check-balance with multiple payers in paidBy query params", () => {
+    const signerAddress = randomCharString();
+    const payer1Address = randomCharString();
+    const payer2Address = randomCharString();
+
+    before(async () => {
+      await dbTestHelper.insertStubUser({
+        user_address: signerAddress,
+        winston_credit_balance: "100",
+      });
+      await dbTestHelper.createStubDelegatedPaymentApproval({
+        approved_address: signerAddress,
+        paying_address: payer1Address,
+        approved_winc_amount: "25",
+      });
+      await dbTestHelper.createStubDelegatedPaymentApproval({
+        approved_address: signerAddress,
+        paying_address: payer2Address,
+        approved_winc_amount: "25",
+      });
     });
 
+    it("returns 200 for an affordable winc amounts", async () => {
+      const adjustedWincTotal = new Winston("100");
+      stub(pricingService, "getWCForBytes").resolves({
+        finalPrice: new FinalPrice(adjustedWincTotal),
+        networkPrice: new NetworkPrice(adjustedWincTotal),
+        deprecatedChunkBasedNetworkPrice: new NetworkPrice(adjustedWincTotal),
+        adjustments: [],
+      });
+
+      const { data, status, statusText } = await axios.get(
+        `/v1/check-balance/arweave/${signerAddress}?byteCount=1000&paidBy=${payer1Address},${payer2Address}`,
+        authHeaders
+      );
+
+      expect(statusText).to.equal("User has sufficient balance");
+      expect(status).to.equal(200);
+      expect(data).to.deep.equal({
+        userHasSufficientBalance: true,
+        bytesCostInWinc: "100",
+        userBalanceInWinc: "150",
+        adjustments: [],
+      });
+    });
+
+    it("returns 402 when neither the provided payers nor the signer can satisfy the entire winc amount", async () => {
+      const adjustedWincTotal = new Winston("1000");
+      stub(pricingService, "getWCForBytes").resolves({
+        finalPrice: new FinalPrice(adjustedWincTotal),
+        networkPrice: new NetworkPrice(adjustedWincTotal),
+        deprecatedChunkBasedNetworkPrice: new NetworkPrice(adjustedWincTotal),
+        adjustments: [],
+      });
+
+      const { data, status, statusText } = await axios.get(
+        `/v1/check-balance/arweave/${signerAddress}?byteCount=1000&paidBy=${payer1Address},${payer2Address}`,
+        authHeaders
+      );
+
+      expect(statusText).to.equal("Insufficient balance");
+      expect(status).to.equal(402);
+      expect(data).to.deep.equal({
+        userHasSufficientBalance: false,
+        bytesCostInWinc: adjustedWincTotal.toString(),
+        userBalanceInWinc: "150",
+      });
+    });
+  });
+
+  it("GET /refund-balance returns 200 for correct params", async () => {
+    const winstonCredits = 1000;
+
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/refund-balance/arweave/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${randomCharString()}`,
+      authHeaders
     );
     expect(statusText).to.equal("Balance refunded");
     expect(status).to.equal(200);
@@ -1648,26 +1679,20 @@ describe("Router tests", () => {
     const winstonCredits = 1000;
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`
+      `/v1/refund-balance/arweave/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`
     );
     expect(statusText).to.equal("Unauthorized");
     expect(status).to.equal(401);
   });
 
   it("GET /refund-balance returns 404 if user not found", async () => {
-    const testAddress = "someRandomAddress";
+    const testAddress = randomCharString();
+    const dataItemId = randomCharString();
     const winstonCredits = 100000;
-    const token = sign({}, TEST_PRIVATE_ROUTE_SECRET, {
-      expiresIn: "1h",
-    });
 
     const { status, statusText } = await axios.get(
-      `/v1/refund-balance/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${stubTxId1}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
+      `/v1/refund-balance/arweave/${testAddress}?winstonCredits=${winstonCredits}&dataItemId=${dataItemId}`,
+      authHeaders
     );
 
     expect(statusText).to.equal("User not found");
@@ -1810,6 +1835,7 @@ describe("Router tests", () => {
       id: paymentReceivedEventId,
       metadata: {
         topUpQuoteId: paymentSuccessTopUpQuoteId,
+        winstonCreditAmount: "500",
       },
       amount: 100,
       currency: "usd",
@@ -1887,6 +1913,7 @@ describe("Router tests", () => {
       id: paymentReceivedEventId,
       metadata: {
         topUpQuoteId: paymentSuccessTopUpQuoteId,
+        winstonCreditAmount: "500",
       },
       amount: 100,
       currency: "usd",
@@ -1974,6 +2001,106 @@ describe("Router tests", () => {
     expect(status).to.equal(400);
     expect(statusText).to.equal("Bad Request");
     expect(data).to.equal("Webhook Error!");
+  });
+
+  it("POST /stripe-webhook returns 200 for a valid stripe payment event from an ArNS Purchase Quote", async () => {
+    const paymentReceivedEventId = "A Payment Receipt Id";
+    const paymentReceivedUserAddress = "User Address Stubbed";
+    const paymentStubNonce = "0x0987654321";
+    const testName = "testName90000";
+
+    await dbTestHelper.insertStubUser({
+      user_address: paymentReceivedUserAddress,
+      winston_credit_balance: "0",
+    });
+
+    await dbTestHelper.insertStubArNSQuote({
+      nonce: paymentStubNonce,
+      name: testName,
+      intent: "Buy-Name",
+      type: "permabuy",
+      payment_amount: "100",
+      quoted_payment_amount: "100",
+      owner: paymentReceivedUserAddress,
+    });
+
+    const successStub = paymentIntentStub({
+      id: paymentReceivedEventId,
+      metadata: {
+        nonce: paymentStubNonce,
+      },
+      amount: 100,
+      currency: "usd",
+    });
+
+    stub(gatewayMap.ario, "initiateArNSPurchase").resolves({ id: "0" });
+    const stubEvent = stripeStubEvent({
+      type: "payment_intent.succeeded",
+      eventObject: successStub,
+    });
+    const webhookStub = stub(stripe.webhooks, "constructEvent").returns(
+      stubEvent
+    );
+
+    const { status, statusText, data } = await axios.post(`/v1/stripe-webhook`);
+
+    expect(status).to.equal(200);
+    expect(statusText).to.equal("OK");
+    expect(data).to.equal("OK");
+
+    // wait a few seconds for the database to update since we return the response right away
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    expect(webhookStub.calledOnce).to.equal(true);
+
+    const arnsReceipt = await paymentDatabase["reader"]<ArNSPurchaseDBResult>(
+      tableNames.arNSPurchaseReceipt
+    ).where({
+      nonce: paymentStubNonce,
+    });
+
+    expect(arnsReceipt.length).to.equal(1);
+    const {
+      payment_amount,
+      quoted_payment_amount,
+      created_date,
+      intent,
+      mario_qty,
+      name,
+      nonce,
+      owner,
+      usd_ar_rate,
+      usd_ario_rate,
+      winc_qty,
+      currency_type,
+      increase_qty,
+      payment_provider,
+      process_id,
+      quote_creation_date,
+      quote_expiration_date,
+      type,
+      years,
+    } = arnsReceipt[0];
+
+    expect(payment_amount).to.equal(100);
+    expect(quoted_payment_amount).to.equal(100);
+    expect(currency_type).to.equal("usd");
+    expect(payment_provider).to.equal("stripe");
+    expect(name).to.equal(testName);
+    expect(owner).to.equal(paymentReceivedUserAddress);
+    expect(nonce).to.equal(paymentStubNonce);
+    expect(intent).to.equal("Buy-Name");
+    expect(type).to.equal("permabuy");
+    expect(usd_ar_rate).to.equal("1.00");
+    expect(usd_ario_rate).to.equal("1.00");
+    expect(winc_qty).to.equal("1337");
+    expect(mario_qty).to.equal("1337");
+    expect(years).to.equal(null);
+    expect(increase_qty).to.equal(null);
+    expect(process_id).to.equal(stubTxId1);
+    expect(quote_creation_date).to.exist;
+    expect(quote_expiration_date).to.exist;
+    expect(created_date).to.exist;
   });
 
   it("GET /rates returns 503 if unable to fetch prices", async () => {
@@ -2193,12 +2320,17 @@ describe("Router tests", () => {
 
     expect(status).to.equal(200);
     expect(statusText).to.equal("OK");
-    expect(data).to.deep.equal({ winc: "1000000000", balance: "1000000000" });
+    expect(data).to.deep.equal({
+      winc: "1000000000",
+      balance: "1000000000",
+      effectiveBalance: "1000000000",
+      controlledWinc: "1000000000",
+      givenApprovals: [],
+      receivedApprovals: [],
+    });
   });
 
-  const tokens = ["arweave", "ethereum", "solana", "kyve", "matic"] as const;
-
-  for (const token of tokens) {
+  for (const token of userAddressTypes) {
     it(`GET /account/balance/${token} returns 200 for valid params`, async () => {
       const testAddress = "a stub address for token test" + token;
       await dbTestHelper.insertStubUser({
@@ -2213,7 +2345,14 @@ describe("Router tests", () => {
 
       expect(status).to.equal(200);
       expect(statusText).to.equal("OK");
-      expect(data).to.deep.equal({ winc: "1337", balance: "1337" });
+      expect(data).to.deep.equal({
+        winc: "1337",
+        balance: "1337",
+        effectiveBalance: "1337",
+        controlledWinc: "1337",
+        givenApprovals: [],
+        receivedApprovals: [],
+      });
     });
 
     it(`GET /account/balance/${token} returns 400 for missing address`, async () => {
@@ -2275,7 +2414,8 @@ describe("Router tests", () => {
         }
       );
 
-      const turboInfraFeeMagnitude = 0.766;
+      const turboInfraFeeMagnitude =
+        token === "ario" ? 1 : token === "kyve" ? 0.5 : 0.766;
       const ratio =
         expectedTokenPrices[tokenNameToCoinGeckoTokenName[token]].usd /
         expectedTokenPrices.arweave.usd;
@@ -2292,17 +2432,22 @@ describe("Router tests", () => {
       expect(statusText).to.equal("OK");
       expect(data).to.deep.equal({
         creditedTransaction: {
-          adjustments: [
-            {
-              adjustmentAmount: infraFeeReducedWc.valueOf(),
-              currencyType: token,
-              description:
-                "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
-              name: "Turbo Infrastructure Fee",
-              operator: "multiply",
-              operatorMagnitude: 0.766,
-            },
-          ],
+          adjustments:
+            token === "ario"
+              ? []
+              : [
+                  {
+                    adjustmentAmount: infraFeeReducedWc.valueOf(),
+                    currencyType: token,
+                    description:
+                      "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+                    name:
+                      (token === "kyve" ? "Kyve " : "") +
+                      "Turbo Infrastructure Fee",
+                    operator: "multiply",
+                    operatorMagnitude: turboInfraFeeMagnitude,
+                  },
+                ],
           blockHeight: 1,
           destinationAddress: transactionSenderAddress,
           destinationAddressType: token,
@@ -2338,7 +2483,8 @@ describe("Router tests", () => {
         }
       );
 
-      const turboInfraFeeMagnitude = 0.766;
+      const turboInfraFeeMagnitude =
+        token === "ario" ? 1 : token === "kyve" ? 0.5 : 0.766;
       const ratio =
         expectedTokenPrices[tokenNameToCoinGeckoTokenName[token]].usd /
         expectedTokenPrices.arweave.usd;
@@ -2355,17 +2501,22 @@ describe("Router tests", () => {
       expect(statusText).to.equal("Accepted");
       expect(data).to.deep.equal({
         pendingTransaction: {
-          adjustments: [
-            {
-              adjustmentAmount: infraFeeReducedWc.valueOf(),
-              currencyType: token,
-              description:
-                "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
-              name: "Turbo Infrastructure Fee",
-              operator: "multiply",
-              operatorMagnitude: 0.766,
-            },
-          ],
+          adjustments:
+            token === "ario"
+              ? []
+              : [
+                  {
+                    adjustmentAmount: infraFeeReducedWc.valueOf(),
+                    currencyType: token,
+                    description:
+                      "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+                    name:
+                      (token === "kyve" ? "Kyve " : "") +
+                      "Turbo Infrastructure Fee",
+                    operator: "multiply",
+                    operatorMagnitude: turboInfraFeeMagnitude,
+                  },
+                ],
           transactionId: testTxId,
           transactionQuantity: tokenAmount,
           tokenType: token,
@@ -2595,6 +2746,693 @@ describe("Router tests", () => {
     expect(status).to.equal(503);
     expect(statusText).to.equal("Service Unavailable");
     expect(data).to.equal("Gateway not found for currency!");
+  });
+
+  describe("GET /accounts/approvals/create", () => {
+    it("returns 200 for valid params", async () => {
+      const payingAddress = "43CharacterStubApprovalCreateAddress1234567";
+      const approvalDataItemId = "43CharacterStubApprovalCreateId123456789012";
+      const approvedAddress = "43CharacterStubApprovalCreateApprovedAdd123";
+      const approvedWincAmount = "100";
+
+      await dbTestHelper.insertStubUser({
+        user_address: payingAddress,
+        winston_credit_balance: "1000",
+      });
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=${payingAddress}&approvedAddress=${approvedAddress}&dataItemId=${approvalDataItemId}&winc=${approvedWincAmount}&expiresInSeconds=3600`,
+        authHeaders
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("Approval created");
+
+      expect(data.creationDate).to.exist;
+      expect(data.expirationDate).to.exist;
+      expect(
+        filterKeysFromObject(data, ["creationDate", "expirationDate"])
+      ).to.deep.equal({
+        approvalDataItemId,
+        approvedAddress,
+        approvedWincAmount,
+        payingAddress: payingAddress,
+        usedWincAmount: "0",
+      });
+    });
+
+    it("returns 400 for missing params", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create`,
+        authHeaders
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal(
+        "Malformed or missing required query parameters: payingAddress, approvedAddress"
+      );
+    });
+
+    it("returns 400 for invalid paying address", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=invalid&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}&winc=100`,
+        authHeaders
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal("Invalid paying address");
+    });
+
+    it("returns 400 for invalid approved address", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=${stubArweaveUserAddress}&approvedAddress=invalid&dataItemId=${stubTxId1}&winc=100`,
+        authHeaders
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal("Invalid approved address");
+    });
+
+    it("returns 400 for invalid data item id", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=${stubArweaveUserAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=invalid&winc=100`,
+        authHeaders
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal("Invalid dataItemId provided!");
+    });
+
+    it("returns 400 for invalid winc amount", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=${stubArweaveUserAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}&winc=0.4300`,
+        authHeaders
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal(
+        "Invalid value provided for wincAmount: 0.4300\nWinston value should be an integer!"
+      );
+    });
+
+    it("returns 401 for unauthorized access", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=${stubArweaveUserAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}&winc=100`
+      );
+
+      expect(status).to.equal(401);
+      expect(statusText).to.equal("Unauthorized");
+      expect(data).to.equal(
+        "No authorization or user provided for authorized route!"
+      );
+    });
+
+    it("returns 402 for user not found for payment approval", async () => {
+      const unknownAddress = "43CharacterAddressWithNoBalance123456789012";
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=${unknownAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}&winc=100`,
+        authHeaders
+      );
+
+      expect(status).to.equal(402);
+      expect(statusText).to.equal("Payment Required");
+      expect(data).to.equal(
+        "No user found in database with address '" + unknownAddress + "'"
+      );
+    });
+
+    it("returns 402 for insufficient balance for payment approval", async () => {
+      const payingAddress = "43CharacterAddressWithLowBalance12345678901";
+      await dbTestHelper.insertStubUser({
+        user_address: payingAddress,
+        winston_credit_balance: "100",
+      });
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=${payingAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}&winc=1000`,
+        authHeaders
+      );
+
+      expect(status).to.equal(402);
+      expect(statusText).to.equal("Payment Required");
+      expect(data).to.equal("Insufficient balance for '" + payingAddress + "'");
+    });
+
+    it("returns 503 for unexpected database errors", async () => {
+      stub(paymentDatabase, "createDelegatedPaymentApproval").throws(
+        Error("Database error")
+      );
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/create?payingAddress=${stubArweaveUserAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}&winc=100`,
+        authHeaders
+      );
+
+      expect(status).to.equal(503);
+      expect(statusText).to.equal("Service Unavailable");
+      expect(data).to.equal("Database error");
+    });
+  });
+  describe("GET /accounts/approvals/revoke", () => {
+    it("returns 200 for valid params", async () => {
+      const approvedAddress = "43CharacterStubApprovalRevokeApprovedAdd123";
+      const payingAddress = "43CharacterStubApprovalRevokeAddress1234567";
+      const revokeDataItemId = "43CharacterStubApprovalRevokeId123456789012";
+      const approvalDataItemId = "unique gibberish";
+
+      await dbTestHelper.insertStubUser({
+        user_address: payingAddress,
+        winston_credit_balance: "1000",
+      });
+
+      await dbTestHelper.db.createDelegatedPaymentApproval({
+        approvalDataItemId,
+        payingAddress: payingAddress,
+        approvedAddress: approvedAddress,
+        approvedWincAmount: W(100),
+      });
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/revoke?payingAddress=${payingAddress}&approvedAddress=${approvedAddress}&dataItemId=${revokeDataItemId}`,
+        authHeaders
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("Approvals revoked");
+
+      expect(data[0].creationDate).to.exist;
+      expect(data[0].inactiveDate).to.exist;
+      expect(
+        filterKeysFromObject(data[0], ["creationDate", "inactiveDate"])
+      ).to.deep.equal({
+        approvedAddress,
+        payingAddress,
+        approvedWincAmount: "100",
+        usedWincAmount: "0",
+        inactiveReason: "revoked",
+        revokeDataItemId,
+        approvalDataItemId,
+      });
+    });
+
+    it("returns 400 for missing params", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/revoke`,
+        authHeaders
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal(
+        "Malformed or missing required query parameters: payingAddress, approvedAddress"
+      );
+    });
+
+    it("returns 401 for unauthorized access", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/revoke?payingAddress=${stubArweaveUserAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}`
+      );
+
+      expect(status).to.equal(401);
+      expect(statusText).to.equal("Unauthorized");
+      expect(data).to.equal(
+        "No authorization or user provided for authorized route!"
+      );
+    });
+
+    it("returns 400 for no approvals found to revoke", async () => {
+      const unknownUserAddress = "43CharacterAddressWithNoApprovals1234567890";
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/revoke?payingAddress=${unknownUserAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}`,
+        authHeaders
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal(
+        `No valid approvals found for approved address '${stubArweaveUserAddress}' and paying address '${unknownUserAddress}'`
+      );
+    });
+
+    it("returns 503 for unexpected database errors", async () => {
+      stub(paymentDatabase, "revokeDelegatedPaymentApprovals").throws(
+        Error("Database error")
+      );
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/revoke?payingAddress=${stubArweaveUserAddress}&approvedAddress=${stubArweaveUserAddress}&dataItemId=${stubTxId1}`,
+        authHeaders
+      );
+
+      expect(status).to.equal(503);
+      expect(statusText).to.equal("Service Unavailable");
+      expect(data).to.equal("Database error");
+    });
+  });
+
+  describe("GET approvals /accounts/approvals", () => {
+    it("returns 200 for valid params", async () => {
+      const payingAddress = "43CharacterStubApprovalGetAddress1234567890";
+      const approvalDataItemId = "43CharacterStubApprovalGetId123456789012345";
+      await dbTestHelper.insertStubUser({
+        user_address: payingAddress,
+        winston_credit_balance: "1000",
+      });
+
+      const approvedAddress = "43CharacterStubApprovalGetApprovedAddress12";
+
+      await dbTestHelper.db.createDelegatedPaymentApproval({
+        approvalDataItemId,
+        payingAddress,
+        approvedAddress,
+        approvedWincAmount: W(100),
+      });
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals?payingAddress=${payingAddress}&approvedAddress=${approvedAddress}`
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("Approvals retrieved");
+
+      const approvals = data.approvals;
+      expect(approvals.length).to.equal(1);
+      expect(approvals[0].creationDate).to.exist;
+      expect(approvals[0].expirationDate).to.be.undefined;
+
+      expect(data.amount).to.equal("100");
+      expect(data.expiresBy).to.be.undefined;
+
+      expect(
+        filterKeysFromObject(approvals[0], ["creationDate"])
+      ).to.deep.equal({
+        approvalDataItemId,
+        payingAddress,
+        approvedAddress,
+        approvedWincAmount: "100",
+        usedWincAmount: "0",
+      });
+    });
+
+    it("returns 400 for missing params", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals`
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal(
+        "Malformed or missing required query parameters: payingAddress, approvedAddress"
+      );
+    });
+
+    it("returns 400 if no approvals found", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals?payingAddress=${stubArweaveUserAddress}&approvedAddress=${stubArweaveUserAddress}`
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal(
+        `No valid approvals found for approved address '${stubArweaveUserAddress}' and paying address '${stubArweaveUserAddress}'`
+      );
+    });
+
+    it("returns 503 for unexpected database errors", async () => {
+      stub(paymentDatabase, "getApprovalsFromPayerForAddress").throws(
+        Error("Database error")
+      );
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals?payingAddress=${stubArweaveUserAddress}&approvedAddress=${stubArweaveUserAddress}`
+      );
+
+      expect(status).to.equal(503);
+      expect(statusText).to.equal("Service Unavailable");
+      expect(data).to.equal("Database error");
+    });
+  });
+
+  describe("GET /accounts/approvals/get", () => {
+    it("returns 200 for valid params", async () => {
+      const userAddress = "43CharacterStubApprovalGetAllAddress123456a";
+      const approvalId1 = "43CharacterStubApprovalGetAllId123456789012";
+      const approvalId2 = "43CharacterStubApprovalGetAllId123456789015";
+      await dbTestHelper.insertStubUser({
+        user_address: userAddress,
+        winston_credit_balance: "1000",
+      });
+
+      const approvedAddress1 = "43CharacterStubApprovalGetAllApprovedAdd123";
+      const approvedAddress2 = "43CharacterStubApprovalGetAllApprovedAdd523";
+
+      await dbTestHelper.db.createDelegatedPaymentApproval({
+        approvalDataItemId: approvalId1,
+        payingAddress: userAddress,
+        approvedAddress: approvedAddress1,
+        approvedWincAmount: W(100),
+      });
+
+      await dbTestHelper.db.createDelegatedPaymentApproval({
+        approvalDataItemId: approvalId2,
+        payingAddress: userAddress,
+        approvedAddress: approvedAddress2,
+        approvedWincAmount: W(200),
+      });
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/get?userAddress=${userAddress}`
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("Approvals retrieved");
+      expect(
+        data.givenApprovals.map((a: DelegatedPaymentApproval) =>
+          filterKeysFromObject(a, ["creationDate"])
+        )
+      ).to.deep.equal([
+        {
+          approvalDataItemId: approvalId1,
+          approvedAddress: approvedAddress1,
+          approvedWincAmount: "100",
+          usedWincAmount: "0",
+          payingAddress: userAddress,
+        },
+        {
+          approvalDataItemId: approvalId2,
+          approvedAddress: approvedAddress2,
+          approvedWincAmount: "200",
+          usedWincAmount: "0",
+          payingAddress: userAddress,
+        },
+      ]);
+    });
+
+    it("returns 200 for valid params and no approvals found", async () => {
+      const userAddress = "43CharacterStubApprovalGetAllAddress123456b";
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/get?userAddress=${userAddress}`
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("Approvals retrieved");
+      expect(data).to.deep.equal({
+        givenApprovals: [],
+        receivedApprovals: [],
+      });
+    });
+
+    it("returns 400 for missing params", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/get`
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal(
+        "Malformed or missing required query parameter: userAddress"
+      );
+    });
+
+    it("returns 503 for unexpected database errors", async () => {
+      stub(paymentDatabase, "getAllApprovalsForUserAddress").throws(
+        Error("Database error")
+      );
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/account/approvals/get?userAddress=${stubArweaveUserAddress}`
+      );
+
+      expect(status).to.equal(503);
+      expect(statusText).to.equal("Service Unavailable");
+      expect(data).to.equal("Database error");
+    });
+  });
+
+  describe("POST /v1/arns/purchase/:intent/:name/:owner ", () => {
+    it("rejects unauthorized access", async () => {
+      const { status, statusText, data } = await axios.post(
+        `/v1/arns/purchase/Buy-Name/testName`
+      );
+      expect(status).to.equal(401);
+      expect(statusText).to.equal("Unauthorized");
+      expect(data).to.equal("Signed request is required for this route");
+    });
+
+    it("rejects invalid intent", async () => {
+      const { status, statusText, data } = await axios.post(
+        `/v1/arns/purchase/invalidIntent/testName`,
+        "",
+        { headers: await signedRequestHeadersFromJwk(testArweaveWallet) }
+      );
+
+      expect(data).to.equal("Invalid intent parameter");
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+    });
+
+    it("rejects buy-name intent with no processId present", async () => {
+      const { status, statusText, data } = await axios.post(
+        `/v1/arns/purchase/buy-name/testName?token=ethereum`,
+        "",
+        {
+          headers: await signedRequestHeadersFromEthWallet(testEthereumWallet),
+        }
+      );
+
+      expect(data).to.equal("Missing required parameter: processId");
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+    });
+
+    it("rejects buy-name intent with no type present", async () => {
+      const { status, statusText, data } = await axios.post(
+        `/v1/arns/purchase/buy-name/testName?processId=stubProcessId`,
+        "",
+        { headers: await signedRequestHeadersFromJwk(testArweaveWallet) }
+      );
+
+      expect(data).to.equal(
+        "Missing required parameter: type. Must be either 'permabuy' or 'lease'"
+      );
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+    });
+
+    it("succeeds for valid params and a stubbed ario gateway call", async () => {
+      stub(gatewayMap.ario, "getTokenCost").resolves(new mARIOToken(100));
+      stub(gatewayMap.ario, "initiateArNSPurchase").resolves({
+        id: "stubbedId",
+      });
+      await dbTestHelper.insertStubUser({
+        user_address: stubArweaveUserAddress,
+        winston_credit_balance: "1000000000",
+      });
+
+      const { status, statusText, data } = await axios.post(
+        `/v1/arns/purchase/Buy-Name/test-Name?type=permabuy&processId=stubProcessId`,
+        "",
+        { headers: await signedRequestHeadersFromJwk(testArweaveWallet) }
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("ArNS Purchase Successful");
+
+      const { purchaseReceipt, arioWriteResult } = data;
+      const {
+        nonce,
+        intent,
+        name,
+        owner,
+        type,
+        wincQty,
+        mARIOQty,
+        processId,
+        createdDate,
+      } = purchaseReceipt;
+
+      expect(typeof nonce).to.equal("string");
+      expect(intent).to.equal("Buy-Name");
+      expect(name).to.equal("test-name");
+      expect(owner).to.equal("-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830");
+      expect(type).to.equal("permabuy");
+      expect(wincQty).to.equal("1139601");
+      expect(mARIOQty).to.equal(100);
+      expect(processId).to.equal("stubProcessId");
+      expect(createdDate).to.exist;
+      expect(arioWriteResult.id).to.equal("stubbedId");
+    });
+  });
+
+  describe("GET /v1/arns/purchase/:nonce", () => {
+    it("should return success status for valid purchase in the database", async () => {
+      await dbTestHelper.insertStubArNSPurchase({
+        nonce: "my-great-nonce",
+      });
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/arns/purchase/my-great-nonce`
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("Purchase status retrieved successfully");
+
+      expect(data.nonce).to.equal("my-great-nonce");
+      expect(data.messageId).to.equal("The Stubbiest Message");
+      expect(data.status).to.equal("success");
+    });
+
+    it("should return failed status for failed purchase in the database", async () => {
+      await dbTestHelper.insertStubFailedArNSPurchase({
+        nonce: "failed-nonce",
+      });
+      const { status, statusText, data } = await axios.get(
+        `/v1/arns/purchase/failed-nonce`
+      );
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("Purchase status retrieved successfully");
+
+      expect(data.nonce).to.equal("failed-nonce");
+      expect(data.messageId).to.equal("The Stubbiest Message");
+      expect(data.status).to.equal("failed");
+    });
+
+    it("should return pending status for valid quote in the database", async () => {
+      await dbTestHelper.insertStubArNSQuote({
+        nonce: "my-great-pending-nonce",
+      });
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/arns/purchase/my-great-pending-nonce`
+      );
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("Purchase status retrieved successfully");
+
+      expect(data.nonce).to.equal("my-great-pending-nonce");
+      expect(data.status).to.equal("pending");
+    });
+
+    it("should return 400 for nonce not found", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/arns/purchase/invalid-nonce`
+      );
+
+      expect(status).to.equal(400);
+      expect(statusText).to.equal("Bad Request");
+      expect(data).to.equal("Purchase status not found");
+    });
+  });
+
+  describe("GET /v1/arns/price/:intent/:name", () => {
+    it("should succeed for valid params and a stubbed ario gateway call", async () => {
+      stub(gatewayMap.ario, "getTokenCost").resolves(new mARIOToken(100));
+
+      const { status, statusText, data } = await axios.get(
+        `/v1/arns/price/Buy-Name/testName?type=permabuy`
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("OK");
+      expect(data.mARIO).to.equal("100");
+    });
+  });
+
+  describe("GET /v1/arns/quote/:method/:address/:currency/:intent/:name", () => {
+    beforeEach(() => {
+      stub(gatewayMap.ario, "getTokenCost").resolves(
+        new ARIOToken(1000).toMARIO()
+      );
+      stub(gatewayMap.ario, "initiateArNSPurchase").resolves({
+        id: "stubbedId",
+      });
+      stub(stripe.paymentIntents, "create").resolves(
+        stripeResponseStub({
+          ...paymentIntentStub({
+            amount: 4256,
+            status: "requires_payment_method",
+          }),
+        })
+      );
+    });
+
+    it("should succeed for valid params and a stubbed ario gateway call", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/arns/quote/payment-intent/${stubArweaveUserAddress}/usd/Buy-Name/testName?type=permabuy&processId=stubProcessId`
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("OK");
+
+      const {
+        purchaseQuote: {
+          mARIOQty,
+          wincQty,
+          paymentAmount,
+          paymentProvider,
+          intent,
+          name,
+          type,
+          processId,
+          owner,
+          currencyType,
+        },
+        paymentSession: { amount, status: paymentStatus },
+        fees,
+      } = data;
+
+      expect(mARIOQty).to.equal(1000000000);
+      expect(wincQty).to.equal("14877299472599");
+      expect(paymentAmount).to.equal(10444);
+      expect(paymentProvider).to.equal("stripe");
+      expect(intent).to.equal("Buy-Name");
+      expect(name).to.equal("testname");
+      expect(type).to.equal("permabuy");
+      expect(processId).to.equal("stubProcessId");
+      expect(owner).to.equal(stubArweaveUserAddress);
+      expect(currencyType).to.equal("usd");
+      expect(paymentStatus).to.equal("requires_payment_method");
+      expect(paymentProvider).to.equal("stripe");
+      expect(amount).to.equal(4256);
+
+      expect(fees.length).to.equal(1);
+    });
+
+    it("should succeed with a valid promo code", async () => {
+      const { status, statusText, data } = await axios.get(
+        `/v1/arns/quote/payment-intent/${stubArweaveUserAddress}/usd/Buy-Name/testName?type=permabuy&processId=stubProcessId&promoCode=${routerTestPromoCode}`
+      );
+
+      expect(status).to.equal(200);
+      expect(statusText).to.equal("OK");
+
+      const {
+        adjustments,
+        purchaseQuote: { nonce, paymentAmount },
+      } = data;
+
+      expect(adjustments).to.exist;
+      expect(adjustments.length).to.equal(1);
+      expect(adjustments[0]).to.deep.equal({
+        adjustmentAmount: -2089,
+        currencyType: "usd",
+        description: "",
+        name: "Router Test Promo Code",
+        operator: "multiply",
+        operatorMagnitude: 0.8,
+        promoCode: "routerTestPromoCode",
+      });
+
+      expect(nonce).to.exist;
+      expect(nonce).to.be.a("string");
+      expect(nonce.length).to.equal(36);
+      expect(paymentAmount).to.equal(8355);
+    });
   });
 });
 

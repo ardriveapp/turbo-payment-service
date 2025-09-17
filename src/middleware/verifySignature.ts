@@ -14,19 +14,21 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { SignatureConfig } from "@dha-team/arbundles";
 import jwt from "jsonwebtoken";
 import { Context, Next } from "koa";
 import winston from "winston";
 
-import { fromB64UrlToBuffer } from "../utils/base64";
-import { arweaveRSAModulusToAddress } from "../utils/jwkUtils";
-import { verifyArweaveSignature } from "../utils/verifyArweaveSignature";
+import { verifySigAndGetNativeAddress } from "../utils/verifyArweaveSignature";
 
 // You should use a secure and secret key for JWT token generation
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 export async function verifySignature(ctx: Context, next: Next): Promise<void> {
   const signature = ctx.request.headers["x-signature"] as string;
+  const rawSigType = ctx.request.headers["x-signature-type"] as
+    | string
+    | undefined;
   const publicKey = ctx.request.headers["x-public-key"] as string;
   const nonce = ctx.request.headers["x-nonce"] as string;
   const logger = (ctx.state.logger as winston.Logger).child({
@@ -36,28 +38,62 @@ export async function verifySignature(ctx: Context, next: Next): Promise<void> {
   });
 
   try {
-    if (!signature || !publicKey || !nonce) {
-      logger.debug("Missing signature, public key or nonce");
+    let signatureType: number;
+    if (rawSigType) {
+      signatureType = +rawSigType;
+      if (isNaN(signatureType)) {
+        logger.debug("Invalid signature type", { rawSigType });
+        return next();
+      }
+    } else {
+      signatureType = SignatureConfig.ARWEAVE;
+    }
+
+    const supportedSignatureTypes: SignatureConfig[] = [
+      SignatureConfig.ARWEAVE,
+      SignatureConfig.ETHEREUM,
+    ];
+    if (
+      !signature ||
+      !publicKey ||
+      !nonce ||
+      supportedSignatureTypes.indexOf(signatureType as SignatureConfig) === -1
+    ) {
+      logger.debug(
+        "Missing signature, public key, nonce, or unsupported token.",
+        {
+          signature: !!signature,
+          publicKey: !!publicKey,
+          nonce: !!nonce,
+          signatureType,
+          supportedSignatureTypes,
+        }
+      );
       return next();
     }
-    logger.info("Verifying arweave signature");
 
-    // TODO: use a factory that verifies, validates and returns address of provided x-public-key-header
-    const isVerified = await verifyArweaveSignature({
+    const maybeWalletAddress = await verifySigAndGetNativeAddress({
+      signatureType,
       publicKey,
-      signature: fromB64UrlToBuffer(signature),
+      signature,
       // TODO: Verify from additional DATA on POST
       additionalData: undefined,
       nonce: nonce,
     });
 
-    logger.info("Signature verification result computed.", { isVerified });
+    const isVerified = maybeWalletAddress !== false;
+
+    logger.debug("Signature verification result computed.", {
+      isVerified,
+      maybeWalletAddress,
+    });
 
     if (isVerified) {
       // Attach wallet address for the next middleware
-      ctx.state.walletAddress = arweaveRSAModulusToAddress(publicKey);
+      ctx.state.walletAddress = maybeWalletAddress;
+      ctx.state.nonce = nonce;
       // Generate a JWT token for subsequent requests
-      logger.info("Generating JWT token for wallet.", {
+      logger.debug("Generating JWT token for wallet.", {
         wallet: ctx.state.walletAddress,
       });
       const token = jwt.sign(

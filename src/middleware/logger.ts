@@ -36,7 +36,7 @@ export async function loggerMiddleware(ctx: KoaContext, next: Next) {
   });
 
   // TODO: replace with open telemetry middleware, log the request headers once to track SDK usage.
-  log.info("Request headers", { headers: ctx.headers });
+  log.debug("Request headers", { headers: ctx.headers });
   ctx.state.logger = log;
   ctx.state.trace = trace;
   const startTime = Date.now();

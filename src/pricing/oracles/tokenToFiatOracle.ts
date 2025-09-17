@@ -20,8 +20,8 @@ import {
 } from "@ardrive/ardrive-promise-cache";
 
 import { createAxiosInstance } from "../../axiosClient";
-import { TokenType, supportedPaymentTokens } from "../../gateway";
 import logger from "../../logger";
+import { TokenType, supportedPaymentTokens } from "../../types";
 import {
   SupportedFiatPaymentCurrencyType,
   supportedFiatPaymentCurrencyTypes,
@@ -33,6 +33,8 @@ const coinGeckoTokenNames = [
   "solana",
   "kyve-network",
   "matic-network",
+  "l2-standard-bridged-weth-base",
+  "ar-io-network",
 ] as const;
 
 type CoinGeckoTokenName = (typeof coinGeckoTokenNames)[number];
@@ -44,8 +46,12 @@ export const tokenNameToCoinGeckoTokenName: Record<
   arweave: "arweave",
   ethereum: "ethereum",
   solana: "solana",
+  ed25519: "solana",
+  pol: "matic-network",
   kyve: "kyve-network",
   matic: "matic-network",
+  "base-eth": "l2-standard-bridged-weth-base",
+  ario: "ar-io-network",
 };
 
 type CoinGeckoResponse = Record<
@@ -85,7 +91,7 @@ export class CoingeckoTokenToFiatOracle implements TokenToFiatOracle {
 
     const url = `${coinGeckoUrl}simple/price?ids=${tokenTypesString}&vs_currencies=${currencyTypesString}`;
     try {
-      logger.info(`Getting AR prices from Coingecko`, { url });
+      logger.debug(`Getting AR prices from Coingecko`, { url });
       const { data } = await this.axiosInstance.get<CoinGeckoResponse>(url);
 
       const coinGeckoResponse = data;
@@ -146,15 +152,23 @@ export class ReadThroughTokenToFiatOracle {
     const arweaveUsdPrice = cachedValue.arweave.usd;
 
     const coinGeckoToken = tokenNameToCoinGeckoTokenName[token];
-
     const tokenUsdPrice = cachedValue[coinGeckoToken].usd;
 
     return tokenUsdPrice / arweaveUsdPrice;
   }
 
-  async getUsdPriceForOneToken(token: TokenType): Promise<number> {
+  async getFiatPriceForOneToken(
+    token: TokenType,
+    fiat: string
+  ): Promise<number> {
     const cachedValue = await this.readThroughPromiseCache.get("arweave");
     const coinGeckoToken = tokenNameToCoinGeckoTokenName[token];
-    return cachedValue[coinGeckoToken].usd;
+    return cachedValue[coinGeckoToken][
+      fiat as SupportedFiatPaymentCurrencyType
+    ];
+  }
+
+  async getUsdPriceForOneToken(token: TokenType): Promise<number> {
+    return this.getFiatPriceForOneToken(token, "usd");
   }
 }

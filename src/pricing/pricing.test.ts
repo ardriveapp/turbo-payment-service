@@ -30,11 +30,9 @@ import {
   UploadAdjustmentCatalogDBInsert,
 } from "../database/dbTypes";
 import { PostgresDatabase } from "../database/postgres";
-import { TokenType } from "../gateway";
-import { ByteCount, W, Winston } from "../types";
+import { ByteCount, TokenType, W, Winston } from "../types";
 import { Payment } from "../types/payment";
 import { filterKeysFromObject } from "../utils/common";
-import { roundToArweaveChunkSize } from "../utils/roundToChunkSize";
 import { ReadThroughBytesToWinstonOracle } from "./oracles/bytesToWinstonOracle";
 import {
   CoingeckoTokenToFiatOracle,
@@ -55,170 +53,122 @@ describe("TurboPricingService class", () => {
   });
 
   describe("getWCForBytes", () => {
-    describe("with a date before the subsidy", () => {
-      let clock: SinonFakeTimers;
-      before(() => {
-        const fakeDateBeforeSubsidy = new Date("2021-01-01T00:00:00.000Z");
-        clock = useFakeTimers(fakeDateBeforeSubsidy.getTime());
+    let clock: SinonFakeTimers;
+
+    after(() => {
+      clock.restore();
+    });
+
+    beforeEach(() => {
+      stub(bytesToWinstonOracle, "getWinstonForBytes").callsFake((b) =>
+        // Return the given byte count (rounded as chunks) as the stubbed price
+        Promise.resolve(new Winston(b.toString()))
+      );
+    });
+
+    it("returns the expected price for a given byte count", async () => {
+      const price = await pricing.getWCForBytes(ByteCount(100));
+      expect(price.finalPrice.winc.toString()).to.equal("100");
+    });
+
+    describe("when a flat discount upload promo event is applied...", () => {
+      const startDate = new Date("2001-01-02T00:00:00.000Z");
+      const endDate = new Date("2001-01-04T00:00:00.000Z");
+
+      const dateBeforeDiscount = new Date("2001-01-01T00:00:00.000Z");
+      const dateDuringDiscount = new Date("2001-01-03T00:00:00.000Z");
+      const dateAfterDiscount = new Date("2001-01-05T00:00:00.000Z");
+
+      before(async () => {
+        const insert: UploadAdjustmentCatalogDBInsert = {
+          adjustment_name: "Turbo 1 million winc off",
+          catalog_id: "best_stub_id_ever",
+          operator: "add",
+          adjustment_end_date: endDate.toISOString(),
+          operator_magnitude: "-1000000",
+          adjustment_start_date: startDate.toISOString(),
+        };
+
+        await paymentDatabase["writer"](
+          tableNames.uploadAdjustmentCatalog
+        ).insert(insert);
       });
-      after(() => {
+
+      after(async () => {
+        await paymentDatabase["writer"](tableNames.uploadAdjustmentCatalog)
+          .where({ catalog_id: "best_stub_id_ever_2" })
+          .delete();
+      });
+
+      afterEach(() => {
         clock.restore();
       });
 
-      beforeEach(() => {
-        stub(bytesToWinstonOracle, "getWinstonForBytes").callsFake((b) =>
-          // Return the given byte count (rounded as chunks) as the stubbed price
-          Promise.resolve(new Winston(b.toString()))
-        );
-      });
+      it("returns the expected price for a given byte count larger than the discount", async () => {
+        clock = useFakeTimers(dateDuringDiscount.getTime());
 
-      it("returns the expected price for a given byte count", async () => {
-        const price = await pricing.getWCForBytes(ByteCount(100));
-        expect(price.finalPrice.winc.toString()).to.equal(
-          `${roundToArweaveChunkSize(ByteCount(100))}`
-        );
-      });
+        const { adjustments, finalPrice, networkPrice } =
+          await pricing.getWCForBytes(ByteCount(1_048_576));
 
-      describe("when a flat discount upload promo event is applied...", () => {
-        const startDate = new Date("2001-01-02T00:00:00.000Z");
-        const endDate = new Date("2001-01-04T00:00:00.000Z");
+        expect(finalPrice.winc.toString()).to.equal("48576");
+        expect(networkPrice.winc.toString()).to.equal("1048576");
 
-        const dateBeforeDiscount = new Date("2001-01-01T00:00:00.000Z");
-        const dateDuringDiscount = new Date("2001-01-03T00:00:00.000Z");
-        const dateAfterDiscount = new Date("2001-01-05T00:00:00.000Z");
-
-        before(async () => {
-          const insert: UploadAdjustmentCatalogDBInsert = {
-            adjustment_name: "Turbo 1 million winc off",
-            catalog_id: "best_stub_id_ever",
+        expect(adjustments).to.deep.equal([
+          {
+            adjustmentAmount: new Winston(-1000000),
+            description: "",
+            name: "Turbo 1 million winc off",
             operator: "add",
-            adjustment_end_date: endDate.toISOString(),
-            operator_magnitude: "-1000000",
-            adjustment_start_date: startDate.toISOString(),
-          };
-
-          await paymentDatabase["writer"](
-            tableNames.uploadAdjustmentCatalog
-          ).insert(insert);
-        });
-
-        after(async () => {
-          await paymentDatabase["writer"](tableNames.uploadAdjustmentCatalog)
-            .where({ catalog_id: "best_stub_id_ever_2" })
-            .delete();
-        });
-
-        afterEach(() => {
-          clock.restore();
-        });
-
-        it("returns the expected price for a given byte count larger than the discount", async () => {
-          clock = useFakeTimers(dateDuringDiscount.getTime());
-
-          const { adjustments, finalPrice, networkPrice } =
-            await pricing.getWCForBytes(ByteCount(1_048_576));
-
-          expect(finalPrice.winc.toString()).to.equal("48576");
-          expect(networkPrice.winc.toString()).to.equal("1048576");
-
-          expect(adjustments).to.deep.equal([
-            {
-              adjustmentAmount: new Winston(-1000000),
-              description: "",
-              name: "Turbo 1 million winc off",
-              operator: "add",
-              operatorMagnitude: -1000000,
-              catalogId: "best_stub_id_ever",
-            },
-          ]);
-        });
-
-        it("returns the expected price for a given byte count smaller than the discount", async () => {
-          clock = useFakeTimers(dateDuringDiscount.getTime());
-
-          const { adjustments, finalPrice, networkPrice } =
-            await pricing.getWCForBytes(ByteCount(256 * 1024));
-
-          expect(finalPrice.winc.toString()).to.equal("0");
-          expect(networkPrice.winc.toString()).to.equal("262144");
-
-          expect(adjustments).to.deep.equal([
-            {
-              adjustmentAmount: new Winston(-262144),
-              description: "",
-              name: "Turbo 1 million winc off",
-              operator: "add",
-              operatorMagnitude: -1000000,
-              catalogId: "best_stub_id_ever",
-            },
-          ]);
-        });
-
-        it("returns the expected price for a given byte count when the discount is expired", async () => {
-          clock = useFakeTimers(dateAfterDiscount.getTime());
-
-          const { adjustments, finalPrice, networkPrice } =
-            await pricing.getWCForBytes(ByteCount(256 * 1024));
-
-          expect(finalPrice.winc.toString()).to.equal("262144");
-          expect(networkPrice.winc.toString()).to.equal("262144");
-
-          expect(adjustments).to.deep.equal([]);
-        });
-
-        it("returns the expected price for a given byte before the discount has started", async () => {
-          clock = useFakeTimers(dateBeforeDiscount.getTime());
-
-          const { adjustments, finalPrice, networkPrice } =
-            await pricing.getWCForBytes(ByteCount(256 * 1024));
-
-          expect(finalPrice.winc.toString()).to.equal("262144");
-          expect(networkPrice.winc.toString()).to.equal("262144");
-
-          expect(adjustments).to.deep.equal([]);
-        });
-      });
-    });
-
-    describe("with dates throughout the subsidy", () => {
-      beforeEach(() => {
-        stub(bytesToWinstonOracle, "getWinstonForBytes").resolves(
-          new Winston(100)
-        );
+            operatorMagnitude: -1000000,
+            catalogId: "best_stub_id_ever",
+          },
+        ]);
       });
 
-      const datesAndExpectedPrices = [
-        ["2023-07-14", "100"],
-        ["2023-07-15", "40"],
-        ["2023-08-14", "40"],
-        ["2023-08-15", "47"],
-        ["2023-09-14", "47"],
-        ["2023-09-15", "55"],
-        ["2023-10-14", "55"],
-        ["2023-10-15", "62"],
-        ["2023-11-14", "62"],
-        ["2023-11-15", "70"],
-        ["2023-12-14", "70"],
-        ["2023-12-15", "77"],
-        ["2024-01-14", "77"],
-        ["2024-01-15", "85"],
-        ["2024-02-14", "85"],
-        ["2024-02-15", "92"],
-        ["2024-03-14", "92"],
-        ["2024-03-15", "100"],
-      ];
+      it("returns the expected price for a given byte count smaller than the discount", async () => {
+        clock = useFakeTimers(dateDuringDiscount.getTime());
 
-      for (const [date, expectedPrice] of datesAndExpectedPrices) {
-        it(`returns the expected price (${expectedPrice}) for date "${date}" of the fwd research promotion`, async () => {
-          const fakeDate = new Date(`${date}T00:00:00.000Z`);
-          const clock = useFakeTimers(fakeDate.getTime());
+        const { adjustments, finalPrice, networkPrice } =
+          await pricing.getWCForBytes(ByteCount(256 * 1024));
 
-          const price = await pricing.getWCForBytes(ByteCount(100));
-          expect(price.finalPrice.winc.toString()).to.equal(expectedPrice);
+        expect(finalPrice.winc.toString()).to.equal("0");
+        expect(networkPrice.winc.toString()).to.equal("262144");
 
-          clock.restore();
-        });
-      }
+        expect(adjustments).to.deep.equal([
+          {
+            adjustmentAmount: new Winston(-262144),
+            description: "",
+            name: "Turbo 1 million winc off",
+            operator: "add",
+            operatorMagnitude: -1000000,
+            catalogId: "best_stub_id_ever",
+          },
+        ]);
+      });
+
+      it("returns the expected price for a given byte count when the discount is expired", async () => {
+        clock = useFakeTimers(dateAfterDiscount.getTime());
+
+        const { adjustments, finalPrice, networkPrice } =
+          await pricing.getWCForBytes(ByteCount(256 * 1024));
+
+        expect(finalPrice.winc.toString()).to.equal("262144");
+        expect(networkPrice.winc.toString()).to.equal("262144");
+
+        expect(adjustments).to.deep.equal([]);
+      });
+
+      it("returns the expected price for a given byte before the discount has started", async () => {
+        clock = useFakeTimers(dateBeforeDiscount.getTime());
+
+        const { adjustments, finalPrice, networkPrice } =
+          await pricing.getWCForBytes(ByteCount(256 * 1024));
+
+        expect(finalPrice.winc.toString()).to.equal("262144");
+        expect(networkPrice.winc.toString()).to.equal("262144");
+
+        expect(adjustments).to.deep.equal([]);
+      });
     });
   });
 
@@ -707,6 +657,52 @@ describe("TurboPricingService class", () => {
           name: "Turbo Infrastructure Fee",
           operator: "multiply",
           operatorMagnitude: 0.766,
+        },
+      ]);
+    });
+
+    it("returns the expected price for a given kyve payment", async () => {
+      stub(oracle, "getFiatPricesForOneToken").resolves(expectedTokenPrices);
+      const { inclusiveAdjustments, finalPrice } =
+        await pricing.getWCForCryptoPayment({
+          amount: W(100),
+          token: "kyve",
+        });
+      expect(finalPrice.winc.toString()).to.equal("166389");
+      expect(
+        inclusiveAdjustments.map((a) => filterKeysFromObject(a, ["catalogId"]))
+      ).to.deep.equal([
+        {
+          adjustmentAmount: W(-166390),
+          currencyType: "kyve",
+          description:
+            "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+          name: "Kyve Turbo Infrastructure Fee",
+          operator: "multiply",
+          operatorMagnitude: 0.5,
+        },
+      ]);
+    });
+
+    it("returns the expected price for a given arweave payment with feeMode invert", async () => {
+      const { inclusiveAdjustments, finalPrice } =
+        await pricing.getWCForCryptoPayment({
+          amount: W(100),
+          token: "arweave",
+          feeMode: "invert",
+        });
+      expect(finalPrice.winc.toString()).to.equal("130");
+      expect(
+        inclusiveAdjustments.map((a) => filterKeysFromObject(a, ["catalogId"]))
+      ).to.deep.equal([
+        {
+          adjustmentAmount: W(30),
+          currencyType: "arweave",
+          description:
+            "Inclusive usage fee on all payments to cover infrastructure costs and payment provider fees.",
+          name: "Turbo Infrastructure Fee",
+          operator: "multiply",
+          operatorMagnitude: 1.3054830287206267,
         },
       ]);
     });

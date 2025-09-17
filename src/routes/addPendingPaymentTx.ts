@@ -31,9 +31,8 @@ import {
   PaymentTransactionNotMined,
   PaymentTransactionRecipientOnExcludedList,
 } from "../database/errors";
-import { isSupportedPaymentToken } from "../gateway";
 import { KoaContext } from "../server";
-import { W } from "../types";
+import { W, isSupportedPaymentToken } from "../types";
 import { sendCryptoFundSlackMessage } from "../utils/slack";
 import { walletAddresses } from "./info";
 
@@ -132,7 +131,7 @@ export async function addPendingPaymentTx(ctx: KoaContext, _next: Next) {
       transactionQuantity: pendingTx.transactionQuantity,
       tokenType: token,
       destinationAddress: pendingTx.transactionSenderAddress,
-      destinationAddressType: token, // TODO: Can destination wallet type be different from transaction type?
+      destinationAddressType: token,
       winstonCreditAmount: finalPrice.winc,
     };
 
@@ -177,6 +176,10 @@ export async function addPendingPaymentTx(ctx: KoaContext, _next: Next) {
       };
     }
   } catch (error) {
+    logger.error("Error adding pending payment transaction", error, {
+      errorMessage: error instanceof Error ? error.message : "Unknown error",
+    });
+
     if (
       error instanceof BadRequest ||
       error instanceof PaymentTransactionHasWrongTarget ||
@@ -193,7 +196,6 @@ export async function addPendingPaymentTx(ctx: KoaContext, _next: Next) {
       ctx.body = error.message;
     } else {
       ctx.status = 503;
-      logger.error("Error adding pending payment transaction", error);
       ctx.body =
         error instanceof Error ? error.message : "Internal server error";
     }

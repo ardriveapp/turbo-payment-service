@@ -40,9 +40,14 @@ import {
   PaymentAmountTooSmallForPromoCode,
 } from "../database/errors";
 import { PostgresDatabase } from "../database/postgres";
-import { TokenType } from "../gateway";
 import defaultLogger from "../logger";
-import { ByteCount, PositiveFiniteInteger, W, Winston } from "../types";
+import {
+  ByteCount,
+  PositiveFiniteInteger,
+  TokenType,
+  W,
+  Winston,
+} from "../types";
 import { Payment } from "../types/payment";
 import {
   SupportedFiatPaymentCurrencyType,
@@ -57,6 +62,7 @@ import { FinalPrice, NetworkPrice, SubtotalPrice } from "./price";
 export type WincForBytesResponse = {
   finalPrice: FinalPrice;
   networkPrice: NetworkPrice;
+  deprecatedChunkBasedNetworkPrice: NetworkPrice;
   adjustments: UploadAdjustment[];
 };
 
@@ -84,9 +90,16 @@ export type WincForPaymentParams = {
 export type WincForCryptoPaymentParams = {
   amount: Winston;
   token: TokenType;
+  /**
+   * How to apply fees to the Winc value,
+   * `default` means the fee is removed from the Winc value, meaning we're giving the user less Winc than their purchase
+   * `invert` means the fee is added to the Winc value, meaning we're giving the user more Winc than their purchase
+   * `none` means no fee is applied, meaning we're giving the user the exact Winc value they purchased
+   */
+  feeMode?: "default" | "invert" | "none";
   // TODO: Promo code support for crypto payments. Since payments happen before we give a quote, we may not be able to support `exclusive` adjustments for crypto payments without sending crypto back to the user
   // userAddress?: string;
-  // promoCodes?: string[];
+  // promoCodes: string[];
 };
 
 export interface PricingService {
@@ -98,6 +111,10 @@ export interface PricingService {
   ) => Promise<WincForCryptoPaymentResponse>;
   getCurrencyLimitations: () => Promise<CurrencyLimitations>;
   getFiatPriceForOneAR: (currency: CurrencyType) => Promise<number>;
+  getUSDPriceForOneARAndOneARIO: () => Promise<{
+    usdArRate: number;
+    usdArioRate: number;
+  }>;
   getFiatRatesForOneGiB: () => Promise<{
     winc: Winston;
     fiat: Record<string, number>;
@@ -115,6 +132,17 @@ export interface PricingService {
     amount: BigNumber.Value;
     token: TokenType;
   }) => Promise<number>;
+  getFiatPriceForCryptoAmount: (params: {
+    amount: BigNumber.Value;
+    type: SupportedFiatPaymentCurrencyType;
+    token: TokenType;
+    promoCodes: string[];
+    userAddress?: UserAddress;
+  }) => Promise<{
+    paymentAmount: number;
+    quotedPaymentAmount: number;
+    adjustments: PaymentAdjustment[];
+  }>;
 }
 
 /** Stripe accepts 8 digits on all currency types except IDR */
@@ -197,7 +225,7 @@ export class TurboPricingService implements PricingService {
   }
 
   private async getDynamicCurrencyLimitation(
-    curr: string,
+    curr: SupportedFiatPaymentCurrencyType,
     {
       maximumPaymentAmount: currMax,
       minimumPaymentAmount: currMin,
@@ -257,7 +285,7 @@ export class TurboPricingService implements PricingService {
       ? currSuggested
       : dynamicSuggested;
 
-    this.logger.info(
+    this.logger.debug(
       "Successfully fetched dynamic prices for supported currencies",
       {
         curr,
@@ -271,6 +299,8 @@ export class TurboPricingService implements PricingService {
       maximumPaymentAmount,
       minimumPaymentAmount,
       suggestedPaymentAmounts,
+      stripeMinimumPaymentAmount:
+        paymentAmountLimits[curr].stripeMinimumPaymentAmount,
     };
   }
 
@@ -280,7 +310,10 @@ export class TurboPricingService implements PricingService {
     await Promise.all(
       Object.entries(paymentAmountLimits).map(async ([curr, currLimits]) => {
         limits[curr as SupportedFiatPaymentCurrencyType] =
-          await this.getDynamicCurrencyLimitation(curr, currLimits);
+          await this.getDynamicCurrencyLimitation(
+            curr as SupportedFiatPaymentCurrencyType,
+            currLimits
+          );
       })
     );
 
@@ -291,12 +324,30 @@ export class TurboPricingService implements PricingService {
     return this.tokenToFiatOracle.getFiatPriceForOneAR(currency);
   }
 
+  public async getUSDPriceForOneARAndOneARIO(): Promise<{
+    usdArRate: number;
+    usdArioRate: number;
+  }> {
+    const usdArRate = await this.tokenToFiatOracle.getUsdPriceForOneToken(
+      "arweave"
+    );
+    const usdArioRate = await this.tokenToFiatOracle.getUsdPriceForOneToken(
+      "ario"
+    );
+
+    return {
+      usdArRate,
+      usdArioRate,
+    };
+  }
+
   public async getFiatRatesForOneGiB() {
     const { adjustments: uploadAdjustments, finalPrice } =
       await this.getWCForBytes(oneGiBInBytes);
 
-    const adjustmentCatalogs: PaymentAdjustmentCatalog[] =
-      await this.paymentDatabase.getPaymentAdjustmentCatalogs();
+    const adjustmentCatalogs: PaymentAdjustmentCatalog[] = (
+      await this.paymentDatabase.getPaymentAdjustmentCatalogs()
+    ).filter((cat) => cat.exclusivity === "inclusive");
 
     const fiat: Record<string, number> = {};
 
@@ -402,7 +453,7 @@ export class TurboPricingService implements PricingService {
     const finalPrice = new FinalPrice(baseWinstonCreditsFromPayment);
     const quotedPaymentAmount = payment.amount;
 
-    this.logger.info("Calculated adjustments for payment.", {
+    this.logger.debug("Calculated adjustments for payment.", {
       quotedPaymentAmount,
       paymentAmountAfterExclusiveAdjustments,
       paymentAmountAfterInclusiveAdjustments,
@@ -419,13 +470,27 @@ export class TurboPricingService implements PricingService {
     };
   }
 
+  private tenGiBInBytes = ByteCount(Math.pow(2, 30) * 10);
+
   async getWCForBytes(
     bytes: ByteCount,
     userAddress?: UserAddress
   ): Promise<WincForBytesResponse> {
-    const chunkSize = roundToArweaveChunkSize(bytes);
+    const priceFor10GiB = await this.bytesToWinstonOracle.getWinstonForBytes(
+      this.tenGiBInBytes
+    );
+    const prorationFactor = new BigNumber(bytes.valueOf()).dividedBy(
+      this.tenGiBInBytes.valueOf()
+    );
+
+    const deprecatedChunkBasedNetworkPrice = new NetworkPrice(
+      await this.bytesToWinstonOracle.getWinstonForBytes(
+        roundToArweaveChunkSize(bytes)
+      )
+    );
+
     const networkPrice = new NetworkPrice(
-      await this.bytesToWinstonOracle.getWinstonForBytes(chunkSize)
+      priceFor10GiB.times(prorationFactor, "ROUND_CEIL")
     );
 
     const uploadAdjustmentCatalogs =
@@ -493,7 +558,7 @@ export class TurboPricingService implements PricingService {
             .isGreaterThan(wincLimitation)
         ) {
           // When the used winc plus the incoming winc adjusted is greater than the limitation, this upload adjustment should not be applied
-          this.logger.info(
+          this.logger.debug(
             "User would or has already exceeded winc limitation, skipping upload adjustment",
             {
               userAddress,
@@ -528,17 +593,21 @@ export class TurboPricingService implements PricingService {
       }
     }
 
-    this.logger.info("Calculated adjustments for bytes.", {
+    const finalPrice = FinalPrice.fromSubtotal(subtotalPrice);
+
+    this.logger.debug("Calculated adjustments for bytes.", {
       bytes,
-      originalAmount: networkPrice.toString(),
+      networkPrice: networkPrice.toString(),
+      finalPrice: finalPrice.toString(),
+      deprecatedChunkBasedNetworkPrice:
+        deprecatedChunkBasedNetworkPrice.toString(),
       adjustments,
     });
-
-    const finalPrice = FinalPrice.fromSubtotal(subtotalPrice);
 
     return {
       finalPrice,
       networkPrice,
+      deprecatedChunkBasedNetworkPrice,
       adjustments,
     };
   }
@@ -654,10 +723,26 @@ export class TurboPricingService implements PricingService {
     return { adjustments, paymentAmountAfterAdjustments };
   }
 
+  private tokensWithoutFees = process.env.TOKENS_WITHOUT_FEES
+    ? process.env.TOKENS_WITHOUT_FEES.split(",")
+    : ["ario"];
+
   public async getWCForCryptoPayment({
     amount,
     token,
+    feeMode = "default",
   }: WincForCryptoPaymentParams): Promise<WincForCryptoPaymentResponse> {
+    if (
+      this.tokensWithoutFees.includes(token) &&
+      // For ArNS Stripe Purchases -- don't override the feeMode
+      feeMode !== "invert"
+    ) {
+      this.logger.debug(
+        "Token is in the tokens without fees list, skipping infra fee calculation"
+      );
+      feeMode = "none";
+    }
+
     if (token !== "arweave") {
       const tokenRatio = await this.tokenToFiatOracle.getPriceRatioForToken(
         token
@@ -681,7 +766,9 @@ export class TurboPricingService implements PricingService {
     }
 
     const adjustmentCatalogs: PaymentAdjustmentCatalog[] =
-      await this.paymentDatabase.getPaymentAdjustmentCatalogs();
+      feeMode === "none"
+        ? []
+        : await this.paymentDatabase.getPaymentAdjustmentCatalogs();
     this.logger.debug("Got adjustment catalogs", {
       adjustmentCatalogs: adjustmentCatalogs.map((a) => ({
         catalogId: a.catalogId,
@@ -703,7 +790,8 @@ export class TurboPricingService implements PricingService {
     }
 
     const inclusiveAdjustmentCatalogs = adjustmentCatalogs.filter(
-      (a) => a.exclusivity === "inclusive"
+      (a) =>
+        a.exclusivity === (token === "kyve" ? "inclusive_kyve" : "inclusive")
     );
 
     let paymentAmountAfterInclusiveAdjustments = amount;
@@ -711,12 +799,22 @@ export class TurboPricingService implements PricingService {
     for (const catalog of inclusiveAdjustmentCatalogs) {
       const {
         operator,
-        operatorMagnitude,
+        operatorMagnitude: rawOperatorMagnitude,
         name: adjustmentName,
         description,
         catalogId,
       } = catalog;
       const amountBeforeAdjustment = paymentAmountAfterInclusiveAdjustments;
+
+      let operatorMagnitude = rawOperatorMagnitude;
+      if (feeMode === "invert") {
+        if (operator === "add") {
+          operatorMagnitude = -operatorMagnitude;
+        }
+        if (operator === "multiply" && operatorMagnitude !== 0) {
+          operatorMagnitude = 1 / operatorMagnitude;
+        }
+      }
 
       switch (operator) {
         case "add":
@@ -800,14 +898,102 @@ export class TurboPricingService implements PricingService {
     const usdPriceForTokens = tokenAmount.times(usdPriceForOneToken);
     return +usdPriceForTokens.toFixed(2);
   }
+
+  public async getFiatPriceForCryptoAmount({
+    amount: baseTokenAmount,
+    type,
+    token,
+    promoCodes,
+    userAddress,
+  }: {
+    amount: BigNumber.Value;
+    type: SupportedFiatPaymentCurrencyType;
+    token: TokenType;
+    promoCodes: string[];
+    userAddress?: string;
+  }): Promise<{
+    paymentAmount: number;
+    quotedPaymentAmount: number;
+    adjustments: PaymentAdjustment[];
+  }> {
+    const fiatPriceForOneToken =
+      await this.tokenToFiatOracle.getFiatPriceForOneToken(token, type);
+    const tokenAmount = baseAmountToTokenAmount(baseTokenAmount, token);
+    const fiatPriceForTokens = tokenAmount.times(fiatPriceForOneToken);
+    const baseFiatPriceForCryptoAmount = zeroDecimalCurrencyTypes.includes(type)
+      ? +fiatPriceForTokens.toFixed(0)
+      : +fiatPriceForTokens.shiftedBy(2).toFixed(0);
+
+    let fiatPriceForCryptoAmount = baseFiatPriceForCryptoAmount;
+    const adjustments: PaymentAdjustment[] = [];
+    if (promoCodes && promoCodes.length > 0) {
+      const adjustmentCatalogs: PaymentAdjustmentCatalog[] =
+        await this.paymentDatabase.getPaymentAdjustmentCatalogs();
+      // if there is a userAddress, we can check if they are eligible for single use promo codes
+      if (userAddress) {
+        const singleUseCodeAdjustmentCatalogs =
+          await this.paymentDatabase.getSingleUsePromoCodeAdjustments(
+            promoCodes,
+            userAddress
+          );
+
+        if (singleUseCodeAdjustmentCatalogs.length > 0) {
+          for (const catalog of singleUseCodeAdjustmentCatalogs) {
+            if (
+              (await this.convertFromUSDAmount({
+                amount: baseFiatPriceForCryptoAmount,
+                type,
+              })) < catalog.minimumPaymentAmount
+            ) {
+              throw new PaymentAmountTooSmallForPromoCode(
+                catalog.codeValue,
+                catalog.minimumPaymentAmount
+              );
+            }
+            adjustmentCatalogs.push(catalog);
+          }
+        }
+      }
+
+      const exclusiveAdjustments = adjustmentCatalogs.filter(
+        (a) => a.exclusivity === "exclusive"
+      );
+      const {
+        adjustments: exclusiveAdjustmentsApplied,
+        paymentAmountAfterAdjustments: fiatPriceAfterExclusiveAdjustments,
+      } = await this.applyPaymentAdjustments({
+        adjustmentCatalogs: exclusiveAdjustments,
+        paymentAmount: baseFiatPriceForCryptoAmount,
+        currencyType: type,
+      });
+      fiatPriceForCryptoAmount = fiatPriceAfterExclusiveAdjustments;
+      adjustments.push(...exclusiveAdjustmentsApplied);
+    }
+
+    return {
+      paymentAmount: fiatPriceForCryptoAmount,
+      quotedPaymentAmount: baseFiatPriceForCryptoAmount,
+      adjustments,
+    };
+  }
 }
 
+const ukyveExponent = 6;
+const lamportExponent = 9;
+const winstonExponent = 12;
+const weiExponent = 18;
+const mARIOExponent = 6;
+
 export const tokenExponentMap = {
-  arweave: 12,
-  ethereum: 18,
-  solana: 9,
-  kyve: 6,
-  matic: 18,
+  arweave: winstonExponent,
+  solana: lamportExponent,
+  ed25519: lamportExponent,
+  kyve: ukyveExponent,
+  ethereum: weiExponent,
+  matic: weiExponent,
+  pol: weiExponent,
+  "base-eth": weiExponent,
+  ario: mARIOExponent,
 };
 
 export function baseAmountToTokenAmount(

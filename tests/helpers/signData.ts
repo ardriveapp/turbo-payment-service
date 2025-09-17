@@ -14,16 +14,19 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { SignatureConfig } from "@dha-team/arbundles";
 import Arweave from "arweave/node/common";
 import { stringToBuffer } from "arweave/node/lib/utils";
 import { RawAxiosRequestHeaders } from "axios";
 import { Buffer } from "buffer";
 import { randomUUID } from "crypto";
+import { HDNodeWallet } from "ethers";
 
 import { JWKInterface } from "../../src/types/jwkTypes";
 import { toB64Url } from "../../src/utils/base64";
+import { signEthereumData } from "../../src/utils/verifyArweaveSignature";
 
-export async function signData(
+export async function signArweaveData(
   jwk: JWKInterface,
   dataToSign: string
 ): Promise<Uint8Array> {
@@ -37,11 +40,26 @@ export async function signedRequestHeadersFromJwk(
   nonce: string = randomUUID(),
   data = ""
 ): Promise<RawAxiosRequestHeaders> {
-  const signature = await signData(jwk, data + nonce);
+  const signature = await signArweaveData(jwk, data + nonce);
 
   return {
     "x-public-key": jwk.n,
     "x-nonce": nonce,
     "x-signature": toB64Url(Buffer.from(signature)),
+  };
+}
+
+export async function signedRequestHeadersFromEthWallet(
+  wallet: HDNodeWallet,
+  nonce: string = randomUUID(),
+  data = ""
+): Promise<RawAxiosRequestHeaders> {
+  const signature = await signEthereumData(wallet, data + nonce);
+
+  return {
+    "x-public-key": wallet.publicKey,
+    "x-nonce": nonce,
+    "x-signature": signature,
+    "x-signature-type": SignatureConfig.ETHEREUM,
   };
 }
