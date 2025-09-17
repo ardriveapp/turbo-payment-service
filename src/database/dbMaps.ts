@@ -14,23 +14,39 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { mARIOToken } from "@ar.io/sdk";
 import BigNumber from "bignumber.js";
 
-import { TokenType } from "../gateway";
-import { PositiveFiniteInteger } from "../types";
+import { PositiveFiniteInteger, TokenType } from "../types";
 import { W, Winston } from "../types/winston";
 import {
   AdjustmentCatalog,
   AdjustmentCatalogDBResult,
+  ArNSNameType,
+  ArNSPurchase,
+  ArNSPurchaseDBResult,
+  ArNSPurchaseIntent,
+  ArNSPurchaseQuote,
+  ArNSPurchaseQuoteDBInsert,
+  ArNSPurchaseQuoteDBResult,
+  ArNSPurchaseQuoteParams,
+  ArNSPurchaseStatusResult,
   ChargebackReceipt,
   ChargebackReceiptDBResult,
   CreditedPaymentTransaction,
   CreditedPaymentTransactionDBResult,
+  DelegatedPaymentApproval,
+  DelegatedPaymentApprovalDBResult,
   DestinationAddressType,
+  FailedArNSPurchase,
+  FailedArNSPurchaseDBResult,
   FailedPaymentTransaction,
   FailedPaymentTransactionDBResult,
   FailedTopUpQuote,
   FailedTopUpQuoteDBResult,
+  InactiveDelegatedPaymentApproval,
+  InactiveDelegatedPaymentApprovalDBResult,
+  InactiveDelegatedPaymentReason,
   IntervalUnit,
   PaymentAdjustmentCatalog,
   PaymentAdjustmentCatalogDBResult,
@@ -50,6 +66,9 @@ import {
   User,
   UserAddressType,
   UserDBResult,
+  failedPurchaseStatus,
+  pendingPurchaseStatus,
+  successPurchaseStatus,
 } from "./dbTypes";
 
 export function userDBMap({
@@ -229,5 +248,182 @@ export function creditedTransactionDBMap(
     ...pendingPaymentTransactionDBMap(dbResult),
     creditedDate: dbResult.credited_transaction_date,
     blockHeight: dbResult.block_height,
+  };
+}
+
+export function delegatedPaymentApprovalDBMap(
+  dbResult: DelegatedPaymentApprovalDBResult
+): DelegatedPaymentApproval {
+  return {
+    approvalDataItemId: dbResult.approval_data_item_id,
+    approvedAddress: dbResult.approved_address,
+    approvedWincAmount: W(dbResult.approved_winc_amount),
+    creationDate: dbResult.creation_date,
+    payingAddress: dbResult.paying_address,
+    usedWincAmount: W(dbResult.used_winc_amount),
+    expirationDate: dbResult.expiration_date ?? undefined,
+  };
+}
+
+export function inactiveDelegatedPaymentApprovalDBMap(
+  dbResult: InactiveDelegatedPaymentApprovalDBResult
+): InactiveDelegatedPaymentApproval {
+  return {
+    ...delegatedPaymentApprovalDBMap(dbResult),
+    inactiveReason: dbResult.inactive_reason as InactiveDelegatedPaymentReason,
+    inactiveDate: dbResult.inactive_date,
+    revokeDataItemId: dbResult.revoke_data_item_id ?? undefined,
+  };
+}
+
+export function arnsPurchaseReceiptDBMap(
+  dbResult: ArNSPurchaseDBResult
+): ArNSPurchase {
+  return {
+    nonce: dbResult.nonce,
+    intent: dbResult.intent,
+    name: dbResult.name,
+    owner: dbResult.owner,
+    type: dbResult.type ?? undefined,
+    years: dbResult.years ?? undefined,
+    increaseQty: dbResult.increase_qty ?? undefined,
+    wincQty: W(dbResult.winc_qty),
+    mARIOQty: new mARIOToken(+dbResult.mario_qty),
+    processId: dbResult.process_id ?? undefined,
+    createdDate: dbResult.created_date ?? undefined,
+    usdArRate: dbResult.usd_ar_rate,
+    usdArioRate: dbResult.usd_ario_rate,
+
+    quoteCreationDate: dbResult.quote_creation_date ?? undefined,
+    quoteExpirationDate: dbResult.quote_expiration_date ?? undefined,
+    paymentAmount: dbResult.payment_amount
+      ? +dbResult.payment_amount
+      : undefined,
+    quotedPaymentAmount: dbResult.quoted_payment_amount
+      ? +dbResult.quoted_payment_amount
+      : undefined,
+    currencyType: dbResult.currency_type ?? undefined,
+    paymentProvider: dbResult.payment_provider ?? undefined,
+    paidBy: dbResult.paid_by?.split(",") ?? [],
+    messageId: dbResult.message_id ?? undefined,
+    excessWincAmount: dbResult.excess_winc
+      ? W(dbResult.excess_winc)
+      : undefined,
+  };
+}
+
+export function failedArNSNamePurchaseDBMap(
+  dbResult: FailedArNSPurchaseDBResult
+): FailedArNSPurchase {
+  return {
+    ...arnsPurchaseReceiptDBMap(dbResult as ArNSPurchaseDBResult),
+    failedReason: dbResult.failed_reason,
+    failedDate: dbResult.failed_date,
+  };
+}
+
+export function isFailedArNSNamePurchaseDBResult(
+  dbResult:
+    | ArNSPurchaseDBResult
+    | FailedArNSPurchaseDBResult
+    | ArNSPurchaseQuoteDBResult
+): dbResult is FailedArNSPurchaseDBResult {
+  return "failed_date" in dbResult;
+}
+export function isArNSPurchaseDBResult(
+  dbResult: ArNSPurchaseDBResult | ArNSPurchaseQuoteDBResult
+): dbResult is ArNSPurchaseDBResult {
+  return "created_date" in dbResult;
+}
+
+export function arnsPurchaseDBMap(
+  dbResult:
+    | FailedArNSPurchaseDBResult
+    | ArNSPurchaseDBResult
+    | ArNSPurchaseQuoteDBResult
+): ArNSPurchaseStatusResult {
+  if (isFailedArNSNamePurchaseDBResult(dbResult)) {
+    return {
+      ...failedArNSNamePurchaseDBMap(dbResult),
+      status: failedPurchaseStatus,
+    };
+  } else if (isArNSPurchaseDBResult(dbResult)) {
+    return {
+      ...arnsPurchaseReceiptDBMap(dbResult),
+      status: successPurchaseStatus,
+    };
+  } else {
+    return {
+      ...arnsPurchaseQuoteDBMap(dbResult),
+      status: pendingPurchaseStatus,
+    };
+  }
+}
+
+export function arnsPurchaseQuoteDBMap(
+  dbResult: ArNSPurchaseQuoteDBResult
+): ArNSPurchaseQuote {
+  return {
+    nonce: dbResult.nonce,
+    intent: dbResult.intent as ArNSPurchaseIntent,
+    name: dbResult.name,
+    type: (dbResult.type as ArNSNameType) ?? undefined,
+    years: dbResult.years ?? undefined,
+    increaseQty: dbResult.increase_qty ?? undefined,
+    processId: dbResult.process_id ?? undefined,
+    usdArRate: dbResult.usd_ar_rate,
+    usdArioRate: dbResult.usd_ario_rate,
+    mARIOQty: new mARIOToken(+dbResult.mario_qty),
+    wincQty: W(dbResult.winc_qty),
+    owner: dbResult.owner,
+    quoteCreationDate: dbResult.quote_creation_date,
+    quoteExpirationDate: dbResult.quote_expiration_date,
+    paymentAmount: +dbResult.payment_amount,
+    quotedPaymentAmount: +dbResult.quoted_payment_amount,
+    currencyType: dbResult.currency_type,
+    paymentProvider: dbResult.payment_provider,
+    excessWincAmount: W(dbResult.excess_winc),
+  };
+}
+
+export function arnsPurchaseQuoteDBInsertFromParams({
+  currencyType,
+  intent,
+  mARIOQty,
+  name,
+  nonce,
+  owner,
+  paymentAmount,
+  paymentProvider,
+  quoteExpirationDate,
+  quotedPaymentAmount,
+  usdArRate,
+  usdArioRate,
+  wincQty,
+  increaseQty,
+  processId,
+  type,
+  years,
+  excessWincAmount,
+}: ArNSPurchaseQuoteParams): ArNSPurchaseQuoteDBInsert {
+  return {
+    currency_type: currencyType,
+    intent,
+    mario_qty: mARIOQty.toString(),
+    name,
+    nonce,
+    owner,
+    payment_amount: paymentAmount.toString(),
+    payment_provider: paymentProvider,
+    quote_expiration_date: quoteExpirationDate,
+    quoted_payment_amount: quotedPaymentAmount.toString(),
+    usd_ar_rate: usdArRate,
+    usd_ario_rate: usdArioRate,
+    winc_qty: wincQty.toString(),
+    increase_qty: increaseQty,
+    process_id: processId,
+    type,
+    years,
+    excess_winc: excessWincAmount.toString(),
   };
 }

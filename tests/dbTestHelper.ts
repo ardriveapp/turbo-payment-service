@@ -14,11 +14,17 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { randomUUID } from "crypto";
 import { Knex } from "knex";
 
 import { tableNames } from "../src/database/dbConstants";
 import {
+  ArNSPurchaseDBInsert,
+  ArNSPurchaseQuoteDBInsert,
   ChargebackReceiptDBInsert,
+  DelegatedPaymentApprovalDBInsert,
+  DelegatedPaymentApprovalDBResult,
+  FailedArNSPurchaseDBInsert,
   PaymentAdjustmentDBInsert,
   PaymentAdjustmentDBResult,
   PaymentReceiptDBInsert,
@@ -29,6 +35,15 @@ import {
   UserDBInsert,
 } from "../src/database/dbTypes";
 import { PostgresDatabase } from "../src/database/postgres";
+import { stubTxId1 } from "./helpers/stubs";
+
+export const arweaveTxIdStringLength = 43;
+export function randomCharString(length = arweaveTxIdStringLength): string {
+  return Array(length)
+    .fill(0)
+    .map(() => Math.random().toString(36).charAt(2)) // Get a random character each time
+    .join("");
+}
 
 export const stubArweaveUserAddress: UserAddress =
   "1234567890123456789012345678901231234567890";
@@ -63,6 +78,96 @@ function stubTopUpQuoteInsert({
     quote_expiration_date,
     payment_provider,
     gift_message,
+  };
+}
+
+function stubArNSQuoteInsert({
+  currency_type = "usd",
+  nonce = randomUUID(),
+  owner = stubArweaveUserAddress,
+  payment_amount = "100",
+  quoted_payment_amount = "150",
+  winc_qty = "1337",
+  mario_qty = "1337",
+  quote_expiration_date = oneHourFromNow,
+  payment_provider = "stripe",
+  increase_qty = undefined,
+  years = undefined,
+  name = "The Stubbiest Name",
+  type = "permabuy",
+  process_id = stubTxId1,
+  intent = "Buy-Name",
+  usd_ar_rate = 1,
+  usd_ario_rate = 1,
+  excess_winc = "0",
+}: Partial<ArNSPurchaseQuoteDBInsert>): ArNSPurchaseQuoteDBInsert {
+  return {
+    currency_type,
+    nonce,
+    owner,
+    payment_amount,
+    quoted_payment_amount,
+    winc_qty,
+    mario_qty,
+    quote_expiration_date,
+    payment_provider,
+    increase_qty,
+    years,
+    name,
+    type,
+    process_id,
+    intent,
+    usd_ar_rate,
+    usd_ario_rate,
+    excess_winc,
+  };
+}
+
+function stubFailedArNSPurchase({
+  created_date,
+  currency_type = "usd",
+  excess_winc = "0",
+  failed_reason = "Failed to process payment",
+  intent = "Buy-Name",
+  message_id = "The Stubbiest Message",
+  name = "The Stubbiest Name",
+  nonce = randomUUID(),
+  owner = stubArweaveUserAddress,
+  payment_amount = "100",
+  payment_provider = "stripe",
+  process_id = stubTxId1,
+  quoted_payment_amount = "150",
+  type = "permabuy",
+  usd_ar_rate = 1,
+  usd_ario_rate = 1,
+  winc_qty = "1337",
+  years = undefined,
+  increase_qty = undefined,
+  quote_expiration_date = oneHourFromNow,
+  mario_qty = "1337",
+}: Partial<FailedArNSPurchaseDBInsert>): FailedArNSPurchaseDBInsert {
+  return {
+    failed_reason,
+    intent,
+    mario_qty,
+    name,
+    nonce,
+    owner,
+    usd_ar_rate,
+    usd_ario_rate,
+    winc_qty,
+    created_date,
+    currency_type,
+    excess_winc,
+    increase_qty,
+    message_id,
+    payment_amount,
+    payment_provider,
+    process_id,
+    quoted_payment_amount,
+    type,
+    years,
+    quote_expiration_date,
   };
 }
 
@@ -165,6 +270,54 @@ export class DbTestHelper {
     );
   }
 
+  public async insertStubArNSQuote(
+    insertParams: Partial<ArNSPurchaseQuoteDBInsert>
+  ): Promise<void> {
+    return this.knex(tableNames.arNSPurchaseQuote).insert(
+      stubArNSQuoteInsert(insertParams)
+    );
+  }
+
+  public async insertStubFailedArNSPurchase(
+    insertParams: Partial<FailedArNSPurchaseDBInsert>
+  ): Promise<void> {
+    return this.knex(tableNames.failedArNSPurchase).insert(
+      stubFailedArNSPurchase(insertParams)
+    );
+  }
+
+  public async createStubDelegatedPaymentApproval({
+    approval_data_item_id,
+    approved_address = stubArweaveUserAddress,
+    approved_winc_amount = "100",
+    expiration_date,
+    paying_address = stubArweaveUserAddress,
+    createPayer = true,
+  }: Partial<DelegatedPaymentApprovalDBInsert> & { createPayer?: boolean }) {
+    if (createPayer) {
+      try {
+        await this.insertStubUser({
+          user_address: paying_address,
+          winston_credit_balance: "1000",
+        });
+      } catch {
+        // User already exists
+      }
+    }
+
+    approval_data_item_id ??= randomCharString();
+
+    return this.knex<DelegatedPaymentApprovalDBResult>(
+      tableNames.delegatedPaymentApproval
+    ).insert({
+      approval_data_item_id,
+      approved_address,
+      approved_winc_amount,
+      expiration_date,
+      paying_address,
+    });
+  }
+
   public async insertStubPaymentAdjustment(
     insertParams: StubPaymentAdjustmentParams
   ): Promise<void> {
@@ -195,5 +348,56 @@ export class DbTestHelper {
     return this.knex(tableNames.pendingPaymentTransaction).insert(
       stubPendingPaymentTxInsert(insertParams)
     );
+  }
+
+  public async insertStubArNSPurchase({
+    nonce = randomCharString(),
+    mario_qty = "100",
+    name = "The Stubbiest Name",
+    owner = "The Stubbiest Owner",
+    type = "permabuy",
+    winc_qty = "100",
+    years = undefined,
+    process_id = undefined,
+    intent = "Buy-Name",
+    increase_qty = undefined,
+    usd_ar_rate = 1,
+    usd_ario_rate = 1,
+    currency_type,
+    excess_winc,
+    overflow_spend,
+    paid_by,
+    payment_amount,
+    quoted_payment_amount,
+    quote_expiration_date,
+    payment_provider,
+    quote_creation_date,
+    message_id = "The Stubbiest Message",
+  }: Partial<ArNSPurchaseDBInsert>): Promise<void> {
+    const insert: ArNSPurchaseDBInsert = {
+      nonce,
+      mario_qty,
+      name,
+      owner,
+      type,
+      winc_qty,
+      years,
+      process_id,
+      intent,
+      increase_qty,
+      usd_ar_rate,
+      usd_ario_rate,
+      currency_type,
+      excess_winc,
+      overflow_spend,
+      paid_by,
+      payment_amount,
+      quoted_payment_amount,
+      quote_expiration_date,
+      payment_provider,
+      quote_creation_date,
+      message_id,
+    };
+    return this.knex(tableNames.arNSPurchaseReceipt).insert(insert);
   }
 }

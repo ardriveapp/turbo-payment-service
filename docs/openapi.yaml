@@ -1,10 +1,26 @@
-openapi: 3.0.0
+openapi: 3.1.1
 info:
   title: Payment Service
   version: 0.1.0
 
 servers:
   - url: /v1
+
+tags:
+  - name: Pricing
+    description: Pricing and cost calculation endpoints
+  - name: Balance
+    description: Account balance and credit management
+  - name: Payments
+    description: Payment processing and top-up operations
+  - name: Currencies
+    description: Supported currencies and exchange rates
+  - name: Redemption
+    description: Credit redemption and gift processing
+  - name: Approvals
+    description: Credit sharing and approval management
+  - name: Info
+    description: Service information and metadata
 
 components:
   schemas:
@@ -21,6 +37,22 @@ components:
           "$ref": "#/components/schemas/Winc"
         adjustments:
           "$ref": "#/components/schemas/Adjustment"
+
+    BalanceResponse:
+      properties:
+        controlledWinc:
+          type: string
+          description: The total amount of winc that a user has if they revoked all approvals they've created
+        winc:
+          type: string
+          description: The total amount of winc the user can spend without using any approved balances given to them
+        effectiveBalance:
+          type: string
+          description: The total amount of winc that can currently be spent by the user's balance, including any shared Credits
+        givenApprovals:
+          "$ref": "#/components/schemas/CreditShareApprovals"
+        receivedApprovals:
+          "$ref": "#/components/schemas/CreditShareApprovals"
 
     PaymentCreditResponse:
       type: object
@@ -268,10 +300,46 @@ components:
       default: hosted
       example: embedded
 
+    CreditShareApprovals:
+      type: array
+      items:
+        type: object
+        properties:
+          approvalDataItemId:
+            type: string
+            description: The data item ID of the approval
+            example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+          approvedAddress:
+            type: string
+            description: Approved wallet address
+            example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+          payingAddress:
+            type: string
+            description: Paying wallet address
+            example: abcdefghijklmnopqrxtuvwxyz123456789ABCDEFGH
+          approvedWincAmount:
+            type: string
+            description: The amount of winc approved
+            example: "332824926"
+          usedWincAmount:
+            type: string
+            description: The amount of winc used
+            example: "332824926"
+          creationDate:
+            type: string
+            description: The date and time the approval was created
+            example: 2023-05-17T21:46:38.404Z
+          expirationDate:
+            type: string
+            description: The date and time the approval expires
+            example: 2023-05-17T21:46:38.404Z
+
 paths:
   # winc Price for ByteCount of Data Items
   /price/bytes/{byteCount}:
     get:
+      tags:
+        - Pricing
       summary: Get Amount of Credits in winc for Byte Count
       description: Returns the current amount of winc it will cost to upload a given byte count worth of data items
 
@@ -309,6 +377,8 @@ paths:
   # winc for payment endpoint
   /price/{type}/{amount}:
     get:
+      tags:
+        - Pricing
       summary: Get winc for Payment Type and Amount
       description: Returns the current amount of winc this service will quote for a given payment type and amount
 
@@ -386,23 +456,32 @@ paths:
     parameters:
       - name: x-signature
         in: header
-        required: true
+        required: false
         schema:
           "$ref": "#/components/schemas/SignatureHeader"
 
       - name: x-nonce
         in: header
-        required: true
+        required: false
         schema:
           "$ref": "#/components/schemas/NonceHeader"
 
       - name: x-public-key
         in: header
-        required: true
+        required: false
         schema:
           "$ref": "#/components/schemas/PublicKeyHeader"
 
+      - name: address
+        in: query
+        required: false
+        schema:
+          type: string
+          description: Destination wallet address, required if no signature headers are provided
+
     get:
+      tags:
+        - Balance
       summary: Get Current Balance of winc
       description: Use a signed request or a previously obtained JWT to get the signing wallet's current service balance in winc
 
@@ -412,7 +491,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/CreditResponse"
+                "$ref": "#/components/schemas/BalanceResponse"
 
         "403":
           description: Forbidden
@@ -440,6 +519,8 @@ paths:
 
   /top-up/{method}/{address}/{currency}/{amount}:
     get:
+      tags:
+        - Payments
       summary: Get Top Up Quote for Credits
       description: Get a top up quote and payment session for a given method (payment-intent or checkout-session), destination address, currency type, and payment amount
 
@@ -564,6 +645,8 @@ paths:
 
   /currencies:
     get:
+      tags:
+        - Currencies
       summary: Get Supported Currencies
       description: Returns the current list of currency types supported by this service
 
@@ -602,6 +685,8 @@ paths:
 
   /countries:
     get:
+      tags:
+        - Currencies
       summary: Get Supported Countries
       description: Returns the current list of currency types supported by this service
 
@@ -618,6 +703,8 @@ paths:
 
   /rates:
     get:
+      tags:
+        - Currencies
       summary: Get conversion rates for 1GB of storage
       description: Returns the supported fiat currency conversion rates for 1GB of storage based on current market prices.
       responses:
@@ -630,6 +717,8 @@ paths:
 
   /rates/{currency}:
     get:
+      tags:
+        - Currencies
       summary: Get current conversion rate for 1 AR for a given currency
       description: Returns the supported fiat currency conversion rate for 1AR based on current market prices.
 
@@ -664,6 +753,8 @@ paths:
 
   /redeem:
     get:
+      tags:
+        - Redemption
       summary: Redeem credits gifted via email
       description: Redeem credits gifted via email by providing the destination wallet address for the credits, the redemption ID, and recipient email address
 
@@ -729,6 +820,8 @@ paths:
 
   /account/balance/{token}:
     post:
+      tags:
+        - Payments
       summary: Post a pending payment transaction
       description: Post a transaction ID that has been sent to the payment service's wallet
 
@@ -812,3 +905,146 @@ paths:
               schema:
                 type: string
                 default: "Error while processing transaction!"
+
+  /account/approvals:
+    get:
+      tags:
+        - Approvals
+      summary: Get credit share approvals for a given payingAddress and approvedAddress
+      description: Get credit share approvals for a given payingAddress and approvedAddress
+
+      parameters:
+        - name: payingAddress
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Paying wallet address
+
+        - name: approvedAddress
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Approved wallet address
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  approvals:
+                    "$ref": "#/components/schemas/CreditShareApprovals"
+                  amount:
+                    type: string
+                    example: "332824926"
+                    description: Total amount of remaining approved winc for the given payingAddress and approvedAddress
+                  expiresBy:
+                    type: number
+                    example: 123456789
+                    description: The unix timestamp of the earliest expiration date on the approval
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Invalid paying address!"
+
+        "503":
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Internal server error"
+
+  /account/approvals/get:
+    get:
+      tags:
+        - Approvals
+      summary: Get all credit share approvals for a given payingAddress and approvedAddress
+      description: Get all credit share approvals for a given userAddress
+
+      parameters:
+        - name: userAddress
+          in: query
+          required: true
+          schema:
+            type: string
+            description: Paying wallet address
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  givenApprovals:
+                    "$ref": "#/components/schemas/CreditShareApprovals"
+                  receivedApprovals:
+                    "$ref": "#/components/schemas/CreditShareApprovals"
+
+        "400":
+          description: Bad Request
+          content:
+            text/plain:
+              schema:
+                type: string
+                description: "Error message string dependent on cause"
+                example: "Invalid paying address!"
+
+        "503":
+          description: Service Unavailable
+          content:
+            text/plain:
+              schema:
+                type: string
+                default: "Internal server error"
+
+  /info:
+    get:
+      tags:
+        - Info
+      summary: Get service information
+      description: Get the current version of the service and the addresses for the supported blockchains
+
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  version:
+                    type: string
+                    example: 0.2.0
+                  addresses:
+                    type: object
+                    properties:
+                      arweave:
+                        type: string
+                        example: JNC6vBhjHY1EPwV3pEeNmrsgFMxH5d38_LHsZ7jful8
+                      ethereum:
+                        type: string
+                        example: 0x6A0A10FFD285c971B841bee8892878c0d583Bf67
+                      solana:
+                        type: string
+                        example: HepiT2k93CFQaSB7i3ZNXhybZKn5MeWiv3UkLsaJKk4i
+                      matic:
+                        type: string
+                        example: 0x6A0A10FFD285c971B841bee8892878c0d583Bf67
+                      kyve:
+                        type: string
+                        example: kyve1clmuh5sjw73784lg0gnf4p07qefzrtk78an698
+                  gateway:
+                    type: string
+                    example: https://arweave.net/

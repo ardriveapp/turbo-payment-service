@@ -14,9 +14,10 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { PublicKey } from "@solana/web3.js";
 import { createHash } from "crypto";
 
-import { UserAddressType } from "../database/dbTypes";
+import { UserAddressType, userAddressTypes } from "../database/dbTypes";
 import { Base64URLString, PublicArweaveAddress } from "../types";
 
 export function ownerToAddress(owner: Base64URLString): PublicArweaveAddress {
@@ -53,8 +54,11 @@ export function isValidArweaveBase64URL(base64URL: Base64URLString) {
 }
 
 export function isValidSolanaAddress(address: string) {
-  const solanaAddressRegex = new RegExp("^[A-Za-z0-9]{44}$");
-  return solanaAddressRegex.test(address);
+  try {
+    return PublicKey.isOnCurve(address);
+  } catch {
+    return false;
+  }
 }
 
 export function isValidEthAddress(address: string) {
@@ -78,16 +82,27 @@ export function isValidUserAddress(
 ): boolean {
   switch (type) {
     case "arweave":
+    case "ario":
       return isValidArweaveBase64URL(address);
     case "solana":
+    case "ed25519":
       return isValidSolanaAddress(address);
     case "ethereum":
+    case "base-eth":
       return isValidEthAddress(address);
     case "kyve":
       return isValidKyveAddress(address);
     case "matic":
+    case "pol":
       return isValidMaticAddress(address);
-    default:
-      return false;
   }
+}
+
+export function isAnyValidUserAddress(address: string): boolean {
+  for (const type of userAddressTypes) {
+    if (isValidUserAddress(address, type)) {
+      return true;
+    }
+  }
+  return false;
 }

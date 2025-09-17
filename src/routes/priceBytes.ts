@@ -26,14 +26,14 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
 
   const bytesValue = ctx.params.amount;
 
-  logger.info("GET request for price of winc for a given byte count", {
+  logger.debug("GET request for price of winc for a given byte count", {
     bytesValue,
   });
 
   if (Number(bytesValue) > Number.MAX_SAFE_INTEGER) {
     ctx.response.status = 400;
     ctx.body = "Byte count too large";
-    logger.info("Byte count too large", { bytesValue });
+    logger.warn("Byte count too large", { bytesValue });
     return next();
   }
   let bytes: ByteCount;
@@ -57,7 +57,7 @@ export async function priceBytesHandler(ctx: KoaContext, next: Next) {
       winc: finalPrice.winc.toString(),
       adjustments,
     };
-    logger.info("Successfully calculated price for byte count", {
+    logger.debug("Successfully calculated price for byte count", {
       ...priceWithAdjustments,
     });
   } catch (error) {

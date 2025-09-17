@@ -263,4 +263,24 @@ describe("Winston class", () => {
       ).to.equal("18014398509481982");
     });
   });
+
+  describe("isEqualTo function", () => {
+    it("returns true when two Winston values are equal", () => {
+      expect(new Winston(1).isEqualTo(new Winston(1))).to.be.true;
+    });
+
+    it("returns false when two Winston values are not equal", () => {
+      expect(new Winston(1).isEqualTo(new Winston(2))).to.be.false;
+    });
+  });
+
+  describe("isZero function", () => {
+    it("returns true when Winston value is 0", () => {
+      expect(new Winston(0).isZero()).to.be.true;
+    });
+
+    it("returns false when Winston value is not 0", () => {
+      expect(new Winston(1).isZero()).to.be.false;
+    });
+  });
 });

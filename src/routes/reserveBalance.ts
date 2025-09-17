@@ -16,102 +16,85 @@
  */
 import { Next } from "koa";
 
-import { InsufficientBalance, UserNotFoundWarning } from "../database/errors";
-import { KoaContext } from "../server";
-import { isValidUserAddress } from "../utils/base64";
 import {
-  validateAuthorizedRoute,
-  validateByteCount,
-  validateQueryParameters,
-  validateUserAddressType,
-} from "../utils/validators";
+  BadRequest,
+  InsufficientBalance,
+  Unauthorized,
+  UserNotFoundWarning,
+} from "../database/errors";
+import { KoaContext } from "../server";
+import { getValidatedReserveBalanceParams } from "../utils/validators";
 
 export async function reserveBalance(ctx: KoaContext, next: Next) {
   const { paymentDatabase, pricingService, logger } = ctx.state;
 
-  const { walletAddress, token: rawToken = "arweave" } = ctx.params;
-
-  if (!validateAuthorizedRoute(ctx)) {
-    return next();
-  }
-
-  const { byteCount: rawByteCount, dataItemId: rawDataItemId } = ctx.query;
-
-  const userAddressType = validateUserAddressType(ctx, rawToken);
-  if (!userAddressType) {
-    return next();
-  }
-  if (!isValidUserAddress(walletAddress, userAddressType)) {
-    ctx.response.status = 400;
-    ctx.response.message = "Invalid wallet address";
-    return next();
-  }
-
-  const queryParameters = [rawByteCount, rawDataItemId];
-  if (!validateQueryParameters(ctx, queryParameters)) {
-    return next();
-  }
-
-  // TODO: do some regex validation on the dataItemId
-  const [stringByteCount, dataItemId] = queryParameters;
-
-  const byteCount = validateByteCount(ctx, stringByteCount);
-  if (!byteCount) {
-    return next();
-  }
-
   try {
-    logger.info("Getting base credit amount for byte count...", {
-      walletAddress,
+    const {
       byteCount,
       dataItemId,
-    });
+      paidBy,
+      paymentDirective,
+      signerAddress,
+      signerAddressType,
+    } = getValidatedReserveBalanceParams(ctx);
     const priceWithAdjustments = await pricingService.getWCForBytes(
       byteCount,
-      walletAddress
+      // If paidBy is not provided, use the signer address as the payer
+      paidBy.length > 0 ? paidBy[0] : signerAddress
     );
-    const { finalPrice, networkPrice, adjustments } = priceWithAdjustments;
+    const {
+      finalPrice,
+      networkPrice,
+      adjustments,
+      deprecatedChunkBasedNetworkPrice,
+    } = priceWithAdjustments;
 
-    logger.info("Reserving balance for user ", {
-      walletAddress,
-      byteCount,
-      dataItemId,
-      ...priceWithAdjustments,
-    });
     await paymentDatabase.reserveBalance({
-      userAddress: walletAddress,
+      signerAddress,
       dataItemId,
       reservedWincAmount: finalPrice,
       adjustments,
       networkWincAmount: networkPrice,
-      userAddressType,
-    });
-    ctx.response.status = 200;
-    ctx.response.message = "Balance reserved";
-    // TODO: Adjust to JSON response body to Expose adjustments via Reserve balance (e.g: body = { winc, adjustments }), and then to the user of data POST
-    ctx.body = finalPrice.winc;
-    logger.info("Balance reserved for user!", {
-      walletAddress,
-      byteCount,
-      dataItemId,
-      ...priceWithAdjustments,
+      signerAddressType,
+      paidBy,
+      paymentDirective,
     });
 
-    return next();
+    ctx.response.status = 200;
+    ctx.response.message = "Balance reserved";
+    ctx.body = finalPrice.winc;
+
+    logger.info("Balance reserved for user!", {
+      signerAddress,
+      byteCount,
+      dataItemId,
+      networkPrice: networkPrice.winc,
+      networkPriceDifference: networkPrice.winc.minus(
+        deprecatedChunkBasedNetworkPrice.winc
+      ),
+    });
   } catch (error: UserNotFoundWarning | InsufficientBalance | unknown) {
     if (error instanceof UserNotFoundWarning) {
       ctx.response.status = 404;
       ctx.response.message = "User not found";
-      logger.info(error.message, { walletAddress, byteCount });
     } else if (error instanceof InsufficientBalance) {
       ctx.response.status = 402;
       ctx.response.message = "Insufficient balance";
-      logger.info(error.message, { walletAddress, byteCount });
-      return next();
+    } else if (error instanceof Unauthorized) {
+      ctx.response.status = 401;
+      ctx.response.message = error.message;
+    } else if (error instanceof BadRequest) {
+      logger.error("Bad request reserving balance", {
+        params: ctx.params,
+        query: ctx.query,
+        error,
+      });
+      ctx.response.status = 400;
+      ctx.response.message = error.message;
     } else {
       logger.error("Error reserving balance", {
-        walletAddress,
-        byteCount,
+        params: ctx.params,
+        query: ctx.query,
         error,
       });
 
@@ -119,5 +102,6 @@ export async function reserveBalance(ctx: KoaContext, next: Next) {
       ctx.response.message = "Error reserving balance";
     }
   }
+
   return next();
 }

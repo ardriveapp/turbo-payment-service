@@ -21,12 +21,13 @@ import validator from "validator";
 
 import {
   CurrencyLimitations,
-  defaultCheckoutCancelUrl,
+  defaultTopUpCheckoutCancelUrl,
+  defaultTopUpCheckoutSuccessUrl,
   electronicallySuppliedServicesTaxCode,
   isGiftingEnabled,
-  paymentIntentTopUpMethod,
-  topUpMethods,
-  topUpQuoteExpirationMs,
+  paymentIntentStripeMethod,
+  stripePaymentMethods,
+  stripePaymentQuoteExpirationMs,
 } from "../constants";
 import { CreateTopUpQuoteParams } from "../database/dbTypes";
 import {
@@ -38,8 +39,9 @@ import { MetricRegistry } from "../metricRegistry";
 import { WincForPaymentResponse } from "../pricing/pricing";
 import { KoaContext } from "../server";
 import { Payment } from "../types/payment";
-import { winstonToArc } from "../types/winston";
+import { winstonToCredits } from "../types/winston";
 import { isValidUserAddress } from "../utils/base64";
+import { toStripeMetadata } from "../utils/common";
 import { parseQueryParams } from "../utils/parseQueryParams";
 import {
   assertUiModeAndUrls,
@@ -67,10 +69,9 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
   const loggerObject = { amount, currency, method, rawDestinationAddress };
 
-  if (!topUpMethods.includes(method)) {
+  if (!stripePaymentMethods.includes(method)) {
     ctx.response.status = 400;
-    ctx.body = `Payment method must include one of: ${topUpMethods.toString()}!`;
-    logger.info("top-up GET -- Invalid payment method", loggerObject);
+    ctx.body = `Payment method must include one of: ${stripePaymentMethods.toString()}!`;
     return next();
   }
 
@@ -118,8 +119,10 @@ export async function topUp(ctx: KoaContext, next: Next) {
     if (validatedQueryParams.uiMode === "hosted") {
       stripeUiModeMetadata = {
         ui_mode: validatedQueryParams.uiMode,
-        success_url: validatedQueryParams.successUrl,
-        cancel_url: validatedQueryParams.cancelUrl,
+        success_url:
+          validatedQueryParams.successUrl ?? defaultTopUpCheckoutSuccessUrl,
+        cancel_url:
+          validatedQueryParams.cancelUrl ?? defaultTopUpCheckoutCancelUrl,
       };
     } else {
       stripeUiModeMetadata = {
@@ -148,14 +151,12 @@ export async function topUp(ctx: KoaContext, next: Next) {
     if (!isGiftingEnabled) {
       ctx.response.status = 403;
       ctx.body = "Gifting by email is disabled!";
-      logger.info("top-up GET -- Gifting is disabled", loggerObject);
       return next();
     }
 
     if (!validator.isEmail(rawDestinationAddress)) {
       ctx.response.status = 400;
       ctx.body = "Destination address is not a valid email!";
-      logger.info("top-up GET -- Invalid destination address", loggerObject);
       return next();
     }
 
@@ -195,7 +196,6 @@ export async function topUp(ctx: KoaContext, next: Next) {
     if (error instanceof PaymentValidationError) {
       ctx.response.status = 400;
       ctx.body = error.message;
-      logger.info(error.message, loggerObject);
     } else {
       logger.error(error);
       ctx.response.status = 503;
@@ -232,7 +232,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
   }
 
   const quoteExpirationDate = new Date(
-    Date.now() + topUpQuoteExpirationMs
+    Date.now() + stripePaymentQuoteExpirationMs
   ).toISOString();
   const quoteExpirationMs = new Date(quoteExpirationDate).getTime();
 
@@ -261,27 +261,29 @@ export async function topUp(ctx: KoaContext, next: Next) {
   };
 
   const { paymentProvider, adjustments: _a, ...stripeMetadataRaw } = topUpQuote;
-  const stripeMetadata = adjustments.reduce(
-    (acc, curr, i) => {
-      // Add adjustments to stripe metadata
-      // Stripe key name in metadata is limited to 40 characters, so we need to truncate the name.
-      const keyName = `adj${i}_${curr.name}`.slice(0, 40);
-      acc[keyName] = curr.adjustmentAmount.toString();
-      return acc;
-    },
-    {
+  const stripeMetadata = toStripeMetadata({
+    adjustments,
+    baseMetadata: {
       ...stripeMetadataRaw,
       winstonCreditAmount: finalPrice.winc.toString(),
-      referer,
-    } as Record<string, string | number | null>
-  );
+      referer: referer ?? null,
+    },
+  });
+
+  const payment_method_types = ["card"];
+  if (
+    stripeUiModeMetadata.ui_mode === "hosted" ||
+    "return_url" in stripeUiModeMetadata
+  ) {
+    payment_method_types.push("crypto");
+  }
 
   let intentOrCheckout:
     | Stripe.Response<Stripe.PaymentIntent>
     | Stripe.Response<Stripe.Checkout.Session>;
   try {
-    logger.info(`Creating stripe ${method}...`, loggerObject);
-    if (method === paymentIntentTopUpMethod) {
+    logger.debug(`Creating stripe ${method}...`, loggerObject);
+    if (method === paymentIntentStripeMethod) {
       intentOrCheckout = await stripe.paymentIntents.create({
         amount: actualPaymentAmount,
         currency: payment.type,
@@ -315,7 +317,7 @@ export async function topUp(ctx: KoaContext, next: Next) {
 
           stripeUiModeMetadata.cancel_url = `${giftUrl}?${queryParams.toString()}`;
         } else {
-          stripeUiModeMetadata.cancel_url = defaultCheckoutCancelUrl;
+          stripeUiModeMetadata.cancel_url = defaultTopUpCheckoutCancelUrl;
         }
       }
       intentOrCheckout = await stripe.checkout.sessions.create({
@@ -326,13 +328,14 @@ export async function topUp(ctx: KoaContext, next: Next) {
         },
         // Convert to stripe compatible timestamp, trim off precision
         expires_at: Math.floor(quoteExpirationMs / 1000),
-        payment_method_types: ["card"],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        payment_method_types: payment_method_types as any, // Stripe supports crypto payments, but types are not updated yet
         line_items: [
           {
             price_data: {
               product_data: {
                 name: "Turbo Credits",
-                description: `${winstonToArc(
+                description: `${winstonToCredits(
                   finalPrice.winc
                 )} credits on Turbo to destination address "${destinationAddress}"`,
                 tax_code: electronicallySuppliedServicesTaxCode,
@@ -375,16 +378,14 @@ export async function topUp(ctx: KoaContext, next: Next) {
   ctx.body = {
     topUpQuote,
     paymentSession: intentOrCheckout,
-    adjustments: adjustments.map((a) => {
-      const { catalogId: _, ...adjustmentsWithoutCatalogId } = a;
-
-      return adjustmentsWithoutCatalogId;
-    }),
-    fees: inclusiveAdjustments.map((a) => {
-      const { catalogId: _, ...adjustmentsWithoutCatalogId } = a;
-
-      return adjustmentsWithoutCatalogId;
-    }),
+    adjustments: adjustments.map(
+      ({ catalogId: _, ...adjustmentsWithoutCatalogId }) =>
+        adjustmentsWithoutCatalogId
+    ),
+    fees: inclusiveAdjustments.map(
+      ({ catalogId: _, ...adjustmentsWithoutCatalogId }) =>
+        adjustmentsWithoutCatalogId
+    ),
   };
   ctx.response.status = 200;
 

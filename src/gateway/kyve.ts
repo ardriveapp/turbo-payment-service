@@ -18,7 +18,7 @@ import { AxiosInstance } from "axios";
 import BigNumber from "bignumber.js";
 
 import { createAxiosInstance } from "../axiosClient";
-import { kyveGatewayUrl } from "../constants";
+import { gatewayUrls } from "../constants";
 import {
   PaymentTransactionNotMined,
   TransactionNotAPaymentTransaction,
@@ -85,7 +85,7 @@ export class KyveGateway extends Gateway {
   private axiosInstance: AxiosInstance;
 
   constructor({
-    endpoint = kyveGatewayUrl,
+    endpoint = gatewayUrls.kyve,
     paymentTxPollingWaitTimeMs,
     pendingTxMaxAttempts = 3,
     axiosInstance = createAxiosInstance({

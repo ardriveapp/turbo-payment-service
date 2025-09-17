@@ -33,9 +33,17 @@ export class Winston {
     return W(this.amount.minus(winston.amount));
   }
 
-  times(multiplier: BigNumber.Value): Winston {
+  times(
+    multiplier: BigNumber.Value,
+    round: "ROUND_DOWN" | "ROUND_CEIL" = "ROUND_DOWN"
+  ): Winston {
     return W(
-      this.amount.times(multiplier).decimalPlaces(0, BigNumber.ROUND_DOWN)
+      this.amount
+        .times(multiplier)
+        .decimalPlaces(
+          0,
+          round === "ROUND_DOWN" ? BigNumber.ROUND_DOWN : BigNumber.ROUND_CEIL
+        )
     );
   }
 
@@ -43,7 +51,6 @@ export class Winston {
     divisor: BigNumber.Value,
     round: "ROUND_DOWN" | "ROUND_CEIL" = "ROUND_CEIL"
   ): Winston {
-    // TODO: Best rounding strategy? Up or down?
     return W(
       this.amount
         .dividedBy(divisor)
@@ -60,6 +67,14 @@ export class Winston {
 
   isLessThan(winston: Winston): boolean {
     return this.amount.isLessThan(winston.amount);
+  }
+
+  isEqualTo(winston: Winston): boolean {
+    return this.amount.isEqualTo(winston.amount);
+  }
+
+  isZero(): boolean {
+    return this.amount.isZero();
   }
 
   isNonZeroPositiveInteger(): boolean {
@@ -105,7 +120,7 @@ export function W(amount: BigNumber.Value): Winston {
   return new Winston(amount);
 }
 
-export function winstonToArc(winston: Winston): string {
+export function winstonToCredits(winston: Winston): string {
   BigNumber.config({ DECIMAL_PLACES: 12 });
   const w = new BigNumber(winston.toString(), 10);
   return w.shiftedBy(-12).toFixed();

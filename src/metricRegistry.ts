@@ -39,6 +39,16 @@ export class MetricRegistry {
     help: "top_ups",
   });
 
+  public static arnsPurchaseQuoteSuccessCounter = new promClient.Counter({
+    name: "arns_purchase_quote_success",
+    help: "arns_purchase_quote_success",
+  });
+
+  public static arnsPurchaseQuoteFailedCounter = new promClient.Counter({
+    name: "arns_purchase_quote_failed",
+    help: "arns_purchase_quote_failed",
+  });
+
   public static paymentSuccessCounter = new promClient.Counter({
     name: "payment_intent_succeeded",
     help: "payment_intent_succeeded",
@@ -89,6 +99,13 @@ export class MetricRegistry {
     this.registry.registerMetric(MetricRegistry.failedChargebackCounter);
     this.registry.registerMetric(MetricRegistry.paymentRefundedCounter);
     this.registry.registerMetric(MetricRegistry.paymentSuccessCounter);
+    this.registry.registerMetric(
+      MetricRegistry.arnsPurchaseQuoteSuccessCounter
+    );
+    this.registry.registerMetric(
+      MetricRegistry. arnsPurchaseQuoteFailedCounter
+    );
+    this.registry.registerMetric(MetricRegistry.arnsPurchaseQuoteFailedCounter);
     this.registry.registerMetric(MetricRegistry.topUpsCounter);
     this.registry.registerMetric(MetricRegistry.uncaughtExceptionCounter);
     this.registry.registerMetric(

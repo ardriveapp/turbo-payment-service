@@ -18,22 +18,24 @@ import { Next } from "koa";
 
 import { KoaContext } from "../server";
 
+// cspell:disable -- Turbo Dev env defaults
+const defaultArAddress = "8jNb-iG3a3XByFuZnZ_MWMQSZE0zvxPMaMMBNMYegY4";
+const defaultArioAddress = "NlQZT84j3RXav1Y9WRKZWd360D51os3PXH3aDDFTqjk";
+const defaultEthAddress = "0x9B13eb5096264B12532b8C648Eba4A662b4078ce";
+const defaultSolAddress = "Bg5HnSVtgHVXEGqJYWqxWad9Vrcgva9JrKw3XFSEGvaB";
+const defaultKyveAddress = "kyve18yazy0nuyvctmygxr7uhddwd5clxltmgtqgc8p"; // cspell:enable
+
 export const walletAddresses = {
-  // cspell:disable -- Turbo Dev env defaults
-  arweave:
-    process.env.ARWEAVE_ADDRESS ??
-    "8jNb-iG3a3XByFuZnZ_MWMQSZE0zvxPMaMMBNMYegY4",
-  ethereum:
-    process.env.ETHEREUM_ADDRESS ??
-    "0x9B13eb5096264B12532b8C648Eba4A662b4078ce",
-  solana:
-    process.env.SOLANA_ADDRESS ??
-    "Bg5HnSVtgHVXEGqJYWqxWad9Vrcgva9JrKw3XFSEGvaB",
-  matic:
-    process.env.MATIC_ADDRESS ?? "0x9B13eb5096264B12532b8C648Eba4A662b4078ce",
-  kyve:
-    process.env.KYVE_ADDRESS ?? "kyve18yazy0nuyvctmygxr7uhddwd5clxltmgtqgc8p",
-} as const; // cspell:enable
+  arweave: process.env.ARWEAVE_ADDRESS ?? defaultArAddress,
+  ario: process.env.ARIO_ADDRESS ?? defaultArioAddress,
+  ethereum: process.env.ETHEREUM_ADDRESS ?? defaultEthAddress,
+  solana: process.env.SOLANA_ADDRESS ?? defaultSolAddress,
+  ed25519: process.env.SOLANA_ADDRESS ?? defaultSolAddress,
+  matic: process.env.MATIC_ADDRESS ?? defaultEthAddress,
+  pol: process.env.MATIC_ADDRESS ?? defaultEthAddress,
+  "base-eth": process.env.BASE_ETH_ADDRESS ?? defaultEthAddress,
+  kyve: process.env.KYVE_ADDRESS ?? defaultKyveAddress,
+} as const;
 
 export async function rootResponse(ctx: KoaContext, next: Next) {
   ctx.body = {

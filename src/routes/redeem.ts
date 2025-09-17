@@ -61,7 +61,7 @@ export async function redeem(ctx: KoaContext, next: Next): Promise<void> {
   if (!validator.isEmail(email)) {
     ctx.response.status = 400;
     ctx.body = "Provided recipient email address is not a valid email!";
-    logger.info("top-up GET -- Invalid destination address", ctx.params);
+    logger.warn("top-up GET -- Invalid destination address", ctx.params);
     return next();
   }
   const recipientEmail = validator.escape(email);
@@ -74,7 +74,7 @@ export async function redeem(ctx: KoaContext, next: Next): Promise<void> {
   let user: User;
   let wincRedeemed: WC;
   try {
-    logger.info("Redeeming payment receipt");
+    logger.debug("Redeeming payment receipt");
     const res = await paymentDatabase.redeemGift({
       destinationAddress,
       destinationAddressType: userAddressType,
@@ -87,7 +87,7 @@ export async function redeem(ctx: KoaContext, next: Next): Promise<void> {
     if (error instanceof GiftRedemptionError) {
       ctx.response.status = 400;
       ctx.body = error.message;
-      logger.info(error.message);
+      logger.error(error.message);
       return next();
     }
     const message =

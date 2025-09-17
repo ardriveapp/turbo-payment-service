@@ -16,7 +16,7 @@
     "test:unit": "nyc mocha --spec='src/**/*.test.ts'",
     "test:integration": "nyc mocha --spec='tests/**/*.test.ts'",
     "test:integration:local": "yarn db:up && yarn test:integration \"$@\" ; yarn db:down",
-    "test:docker": " docker compose down -v && docker compose up test-runner --exit-code-from test-runner --build",
+    "test:docker": "docker compose down -v && docker compose --profile test up test-runner --exit-code-from test-runner --build",
     "ci": "yarn build && yarn test:docker",
     "build": "yarn clean && tsc --project ./tsconfig.prod.json",
     "dev": "yarn clean && tsc --project ./tsconfig.prod.json -w",
@@ -28,7 +28,8 @@
     "db:down": "docker compose down -v",
     "db:migrate:latest": "yarn knex migrate:latest --cwd ./src/database --knexfile knexfile.ts",
     "db:migrate:rollback": "yarn knex migrate:rollback $* --cwd ./src/database --knexfile knexfile.ts",
-    "db:make:migration": "yarn knex migrate:make $* -x ts --cwd ./src/database --knexfile knexfile.ts"
+    "db:migrate:make": "yarn knex migrate:make $* -x ts --cwd ./src/database --knexfile knexfile.ts",
+    "db:migrate:list": "yarn knex migrate:list --cwd ./src/database --knexfile knexfile.ts"
   },
   "devDependencies": {
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
@@ -65,22 +66,25 @@
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "@ardrive/ardrive-promise-cache": "^1.1.4",
-    "@aws-sdk/client-secrets-manager": "^3.290.0",
-    "@aws-sdk/client-ssm": "^3.369.0",
+    "@ar.io/sdk": "^3.8.2",
+    "@ardrive/ardrive-promise-cache": "^1.4.0",
+    "@aws-sdk/client-secrets-manager": "^3.654.0",
+    "@aws-sdk/client-ssm": "^3.654.0",
     "@koa/cors": "^5.0.0",
-    "@solana/web3.js": "^1.91.7",
+    "@permaweb/aoconnect": "0.0.57",
+    "@solana/web3.js": "^1.98.2",
     "arweave": "^1.13.4",
-    "axios": "^1.6.7",
+    "axios": "^1.8.4",
     "axios-retry": "^3.4.0",
     "bignumber.js": "^9.1.0",
+    "bs58": "^6.0.0",
     "dotenv": "^16.0.3",
     "ethers": "^6.11.1",
     "jsonwebtoken": "^9.0.0",
     "knex": "^2.5.1",
-    "koa": "2.13.4",
+    "koa": "3.0.0-alpha.3",
     "koa-jwt": "^4.0.4",
-    "koa-router": "11.0.1",
+    "koa-router": "^13.0.1",
     "koa2-swagger-ui": "^5.8.0",
     "mandrill-api": "^1.0.45",
     "p-limit": "^3.1.0",
@@ -88,10 +92,18 @@
     "prom-client": "^14.1.0",
     "raw-body": "^2.5.2",
     "sinon-chai": "^3.7.0",
-    "sqs-consumer": "^8.2.0",
+    "sqs-consumer": "^11.0.2",
     "stripe": "^14.11.0",
     "validator": "^13.11.0",
     "winston": "^3.8.2",
     "yaml": "^2.2.2"
+  },
+  "resolutions": {
+    "axios": "^1.8.4",
+    "ws": "8.17.1",
+    "cross-spawn": "7.0.5",
+    "@babel/runtime": "7.26.10",
+    "base-x": "4.0.1",
+    "form-data": "^4.0.4"
   }
 }

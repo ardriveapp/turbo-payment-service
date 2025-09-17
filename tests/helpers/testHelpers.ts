@@ -16,6 +16,7 @@
  */
 import axiosPackage from "axios";
 import { expect } from "chai";
+import { HDNodeWallet } from "ethers";
 import { Knex } from "knex";
 import Stripe from "stripe";
 
@@ -25,10 +26,13 @@ import { MandrillEmailProvider } from "../../src/emailProvider";
 import {
   ArweaveGateway,
   EthereumGateway,
+  GatewayMap,
   KyveGateway,
-  SolanaGateway,
   MaticGateway,
+  SolanaGateway,
 } from "../../src/gateway";
+import { ARIOGateway } from "../../src/gateway/ario";
+import { BaseEthGateway } from "../../src/gateway/base-eth";
 import {
   ArweaveBytesToWinstonOracle,
   ReadThroughBytesToWinstonOracle,
@@ -100,7 +104,7 @@ export function listTables(pg: Knex): Knex.Raw<KnexRawResult> {
   );
 }
 
-export const testWallet: JWKInterface = {
+export const testArweaveWallet: JWKInterface = {
   kty: "RSA", // cspell:disable
   n: "i0V3ejfc2ZFFRptzx5Tx8ShWtO9LTvunuqMbgqymvMNPjtFWi6pyg6xTIl0qL4xb5Dtv-5O8GO4lfNn5mPDnCfNGIrcY0TO82HH8CVT5g2KsZzBec_XjjxwKeRmoYzMB2JxCBzMm5kVhURN98Vz8_aETlU0JDbWdOsDcVsTWk_fPmyu-Bo3KQVB9X8o9EgySVl9CD9FiAAMQsRjOhe2ACzqqiaEOraTZPtA53R3LdeHRC3S0no1Ux-_4T5hisPlSRXrJ5OFpzQKizMEQ8_Hnw3QAB1KRgdBKYd34SlQWHF3bDuk_5m1nWYusIJ92GNxPuO1ic6AZKpWgZEC3b4-qwvJmhQfBB79yNvxMLyvav1k2rCUzEy2-tA5DSyKTwOuZiNNx9anpabQxiA7jeXglk4q8DGJ8kLMoicG3XiSswB_a7u2cNSkbSqOzV65_th71jVfRpLpXRqFuq-H0qmAgA8iweSzd-YsOpVxsGgOOQXJORYfDRwPpk44RuQbGYzqcVjfEc8R2-NkndJb3lgA1lcUkGgrBTcb-j1Xv-wQ0wjnJ3zBbvM4lNgEc4Oj6aZD715spC7b_FB7DYQNuUzXpDlDqqH8uvT-Vt-z_UDn9qse5dXJBk4p5N4QYkHDt9JYyNplUlufQlHzJTuj_fZwBD_-hRdcmrZaifjHU4hagCU8",
   e: "AQAB",
@@ -111,6 +115,10 @@ export const testWallet: JWKInterface = {
   dq: "EESORt_-Nty1howIEXpbSuvTWXMGSnkXuwAMh4zDR6jhRUB5Gyfgz_3JQW1Xd93Vr3mqg_ul2uehb5sd_VTnGFCCco1MlcV13NL7AJntwRc-furD3LdXr9Vu6mhlO25uPPrBI58tT4iC_QZD7891NMgRT4uUWqbK0w4xd4CvGAYpWPd77TOuShFYCRWuFSCM8VQe_Vi8aYBtIlQezDl36mYlyvAWpMTftqsGk9VKzZG4wwLoy24gx6Ou94_3Rlvd2OctlMCAtLfFokwupoCeKDeqZywBIuJleUavFZeQLF7GQZB7MznO5DT6XQTq26u1p9hCnqiQT0maTvXaLFycwQ",
   qi: "Fthoo6f2f_oaLSu3jtqXqpQpc2H1w1Ns0XxtyD6fi_wW2r3toXaD6Mz0B3eoz-pH6yCmqbquGO3Vt46U6QHAz44oAXKadpV11QfZdjxrc6jqQ-4wUlqvkaOZrCidKL3t7iYqS6x3Ob1vk4MeaOX62r0FgGJ7TLAJeH1csmH9tFbgMt0Q3hgNf6vMZZ0R1nuRS-vjEqW-SbjH2GDfBTiRjP-LjnA-AvZA-aAJvl8odD0RuY8c66krzd1gS8svN4Nhxrgcdc-LB2bVCP0TiuJtP56XaqHZgxk7pmQivCk7SFjOaiISmAksXqk82GNZKoQQnKHyXU9b-YbZKRYD1SUaCw",
 }; // cspell:disable
+
+export const testEthereumWallet = HDNodeWallet.fromPhrase(
+  "flame fitness cube rug clown horn ridge indoor cement couple announce weekend"
+);
 
 export const paymentDatabase = new PostgresDatabase();
 export const dbTestHelper = new DbTestHelper(paymentDatabase);
@@ -136,24 +144,24 @@ export const axios = axiosPackage.create({
   validateStatus: () => true,
 });
 export const emailProvider = new MandrillEmailProvider("test");
-export const gatewayMap = {
+
+const gatewaySettings = { paymentTxPollingWaitTimeMs: 0 };
+export const gatewayMap: GatewayMap = {
   arweave: new ArweaveGateway({
     axiosInstance: axios,
-    // fail polling strategy fast in test environment
-    paymentTxPollingWaitTimeMs: 0,
+    ...gatewaySettings,
   }),
-  ethereum: new EthereumGateway({
-    paymentTxPollingWaitTimeMs: 0,
+  ethereum: new EthereumGateway(gatewaySettings),
+  solana: new SolanaGateway(gatewaySettings),
+  ed25519: new SolanaGateway(gatewaySettings),
+  kyve: new KyveGateway(gatewaySettings),
+  matic: new MaticGateway(gatewaySettings),
+  pol: new MaticGateway(gatewaySettings),
+  "base-eth": new BaseEthGateway({ ...gatewaySettings }),
+  ario: new ARIOGateway({
+    ...gatewaySettings,
+    jwk: testArweaveWallet,
   }),
-  solana: new SolanaGateway({
-    paymentTxPollingWaitTimeMs: 0,
-  }),
-  kyve: new KyveGateway({
-    paymentTxPollingWaitTimeMs: 0,
-  }),
-  matic: new MaticGateway({
-    paymentTxPollingWaitTimeMs: 0,
-  })
 };
 
 export const testAddress = "-kYy3_LcYeKhtqNNXDN6xTQ7hW8S5EV0jgq_6j8a830"; // cspell:disable-line

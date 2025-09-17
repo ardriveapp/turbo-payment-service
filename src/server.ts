@@ -37,11 +37,14 @@ import {
   MaticGateway,
   SolanaGateway,
 } from "./gateway";
+import { ARIOGateway } from "./gateway/ario";
+import { BaseEthGateway } from "./gateway/base-eth";
 import logger from "./logger";
 import { MetricRegistry } from "./metricRegistry";
 import { architectureMiddleware, loggerMiddleware } from "./middleware";
 import { TurboPricingService } from "./pricing/pricing";
 import router from "./router";
+import { JWKInterface } from "./types/jwkTypes";
 import { loadSecretsToEnv } from "./utils/loadSecretsToEnv";
 
 type KoaState = DefaultState & Architecture & { logger: Logger };
@@ -95,12 +98,22 @@ export async function createServer(
     arch.paymentDatabase ?? new PostgresDatabase({ migrate: migrateOnStartup });
   const stripe =
     arch.stripe ?? new Stripe(STRIPE_SECRET_KEY, { apiVersion: "2023-10-16" });
+
+  const jwk: JWKInterface =
+    process.env.ARIO_SIGNING_JWK !== undefined
+      ? JSON.parse(process.env.ARIO_SIGNING_JWK)
+      : undefined;
+
   const gatewayMap: GatewayMap = arch.gatewayMap ?? {
     arweave: new ArweaveGateway(),
+    ario: new ARIOGateway({ jwk, logger }),
     ethereum: new EthereumGateway(),
     solana: new SolanaGateway(),
+    ed25519: new SolanaGateway(),
     kyve: new KyveGateway(),
     matic: new MaticGateway(),
+    pol: new MaticGateway(),
+    "base-eth": new BaseEthGateway(),
   };
 
   const emailProvider = (() => {

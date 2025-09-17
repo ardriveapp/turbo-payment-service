@@ -14,12 +14,24 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-import { CurrencyType, PaymentAmount, Timestamp, UserAddress } from "./dbTypes";
+import {
+  CurrencyType,
+  DataItemId,
+  PaymentAmount,
+  Timestamp,
+  UserAddress,
+} from "./dbTypes";
 
 abstract class BaseError extends Error {
   constructor(message: string) {
     super(message);
     this.name = this.constructor.name;
+  }
+}
+
+export class BadRequest extends BaseError {
+  constructor(message: string) {
+    super(message);
   }
 }
 
@@ -35,7 +47,7 @@ export class InsufficientBalance extends BaseError {
   }
 }
 
-export abstract class PaymentValidationError extends BaseError {}
+export abstract class PaymentValidationError extends BadRequest {}
 
 export class UnsupportedCurrencyType extends PaymentValidationError {
   constructor(currencyType: CurrencyType) {
@@ -127,7 +139,7 @@ export class GiftAlreadyRedeemed extends GiftRedemptionError {
   }
 }
 
-export class BadQueryParam extends BaseError {
+export class BadQueryParam extends BadRequest {
   constructor(message?: string) {
     super(message ?? `Bad query parameter`);
   }
@@ -169,9 +181,9 @@ export class PaymentTransactionRecipientOnExcludedList extends BaseError {
   }
 }
 
-export class BadRequest extends BaseError {
-  constructor(message: string) {
-    super(message);
+export class Unauthorized extends BaseError {
+  constructor(message?: string) {
+    super(message ?? "No authorization or user provided for authorized route!");
   }
 }
 
@@ -180,5 +192,53 @@ export class CryptoPaymentTooSmallError extends BadRequest {
     super(
       `Crypto payment amount is too small! Token value must convert to at least one winc`
     );
+  }
+}
+
+export class ApprovalInvalid extends BadRequest {
+  constructor(approvedAddress: string, payingAddress: string) {
+    super(
+      `No valid approvals for approved address '${approvedAddress}' and paying address '${payingAddress}'`
+    );
+  }
+}
+
+export class NoApprovalsFound extends BadRequest {
+  constructor({
+    approvedAddress,
+    payingAddress,
+  }: {
+    approvedAddress: string;
+    payingAddress: string;
+  }) {
+    super(
+      `No valid approvals found for approved address '${approvedAddress}' and paying address '${payingAddress}'`
+    );
+  }
+}
+
+export class ConflictingApprovalFound extends BadRequest {
+  constructor(approvalDataItemId: DataItemId) {
+    super(`Conflicting approval found for approval ID '${approvalDataItemId}'`);
+  }
+}
+
+export class ArNSPurchaseNotFound extends BaseError {
+  constructor(nonce: string) {
+    super(`No ArNS name purchase found in the database with nonce '${nonce}'`);
+  }
+}
+
+export class ArNSPurchaseAlreadyExists extends BaseError {
+  constructor(name: string, nonce: string) {
+    super(
+      `An ArNS name purchase for name '${name}' already exists in the database with nonce '${nonce}'`
+    );
+  }
+}
+
+export class InvalidArNSWalletType extends BaseError {
+  constructor(walletType: string) {
+    super(`Wallet type not yet implemented for ArNS Purchases '${walletType}'`);
   }
 }

@@ -23,6 +23,8 @@ import {
   MaticGateway,
   SolanaGateway,
 } from "../gateway";
+import { ARIOGateway } from "../gateway/ario";
+import { BaseEthGateway } from "../gateway/base-eth";
 import globalLogger from "../logger";
 import { TurboPricingService } from "../pricing/pricing";
 import { sendCryptoFundSlackMessage } from "../utils/slack";
@@ -37,16 +39,26 @@ export const expirePendingTransactionAfterMs = 60 * 60 * 24 * 1 * 1000; // 1 day
 
 // Run this job on a cron job to start crediting any pending transactions
 export async function creditPendingTransactionsHandler({
-  gatewayMap = {
-    arweave: new ArweaveGateway(),
-    ethereum: new EthereumGateway(),
-    solana: new SolanaGateway(),
-    kyve: new KyveGateway(),
-    matic: new MaticGateway(),
-  },
   paymentDatabase = new PostgresDatabase(),
   pricingService = new TurboPricingService(),
   logger = globalLogger.child({ job: "credit-pending-transactions-job" }),
+  gatewayMap = {
+    arweave: new ArweaveGateway(),
+    ario: new ARIOGateway({
+      logger,
+      jwk:
+        process.env.ARIO_SIGNING_JWK !== undefined
+          ? JSON.parse(process.env.ARIO_SIGNING_JWK)
+          : undefined,
+    }),
+    ethereum: new EthereumGateway(),
+    solana: new SolanaGateway(),
+    ed25519: new SolanaGateway(),
+    kyve: new KyveGateway(),
+    matic: new MaticGateway(),
+    pol: new MaticGateway(),
+    "base-eth": new BaseEthGateway(),
+  },
 }: CreditPendingTxParams = {}) {
   logger.debug("Starting credit pending transactions job");
 
@@ -88,7 +100,7 @@ export async function creditPendingTransactionsHandler({
         new Date(createdDate) <
           new Date(Date.now() - expirePendingTransactionAfterMs)
       ) {
-        logger.info(
+        logger.warn(
           `Transaction ${transactionId} not found and expired, failing transaction`,
           { txStatus }
         );

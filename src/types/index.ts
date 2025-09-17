@@ -14,6 +14,8 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { userAddressTypes } from "../database/dbTypes";
+
 export * from "./positiveFiniteInteger";
 export * from "./equatable";
 export * from "./ar";
@@ -26,3 +28,14 @@ export type RSAModulusString = Base64URLString;
 export type PublicKeyString = RSAModulusString; // TODO: add other supported public key types (ETH, SOL)
 export type PublicArweaveAddress = Base64URLString;
 export type TransactionId = Base64URLString;
+
+export const supportedPaymentTokens = userAddressTypes;
+export type TokenType = (typeof supportedPaymentTokens)[number];
+export function isSupportedPaymentToken(token: string): token is TokenType {
+  return supportedPaymentTokens.includes(token as TokenType);
+}
+
+export type StripeUiModeMetadata =
+  | { ui_mode: "hosted"; success_url: string; cancel_url: string | undefined }
+  | { ui_mode: "embedded"; redirect_on_completion: "never" }
+  | { ui_mode: "embedded"; return_url: string };

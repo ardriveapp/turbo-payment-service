@@ -38,6 +38,13 @@ export const tableNames = {
   pendingPaymentTransaction: "pending_payment_transaction",
   creditedPaymentTransaction: "credited_payment_transaction",
   failedPaymentTransaction: "failed_payment_transaction",
+
+  delegatedPaymentApproval: "delegated_payment_approval",
+  inactiveDelegatedPaymentApproval: "inactive_delegated_payment_approval",
+
+  arNSPurchaseQuote: "arns_purchase_quote",
+  arNSPurchaseReceipt: "arns_purchase_receipt",
+  failedArNSPurchase: "failed_arns_purchase",
 } as const;
 
 export const columnNames = {
@@ -80,6 +87,7 @@ export const columnNames = {
   reservedDate: "reserved_date",
   networkWincAmount: "network_winc_amount", // amount before adjustments
   reservedWincAmount: "reserved_winc_amount", // amount reserved after adjustments
+  overflowSpend: "overflow_spend",
 
   // Adjustments
   adjustmentId: "adjustment_id",
@@ -142,4 +150,36 @@ export const columnNames = {
 
   // Credited Payment Transaction
   creditedDate: "credited_date",
+
+  // Delegated Payment Approval
+  approvalDataItemId: "approval_data_item_id",
+  // creationDate: "creation_date",
+  // expirationDate: "expiration_date", // nullable
+  approvedAddress: "approved_address",
+  payingAddress: "paying_address",
+  approvedWincAmount: "approved_winc_amount", // amount approved
+  usedWincAmount: "used_winc_amount", // amount used up
+
+  // Inactive Delegated Payment Approval
+  // extends delegated_payment_approval
+  inactiveReason: "inactive_reason", // 'expired', 'used', 'revoked'
+  inactiveDate: "inactive_date",
+  revokeDataItemId: "revoke_data_item_id", // nullable, exists if inactive_reason is 'revoked'
+
+  // ArNS Name Purchase
+  nonce: "nonce",
+  name: "name",
+  owner: "owner",
+  type: "type",
+  years: "years",
+  wincQty: "winc_qty",
+  mARIOQty: "mario_qty",
+  processId: "process_id",
+  increaseQty: "increase_qty",
+  intent: "intent",
+  usdArRate: "usd_ar_rate", // USD to AR rate at the time of purchase
+  usdArioRate: "usd_ario_rate", // USD to ARIO rate at the time of purchase
+  messageId: "message_id",
+  excessWinc: "excess_winc",
+  paidBy: "paid_by", // CSV of user addresses
 } as const;

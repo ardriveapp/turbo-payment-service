@@ -27,7 +27,7 @@ import {
 export async function currenciesRoute(ctx: KoaContext, next: Next) {
   const logger = ctx.state.logger;
 
-  logger.info("Currencies requested");
+  logger.debug("Currencies requested");
 
   try {
     const limits = await ctx.state.pricingService.getCurrencyLimitations();

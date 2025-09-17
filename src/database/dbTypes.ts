@@ -14,11 +14,19 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+import { mARIOToken } from "@ar.io/sdk";
 import BigNumber from "bignumber.js";
+import { Knex } from "knex";
 
-import { TokenType } from "../gateway";
 import { FinalPrice, NetworkPrice } from "../pricing/price";
-import { ByteCount, PublicArweaveAddress, WC, Winston } from "../types";
+import {
+  ByteCount,
+  PublicArweaveAddress,
+  TokenType,
+  TransactionId,
+  WC,
+  Winston,
+} from "../types";
 import "../types/arc";
 
 export interface Adjustment {
@@ -48,10 +56,14 @@ export type UserAddress = string | PublicArweaveAddress;
 
 export const userAddressTypes = [
   "arweave",
+  "ario",
   "solana",
+  "ed25519",
   "ethereum",
   "kyve",
   "matic",
+  "pol",
+  "base-eth",
 ] as const;
 export type UserAddressType = (typeof userAddressTypes)[number];
 
@@ -249,6 +261,16 @@ export type CreateChargebackReceiptParams = {
   chargebackReceiptId: ChargebackReceiptId;
 };
 
+export type PendingSpend = {
+  paying_address: UserAddress;
+  winc_amount: WC;
+};
+export type OverflowSpendDBResult = {
+  paying_address: string;
+  winc_amount: string;
+}[];
+export type OverflowSpend = PendingSpend;
+
 export interface BalanceReservation {
   reservationId: ReservationId;
   dataItemId: DataItemId;
@@ -256,15 +278,40 @@ export interface BalanceReservation {
   reservedDate: Timestamp;
   reservedWincAmount: WC;
   networkWincAmount: WC;
+  overflowSpend: OverflowSpend[];
 }
+
+export const paymentDirectives = [
+  "list-only", // Only use paid-by addresses provided
+  "list-or-signer", // Fallback to signer if paid-by addresses are not provided or don't cover the full cost
+
+  // TODO: front-end can request any given approvals and decide on a list of approvals to use
+  // "any", // Use paid-by addresses provided, or any approvals found, or the signer
+  // "any-approval", // Use paid-by addresses provided, or any approvals found
+
+  // TODO: front-end can do this by inserting the signer as the first paid-by address
+  // "signer-or-list" // Use the signer, but fallback to paid-by addresses provided
+  // "signer-or-any", // Use the signer, but fallback to paid-by addresses provided or any approvals found
+  // "signer-only", // Use the signer only, ignore paid-by addresses provided
+
+  // "no-payment", // Don't use any payment method, just reserve the balance if its free otherwise let it fail
+] as const;
+
+export type PaymentDirective = (typeof paymentDirectives)[number];
+
+export const isPaymentDirective = (value: string): value is PaymentDirective =>
+  paymentDirectives.includes(value as PaymentDirective);
 
 export type CreateBalanceReservationParams = {
   dataItemId: DataItemId;
-  userAddress: UserAddress;
-  userAddressType: UserAddressType;
+  signerAddress: UserAddress;
+  signerAddressType: UserAddressType;
   reservedWincAmount: FinalPrice;
   networkWincAmount: NetworkPrice;
   adjustments: UploadAdjustment[];
+
+  paidBy?: UserAddress[];
+  paymentDirective?: PaymentDirective;
 };
 
 export interface AdjustmentCatalog {
@@ -305,6 +352,7 @@ export interface UserDBInsert {
 
 export type AuditChangeReason =
   | "upload"
+  | "approved_upload"
   | "payment"
   | "crypto_payment"
   | "bypassed_payment"
@@ -312,10 +360,18 @@ export type AuditChangeReason =
   | "bypassed_account_creation"
   | "chargeback"
   | "refund"
+  | "refunded_upload"
   | "gifted_payment"
   | "bypassed_gifted_payment"
   | "gifted_payment_redemption"
-  | "gifted_account_creation";
+  | "gifted_account_creation"
+  | "delegated_payment_approval"
+  | "delegated_payment_revoke"
+  | "delegated_payment_expired"
+  | "arns_account_creation"
+  | "arns_purchase_order"
+  | "approved_arns_purchase_order"
+  | "arns_purchase_order_failed";
 
 export interface AuditLogInsert {
   user_address: string;
@@ -382,10 +438,13 @@ export interface BalanceReservationDBInsert {
   user_address: string;
   reserved_winc_amount: string;
   network_winc_amount: string;
+  overflow_spend?: string;
 }
 
-export interface BalanceReservationDBResult extends BalanceReservationDBInsert {
+export interface BalanceReservationDBResult
+  extends Omit<BalanceReservationDBInsert, "overflow_spend"> {
   reserved_date: string;
+  overflow_spend?: OverflowSpendDBResult; // Store as a JSON string
 }
 
 interface AdjustmentCatalogDBInsert {
@@ -408,7 +467,11 @@ export type UploadAdjustmentCatalogDBInsert = AdjustmentCatalogDBInsert & {
   limitation_interval_unit?: string;
 };
 
-export const exclusivity = ["inclusive", "exclusive"] as const;
+export const exclusivity = [
+  "inclusive",
+  "exclusive",
+  "inclusive_kyve",
+] as const;
 export type Exclusivity = (typeof exclusivity)[number];
 
 export interface PaymentAdjustmentCatalogDBInsert
@@ -522,3 +585,220 @@ export interface RedeemedGift extends UnredeemedGift {
 }
 
 export type IntervalUnit = "year" | "month" | "day" | "hour" | "minute";
+
+export interface DelegatedPaymentApprovalDBInsert {
+  approval_data_item_id: string;
+  approved_address: string;
+  paying_address: string;
+  approved_winc_amount: string;
+  used_winc_amount?: string;
+  expiration_date?: string;
+}
+
+export interface DelegatedPaymentApprovalDBResult
+  extends DelegatedPaymentApprovalDBInsert {
+  creation_date: string;
+  used_winc_amount: string;
+}
+
+export type InactiveDelegatedPaymentReason = "expired" | "used" | "revoked";
+
+export interface InactiveDelegatedPaymentApprovalDBInsert
+  extends DelegatedPaymentApprovalDBResult {
+  inactive_reason: InactiveDelegatedPaymentReason;
+  revoke_data_item_id?: string;
+}
+
+export interface InactiveDelegatedPaymentApprovalDBResult
+  extends InactiveDelegatedPaymentApprovalDBInsert {
+  inactive_date: string;
+  expiration_date: string;
+}
+
+export interface DelegatedPaymentApproval {
+  approvalDataItemId: DataItemId;
+  approvedAddress: UserAddress;
+  payingAddress: UserAddress;
+  approvedWincAmount: WC;
+  usedWincAmount: WC;
+  creationDate: Timestamp;
+  expirationDate?: Timestamp;
+}
+
+export interface InactiveDelegatedPaymentApproval
+  extends DelegatedPaymentApproval {
+  inactiveReason: "expired" | "used" | "revoked";
+  inactiveDate: Timestamp;
+  revokeDataItemId?: DataItemId;
+}
+
+export interface CreateDelegatedPaymentApprovalParams {
+  approvalDataItemId: DataItemId;
+  approvedAddress: UserAddress;
+  payingAddress: UserAddress;
+  approvedWincAmount: Winston;
+  expiresInSeconds?: number;
+}
+
+export interface GetBalanceResult {
+  /** Amount of winc that can be spent or shared by user */
+  winc: WC; // user.wincBalance - sumOfAll(givenApprovals.remainingWincFromApproval)
+  /** Amount of winc that a user's account controls, and could be spent if all given approvals were revoked */
+  controlledWinc: WC; // user.wincBalance
+  /** Amount of winc that can be spent by the user plus winc from all received delegated balance approvals */
+  effectiveBalance: WC; // user.wincBalance - sumOfAll(givenApprovals.remainingWincFromApproval) + sumOfAll(receivedApprovals.remainingWincFromApproval)
+
+  givenApprovals: DelegatedPaymentApproval[];
+  receivedApprovals: DelegatedPaymentApproval[];
+}
+
+export type KnexTransaction = Knex | Knex.Transaction;
+
+export type ArNSNameType = "permabuy" | "lease";
+
+export type ArNSTokenCostParams = {
+  type?: ArNSNameType;
+  years?: number;
+  increaseQty?: number;
+  name: string;
+  intent: ArNSPurchaseIntent;
+  /** Assert Turbo wallet has enough balance for the action */
+  assertBalance?: boolean;
+};
+
+export type ArNSPurchaseParams = Omit<ArNSTokenCostParams, "assertBalance"> & {
+  /** Nonce of the signed request that tells Turbo services to initiate the ArNS Purchase */
+  nonce: string;
+  /** User to whom charge credits for the purchase */
+  owner: UserAddress;
+  /** Amount of winc charged to owner */
+  wincQty: WC;
+  /** Equivalent value of mARIO token to winc calculated at time of purchase */
+  mARIOQty: mARIOToken;
+  /** ANT process to assign to the owner of the ArNS Name purchased */
+  processId?: TransactionId;
+  /** USD to AR rate at the time of purchase */
+  usdArRate: number;
+  /** USD to ARIO rate at the time of purchase */
+  usdArioRate: number;
+  paidBy: UserAddress[];
+};
+
+type ArNSPurchaseQuoteFields = {
+  paymentAmount: PaymentAmount;
+  quotedPaymentAmount: PaymentAmount;
+  currencyType: CurrencyType;
+  quoteExpirationDate: Timestamp;
+  paymentProvider: PaymentProvider;
+  excessWincAmount: WC;
+};
+
+export type ArNSPurchaseQuoteParams = Omit<
+  ArNSPurchaseParams,
+  "messageId" | "paidBy"
+> &
+  ArNSPurchaseQuoteFields & {
+    adjustments: PaymentAdjustment[];
+  };
+
+export type ArNSPurchaseQuote = Omit<ArNSPurchaseQuoteParams, "adjustments"> & {
+  quoteCreationDate: Timestamp;
+};
+
+export type ArNSPurchase = ArNSPurchaseParams & {
+  createdDate?: Timestamp;
+  messageId?: string;
+  quoteCreationDate?: Timestamp;
+  overflowSpend?: OverflowSpendDBResult; // Store as a JSON string
+} & Partial<ArNSPurchaseQuoteFields>;
+
+export type ArNSPurchaseResult =
+  | ArNSPurchase
+  | FailedArNSPurchase
+  | ArNSPurchaseQuote;
+
+export const purchaseStatus = ["pending", "success", "failed"] as const;
+export const [
+  pendingPurchaseStatus,
+  successPurchaseStatus,
+  failedPurchaseStatus,
+] = purchaseStatus;
+export type ArNSPurchaseStatus = (typeof purchaseStatus)[number];
+export const isArNSPurchaseStatus = (
+  value: string
+): value is ArNSPurchaseStatus =>
+  purchaseStatus.includes(value as ArNSPurchaseStatus);
+
+export type ArNSPurchaseStatusResult = ArNSPurchaseResult & {
+  status: ArNSPurchaseStatus;
+};
+
+export type FailedArNSPurchase = ArNSPurchase & {
+  failedDate: Timestamp;
+  failedReason: string;
+};
+
+export const isFailedArNSNamePurchase = (
+  purchase: ArNSPurchase
+): purchase is FailedArNSPurchase =>
+  (purchase as FailedArNSPurchase).failedDate !== undefined;
+
+export const validArNSPurchaseIntents = [
+  "Buy-Name",
+  "Buy-Record",
+  "Extend-Lease",
+  "Upgrade-Name",
+  "Increase-Undername-Limit", // TODO: Handle Primary-Name-Request (anonymous initiator)
+] as const;
+export type ArNSPurchaseIntent = (typeof validArNSPurchaseIntents)[number];
+
+type ArNSPurchaseDBCols = {
+  nonce: string;
+  name: string;
+  owner: string;
+  winc_qty: string;
+  mario_qty: string;
+  usd_ar_rate: number;
+  usd_ario_rate: number;
+  intent: ArNSPurchaseIntent;
+  type?: ArNSNameType;
+  years?: number;
+  increase_qty?: number;
+  process_id?: string;
+  paid_by?: string;
+  overflow_spend?: string;
+  message_id?: string;
+};
+
+type ArNSPurchaseQuoteDBCols = {
+  quote_expiration_date: string;
+  quote_creation_date: string;
+  payment_provider: string;
+  payment_amount: string;
+  quoted_payment_amount: string;
+  currency_type: string;
+  excess_winc: string;
+};
+
+export type ArNSPurchaseQuoteDBInsert = ArNSPurchaseDBCols &
+  Omit<ArNSPurchaseQuoteDBCols, "quote_creation_date">;
+
+export type ArNSPurchaseQuoteDBResult = ArNSPurchaseQuoteDBInsert & {
+  quote_creation_date: string;
+};
+
+export type ArNSPurchaseDBInsert = ArNSPurchaseDBCols &
+  Partial<ArNSPurchaseQuoteDBCols>;
+
+export type ArNSPurchaseDBResult = ArNSPurchaseDBInsert & {
+  created_date: string;
+};
+
+export type FailedArNSPurchaseDBInsert = ArNSPurchaseDBInsert & {
+  created_date?: string;
+  failed_reason: string;
+};
+
+export type FailedArNSPurchaseDBResult = FailedArNSPurchaseDBInsert & {
+  failed_date: string;
+};

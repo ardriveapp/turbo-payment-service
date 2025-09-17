@@ -16,37 +16,39 @@
  */
 import { randomUUID } from "crypto";
 import { Stripe } from "stripe";
+import { Logger } from "winston";
 
-import { Database } from "../../../database/database";
-import { EmailProvider } from "../../../emailProvider";
-import logger from "../../../logger";
+import { Architecture } from "../../../architecture";
+import globalLogger from "../../../logger";
 import { MetricRegistry } from "../../../metricRegistry";
 import { triggerEmail } from "../../../triggerEmail";
+import { handleArNSPurchaseEvent } from "./arnsEventHandler";
 
 export async function handlePaymentSuccessEvent(
   pi: Stripe.PaymentIntent,
-  paymentDatabase: Database,
-  stripe: Stripe,
-  emailProvider?: EmailProvider
+  arch: Architecture
 ) {
-  logger.info("💰 Payment Success Event Triggered", pi.metadata);
+  const { paymentDatabase, stripe, emailProvider } = arch;
+  let logger = globalLogger.child({ ...pi.metadata });
+  logger.info("💰 Payment Success Event Triggered");
+
+  if (isArNSPurchaseMetadata(pi.metadata)) {
+    return handleArNSPurchaseEvent(pi, arch);
+  }
+
+  if (!isTopUpQuoteMetadata(pi.metadata)) {
+    logger.error(
+      "Payment intent metadata object must include key 'topUpQuoteId' as a string value!"
+    );
+    return;
+  }
 
   const { topUpQuoteId, winstonCreditAmount } = pi.metadata;
   const paymentReceiptId = randomUUID();
+  logger = logger.child({ paymentReceiptId });
 
-  const loggerObject = {
-    paymentReceiptId,
-    ...pi.metadata,
-  };
   try {
-    if (!topUpQuoteId) {
-      throw Error(
-        'Payment intent metadata object must include key "topUpQuoteId" as a string value!'
-      );
-    }
-
-    logger.info("Creating payment receipt...", loggerObject);
-
+    logger.debug("Creating payment receipt...");
     const maybeUnredeemedGift = await paymentDatabase.createPaymentReceipt({
       paymentReceiptId,
       paymentAmount: pi.amount,
@@ -55,7 +57,7 @@ export async function handlePaymentSuccessEvent(
       senderEmail: pi.receipt_email ?? undefined,
     });
 
-    logger.info(`💸 Payment Receipt created!`, loggerObject);
+    logger.info(`💸 Payment Receipt created!`);
 
     MetricRegistry.paymentSuccessCounter.inc();
     MetricRegistry.topUpsCounter.inc(Number(winstonCreditAmount));
@@ -64,7 +66,7 @@ export async function handlePaymentSuccessEvent(
       await triggerEmail(maybeUnredeemedGift, emailProvider);
     }
   } catch (error) {
-    logger.error("❌ Payment receipt creation has failed!", loggerObject);
+    logger.error("❌ Payment receipt creation has failed!");
     logger.error(error);
 
     if (
@@ -74,31 +76,53 @@ export async function handlePaymentSuccessEvent(
       ))
     ) {
       logger.error(
-        "This top up quote ID exists in another state in the database!",
-        loggerObject
+        "This top up quote ID exists in another state in the database!"
       );
     } else {
-      await refundPayment(stripe, pi.id, loggerObject);
+      await refundPayment(stripe, pi.id, logger);
     }
   }
 }
 
-async function refundPayment(
+export async function refundPayment(
   stripe: Stripe,
   paymentIntentId: string,
-  loggerObject: Record<string, unknown>
+  logger: Logger
 ) {
   try {
-    logger.info("Creating a Stripe refund for payment intent...", loggerObject);
+    logger.info("Creating a Stripe refund for payment intent...");
     await stripe.refunds.create({ payment_intent: paymentIntentId });
 
-    logger.info(
-      "♻️ Payment successfully refunded through Stripe refund",
-      loggerObject
-    );
+    logger.info("♻️ Payment successfully refunded through Stripe refund");
     MetricRegistry.paymentRefundedCounter.inc();
   } catch (error) {
-    logger.error("⛔️ Payment refund has failed!", loggerObject);
+    logger.error("⛔️ Payment refund has failed!");
     logger.error(error);
   }
+}
+
+type TopUpQuoteMetadata = Stripe.Metadata & {
+  topUpQuoteId: string;
+  winstonCreditAmount: string;
+};
+
+function isTopUpQuoteMetadata(
+  metadata: Stripe.Metadata
+): metadata is TopUpQuoteMetadata {
+  return (
+    "topUpQuoteId" in metadata &&
+    typeof metadata.topUpQuoteId === "string" &&
+    "winstonCreditAmount" in metadata &&
+    typeof metadata.winstonCreditAmount === "string"
+  );
+}
+
+type ArNSPurchaseMetadata = Stripe.Metadata & {
+  nonce: string;
+};
+
+function isArNSPurchaseMetadata(
+  metadata: Stripe.Metadata
+): metadata is ArNSPurchaseMetadata {
+  return "nonce" in metadata && typeof metadata.nonce === "string";
 }
